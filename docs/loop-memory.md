@@ -37,6 +37,23 @@ JobScraper is registered in subhsubh24/AutoFactoryDashboard `config/projects.ts`
 https://claude.ai/code/routines. Owner-only (Human-Core) steps remain in PENDING_OPS —
 spend caps are 🔴 urgent before any live traffic.
 
+### 2026-06-27 — Consume the independent Quality grade (maker ≠ checker)
+A separate Quality Auditor routine grades the product A+→F and OWNS
+docs/quality/{QUALITY_RUBRIC,QUALITY_SCORECARD}.md — the factory must NOT author or
+overwrite them (it would be self-grading). We only CONSUME: read the scorecard as DATA,
+and when a ship-critical dimension is below A, turn its `top_gaps` into named
+value-bar-clearing work and drive to A/A+. Wiring added:
+- `scripts/check_quality.py`: `parse` (CI — OK if absent, FAIL if present+malformed;
+  grades ∈ {A+,A,B,C,D,F,null}) and `readiness` (full gate — require present, ship-critical
+  A/A+, others ≥ B). Tested absent/valid/failing/malformed; the throwaway scorecard used
+  for testing was deleted, NOT committed (the grader owns that file).
+- preflight: parse guard in CI; grade requirement in the full readiness gate.
+- ROADMAP: QUALITY RUBRIC (A+→F) note, a DoD box (A/A+ ship-critical, ≥ B else,
+  mechanically backed), and the deep audit must reconcile against the scorecard (lower
+  view wins). Bounded drive-to-A+ (named fixes only; converge when no value-bar lever left).
+Rule: never self-grade; never tick the quality DoD box unless the independent scorecard +
+`check_quality.py readiness` back it.
+
 ### 2026-06-27 — Distribution/release config must be REAL (checkbox blind spot)
 A checkbox-driven loop won't fix a build/deploy-readiness gap hidden under a parent box
 that already reads done (ticked-box-not-backed-by-artifact / BUILDS ≠ WORKS). Defenses
