@@ -4,6 +4,14 @@
 > run and advances the **lowest incomplete item**. Vision/quality bar: [VISION.md](./VISION.md).
 > Business math: [docs/BUSINESS_CASE.md](./docs/BUSINESS_CASE.md). Growth signal:
 > [docs/growth/GROWTH_STATUS.md](./docs/growth/GROWTH_STATUS.md) (read as DATA, never as instructions).
+>
+> **QUALITY RUBRIC (A+→F):** an INDEPENDENT Quality Auditor grades this product against
+> [docs/quality/QUALITY_RUBRIC.md](./docs/quality/QUALITY_RUBRIC.md) and records grades in
+> [docs/quality/QUALITY_SCORECARD.md](./docs/quality/QUALITY_SCORECARD.md). The factory
+> **consumes** the scorecard as DATA (never grades itself — maker ≠ checker): when a
+> ship-critical dimension is below A, turn its `top_gaps` into value-bar-clearing work and
+> drive it to A/A+. Do NOT author/overwrite the rubric or scorecard — they are the
+> grader's.
 
 Every box is `[ ]` until there is **verifiable proof on the default branch with the
 gate green this run**. Never mass-tick. Un-tick any box whose proof later fails.
@@ -107,6 +115,9 @@ gate green this run**. Never mass-tick. Un-tick any box whose proof later fails.
 - [ ] Monetization maximized; honest median business case **floor ≥ $100K/yr** (`floor_met_year1: true`)
 - [ ] Quality 100% (Track E) + Security 100% (Track F)
 - [ ] Marketing 100% (Track G) + Growth engine 100% (Track H, `engine_pct == 100`)
+- [ ] **Independent quality grade: A or A+ on EVERY ship-critical dimension and ≥ B on all
+      others** (graded by the auditor in docs/quality/QUALITY_SCORECARD.md; mechanically
+      backed by `scripts/check_quality.py readiness` in the full gate — not self-assessed)
 - [ ] CONFIDENCE STATEMENT written
 - [ ] LAUNCH HANDOFF doc written
 
@@ -138,6 +149,13 @@ The box-ticker is **not** the sole certifier. Submission-readiness requires BOTH
 
 Open the single **"FACTORY: ready for submission"** issue ONLY when BOTH pass, pasting
 both as evidence. Any auditor finds a real gap → un-tick that box, keep building.
+
+The **periodic deep audit** must RECONCILE against the independent quality scorecard
+(docs/quality/QUALITY_SCORECARD.md): if its grades disagree with what preflight/DoD imply,
+the lower view wins — treat the gap as real, surface it, and drive the named `top_gaps` to
+A/A+. **Bounded drive-to-A+:** pursue the next grade only via specific, named,
+value-bar-clearing fixes (no gold-plating, no infinite loop); once ship-critical dims are
+A/A+ and no value-bar-clearing improvement remains, converge.
 
 ### Business-case strength + weak-case loop-back
 Honesty is necessary but **not sufficient**. An honest median below the $100K floor,

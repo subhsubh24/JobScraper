@@ -77,6 +77,9 @@ else
   fail "web/ Next.js app missing (package.json)"
 fi
 
+sect "quality scorecard parse guard (auditor-owned; we never author it)"
+$PY scripts/check_quality.py parse || fail "QUALITY_SCORECARD malformed"
+
 if [ "$MODE" = "ci" ]; then
   echo ""; echo "PREFLIGHT(ci): mechanical gate GREEN"; exit 0
 fi
@@ -124,6 +127,10 @@ else
   fail "journey suite did not pass this attempt"
 fi
 [ "${E2E_JOURNEYS_PASSED:-0}" = "1" ] || fail "E2E_JOURNEYS_PASSED != 1"
+
+sect "quality grade (independent auditor): A/A+ ship-critical, >= B elsewhere"
+$PY scripts/check_quality.py readiness || fail "quality grade below bar (see docs/quality/QUALITY_SCORECARD.md)"
+ok "quality grade meets the bar"
 
 sect "store-acceptance audit: zero open FAILs"
 if grep -q "FAIL" docs/store/ACCEPTANCE_AUDIT.md; then
