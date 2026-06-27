@@ -65,6 +65,20 @@ else
   fail "mobile/ Expo app missing (package.json)"
 fi
 
+sect "web: present + typecheck + lint (Next.js)"
+if [ -d web ] && [ -f web/package.json ]; then
+  if [ ! -d web/node_modules ]; then
+    echo "  (web/node_modules missing — run: cd web && npm install)"
+    fail "web deps not installed"
+  fi
+  ( cd web && npx tsc --noEmit ) || fail "web tsc --noEmit failed"
+  ok "web tsc clean"
+  ( cd web && npm run -s lint ) || fail "web lint failed"
+  ok "web lint clean"
+else
+  fail "web/ Next.js app missing (package.json)"
+fi
+
 if [ "$MODE" = "ci" ]; then
   echo ""; echo "PREFLIGHT(ci): mechanical gate GREEN"; exit 0
 fi
