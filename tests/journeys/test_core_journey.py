@@ -13,6 +13,13 @@ def _auth_headers(token: str) -> dict:
     return {"Authorization": f"Bearer {token}"}
 
 
+def test_root_is_friendly(client):
+    r = client.get("/")
+    assert r.status_code == 200
+    assert r.json()["name"] == "Career Operator API"
+    assert r.json()["docs"] == "/docs"
+
+
 def test_health_reports_llm_disabled(client):
     r = client.get("/health")
     assert r.status_code == 200
