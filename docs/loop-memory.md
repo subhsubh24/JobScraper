@@ -24,3 +24,15 @@ Durable lessons for the factory loop. Append dated entries. Keep it honest and s
 - **Honest baseline beats a green-looking fake.** DoD starts all `[ ]`; business case is
   honestly below the $100K floor (`floor_met_year1: false`); growth is `pre_launch`,
   engine 0%. Convergence happens over scheduled runs, not by ticking boxes early.
+
+### 2026-06-27 — Cloud routines + dashboard wired (handoff)
+The three scheduled cloud routines that drive this repo (source = this GitHub repo,
+env FactoryDashboard) are LIVE. Future runs: do not recreate them; update via the
+schedule skill if needed.
+- **product factory** — `trig_01E9AFM1m7ZVJXHSzFswhYUD`, cron `0 */6 * * *`, Opus.
+- **Growth Agent** — `trig_01PntigzEpuhp7wBxQNHzJvy`, cron `0 14 * * *`, Sonnet + Gmail.
+- **daily digest** — `trig_01XfvH9BbgDNzEau6jBU7QRa`, cron `0 13 * * *`, Sonnet + Gmail.
+JobScraper is registered in subhsubh24/AutoFactoryDashboard `config/projects.ts`
+(slug `jobscraper`, kind `web+mobile`). Manage routines at
+https://claude.ai/code/routines. Owner-only (Human-Core) steps remain in PENDING_OPS —
+spend caps are 🔴 urgent before any live traffic.
