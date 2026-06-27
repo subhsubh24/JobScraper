@@ -23,6 +23,7 @@ them (maker ≠ checker; that would be self-grading). Modify only app source, te
 your own docs.
 
 ## ORIENT (read before doing anything)
+- `FACTORY_STANDARD.md` (the shared, product-agnostic discipline — read every run, never edit it).
 - `ROADMAP.md` (the convergence anchor — advance the LOWEST incomplete item), `VISION.md`
   (north star + the DESIGN BAR — the UI must NOT look vibe-coded; use the design system in
   `web/app/globals.css` + Tailwind and `mobile/src/theme.ts`, never ad-hoc styles),

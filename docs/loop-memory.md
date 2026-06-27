@@ -37,6 +37,16 @@ JobScraper is registered in subhsubh24/AutoFactoryDashboard `config/projects.ts`
 https://claude.ai/code/routines. Owner-only (Human-Core) steps remain in PENDING_OPS —
 spend caps are 🔴 urgent before any live traffic.
 
+### 2026-06-27 — Adopted the shared FACTORY_STANDARD.md (stable anchor)
+Created `FACTORY_STANDARD.md` at the repo root with the canonical, product-agnostic
+operating standard — copied BYTE-IDENTICAL (no paraphrase/trim/reorder/adaptation) so it
+stays the same across every factory repo. Added the "Operating standard (read every run)"
+pointer under the ROADMAP intro and a STABLE ANCHORS / do-not-churn entry. Referenced it in
+the orient-read set of docs/autonomous-loop/PROMPT.md + AGENTS.md.
+RULE: FACTORY_STANDARD.md is READ-ONLY context every run — NEVER edit or paraphrase it to
+fit this product (product-specifics live in ROADMAP/VISION, which win on any specific). It
+changes ONLY by a deliberate canonical cross-factory sync, never as loop work.
+
 ### 2026-06-27 — Factory-process parity with the sibling products
 Aligned JobScraper's FACTORY (not product) to AptDesignerAI / GroceryManager /
 HighlightMagic so all four run the identical process, building different things. Ported:
