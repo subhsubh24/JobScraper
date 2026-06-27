@@ -11,14 +11,17 @@ __pycache__/
 *$py.class
 *.so
 .Python
-build/
+# NOTE: anchored to repo root with leading "/" so these Python-packaging dirs do NOT
+# match JS subdirs like web/lib, web/build, web/dist (that bug left web/lib uncommitted
+# and broke the Vercel build). Subproject outputs are ignored by web/.gitignore + mobile/.gitignore.
+/build/
 develop-eggs/
-dist/
+/dist/
 downloads/
 eggs/
 .eggs/
-lib/
-lib64/
+/lib/
+/lib64/
 parts/
 sdist/
 var/
