@@ -96,6 +96,16 @@ for f in docs/store/assets/icon.png docs/store/assets/feature_graphic.png; do
 done
 ok "store assets present"
 
+sect "distribution/release config (real, artifact-backed)"
+[ -f mobile/eas.json ] || fail "mobile/eas.json missing (EAS build+submit profiles)"
+$PY -c "import json; d=json.load(open('mobile/eas.json')); assert 'build' in d and 'submit' in d, 'eas.json missing build/submit'" \
+  || fail "mobile/eas.json invalid or missing build/submit profiles"
+grep -q '"bundleIdentifier"' mobile/app.json || fail "app.json missing iOS bundleIdentifier"
+grep -q '"buildNumber"' mobile/app.json || fail "app.json missing iOS buildNumber"
+grep -q '"versionCode"' mobile/app.json || fail "app.json missing Android versionCode"
+[ -f web/package.json ] && grep -q '"build"' web/package.json || fail "web build command missing"
+ok "release/deploy config present"
+
 sect "billing wired (real, not stubs)"
 grep -rqs "stripe.checkout.Session.create" . --include=*.py || fail "no real Stripe Checkout call found"
 grep -rqs "RevenueCat\|Purchases" mobile/ 2>/dev/null || fail "mobile entitlement (RevenueCat) not wired"

@@ -37,6 +37,18 @@ JobScraper is registered in subhsubh24/AutoFactoryDashboard `config/projects.ts`
 https://claude.ai/code/routines. Owner-only (Human-Core) steps remain in PENDING_OPS —
 spend caps are 🔴 urgent before any live traffic.
 
+### 2026-06-27 — Distribution/release config must be REAL (checkbox blind spot)
+A checkbox-driven loop won't fix a build/deploy-readiness gap hidden under a parent box
+that already reads done (ticked-box-not-backed-by-artifact / BUILDS ≠ WORKS). Defenses
+added: explicit UNCHECKED ROADMAP items for (a) mobile release config and (b) web deploy
+config, each requiring an ARTIFACT, not self-assessment. Built the buildable parts:
+`mobile/eas.json` (build+submit profiles), `mobile/app.config.ts` (env overlay:
+EAS_PROJECT_ID, EXPO_PUBLIC_API_URL), app.json bundle id + buildNumber/versionCode +
+runtimeVersion. Validated WITHOUT a signed build: `expo config` resolves the merged
+config, `eas.json` parses, env overlay overrides confirmed; web `next build` produces
+`.next`. Signed cloud build + store submit stay Human-Core (PENDING_OPS: eas-build-submit).
+Rule: never tick a "build/deploy-ready" box unless an artifact backs it; un-tick otherwise.
+
 ### 2026-06-27 — ONE Vercel deployment via Vercel Services (web + API together)
 Owner wants a single Vercel project (like the other products), not two. Implemented with
 **Vercel Services** (`experimentalServices` in vercel.json): `web` (Next.js) at routePrefix

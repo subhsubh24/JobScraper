@@ -48,6 +48,12 @@ OWNER_ACTIONS:
       status: open
       why: "Loop runs on Linux/CI and cannot hold signing identities."
       how: "Configure EAS credentials or upload keystores; the loop builds, you sign/submit."
+    - id: eas-build-submit
+      title: "EAS: eas init (project id) + production build + store submit"
+      priority: high
+      status: open
+      why: "eas.json profiles + app.config.ts exist and are validated, but the actual signed cloud build and store submission are Human-Core (signing, store accounts, project creation)."
+      how: "cd mobile; `eas init` (writes/sets EAS_PROJECT_ID); set submit secrets (APPLE_ID/ASC_APP_ID/APPLE_TEAM_ID, google-play-service-account.json); set EXPO_PUBLIC_API_URL to the live deployment in eas.json production env; `eas build --profile production` then `eas submit --profile production`."
     - id: connect-marketing
       title: "Connect + authorize marketing channels (email provider, analytics) to enable execute-mode"
       priority: normal
