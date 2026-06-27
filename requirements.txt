@@ -13,7 +13,7 @@ sqlalchemy==2.0.25
 psycopg2-binary==2.9.9
 
 # LLM (optional at runtime — degrades gracefully without OPENAI_API_KEY)
-openai==1.10.0
+openai==1.59.6  # >=1.55 required: 1.10 breaks with httpx>=0.28 ("proxies" TypeError) on Vercel
 
 # Core utilities actually imported by the API
 numpy==1.26.3

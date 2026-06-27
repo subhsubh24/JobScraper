@@ -35,14 +35,22 @@ def embedding_model() -> str:
 
 
 def get_llm_client() -> Optional["object"]:
-    """Return an OpenAI-SDK client pointed at Gemini, or None when no key is set.
+    """Return an OpenAI-SDK client pointed at Gemini, or None when unavailable.
 
-    Never raises on a missing key — callers check the return value.
+    Never raises: returns None on a missing key OR if the client can't be constructed
+    (e.g. a dependency skew like openai/httpx). Callers check the return value and
+    degrade gracefully (heuristic scoring; truthful "AI unavailable" responses) instead
+    of 500ing.
     """
     if not llm_available():
         return None
-    from openai import OpenAI
-    return OpenAI(api_key=os.getenv("GEMINI_API_KEY"), base_url=GEMINI_BASE_URL)
+    try:
+        from openai import OpenAI
+        return OpenAI(api_key=os.getenv("GEMINI_API_KEY"), base_url=GEMINI_BASE_URL)
+    except Exception:  # noqa: BLE001 - construction failure must degrade, not crash
+        import logging
+        logging.getLogger("career_operator").exception("LLM client construction failed")
+        return None
 
 
 # Back-compat alias (older imports referenced get_openai_client).
