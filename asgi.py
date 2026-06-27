@@ -564,21 +564,31 @@ def _mirror_api_routes_at_bare_path() -> None:
     """
     from fastapi.routing import APIRoute
 
-    existing = {r.path for r in app.router.routes if isinstance(r, APIRoute)}
+    # Dedup by (path, method) — NOT path alone — so multi-method paths (e.g. /api/jobs has
+    # GET+POST, /api/jobs/{id} has GET+PATCH) get ALL their methods mirrored. Keying by
+    # path-only left the 2nd method 405ing on Vercel.
+    existing = {
+        (r.path, m)
+        for r in app.router.routes
+        if isinstance(r, APIRoute)
+        for m in (r.methods or [])
+    }
     for r in list(app.router.routes):
         if isinstance(r, APIRoute) and r.path.startswith("/api/"):
-            bare = r.path[len("/api"):]  # "/api/auth/login" -> "/auth/login"
-            if bare and bare not in existing:
+            bare = r.path[len("/api"):]  # "/api/jobs" -> "/jobs"
+            methods = [m for m in (r.methods or []) if (bare, m) not in existing]
+            if bare and methods:
                 app.router.add_api_route(
                     bare,
                     r.endpoint,
-                    methods=list(r.methods or []),
+                    methods=methods,
                     response_model=r.response_model,
                     status_code=r.status_code,
                     dependencies=r.dependencies,
                     include_in_schema=False,
                 )
-                existing.add(bare)
+                for m in methods:
+                    existing.add((bare, m))
 
 
 _mirror_api_routes_at_bare_path()

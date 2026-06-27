@@ -38,6 +38,20 @@ def test_vercel_stripped_prefix_is_restored(client):
     assert client.get("/health").status_code == 200
     assert client.get("/api/health").status_code == 200
 
+    # Multi-method paths must have EVERY method mirrored at the bare path (the bug:
+    # only the first method got mirrored, the rest 405'd on Vercel).
+    tok = stripped.json()["token"]
+    h = {"Authorization": f"Bearer {tok}"}
+    # bare POST /jobs (create) AND bare GET /jobs (list) must both work, not 405.
+    cj = client.post("/jobs", headers=h, json={"title": "T", "company_name": "C", "description": "python sql"})
+    assert cj.status_code == 200, f"bare POST /jobs -> {cj.status_code} {cj.text}"
+    lj = client.get("/jobs", headers=h)
+    assert lj.status_code == 200, f"bare GET /jobs -> {lj.status_code} {lj.text}"
+    jid = cj.json()["job"]["id"]
+    # bare GET + PATCH /jobs/{id} must both work.
+    assert client.get(f"/jobs/{jid}", headers=h).status_code == 200
+    assert client.patch(f"/jobs/{jid}", headers=h, json={"status": "applied"}).status_code == 200
+
 
 def test_health_reports_llm_disabled(client):
     r = client.get("/health")
