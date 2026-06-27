@@ -507,6 +507,18 @@ def pipeline_stats(user: User = Depends(get_current_user), db: Session = Depends
     }
 
 
+@app.get("/")
+def root():
+    """Friendly landing payload so the base URL isn't a bare 404 (it's an API)."""
+    return {
+        "name": "Career Operator API",
+        "status": "ok",
+        "version": app.version,
+        "docs": "/docs",
+        "health": "/health",
+    }
+
+
 @app.get("/health")
 def health():
     return {"status": "healthy", "version": app.version, "llm_enabled": llm_available()}
