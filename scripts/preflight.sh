@@ -77,6 +77,14 @@ else
   fail "web/ Next.js app missing (package.json)"
 fi
 
+sect "source tracked in git (no gitignored-source foot-gun)"
+# A local gate passes even when source is gitignored (files exist on disk) but a fresh
+# clone / Vercel build fails. Assert critical source dirs actually have tracked files.
+for d in web/lib web/app web/components mobile/src src; do
+  [ "$(git ls-files "$d" | head -1)" != "" ] || fail "no tracked files under $d (gitignore foot-gun? deploy will fail)"
+done
+ok "web + mobile + backend source is tracked"
+
 sect "quality scorecard parse guard (auditor-owned; we never author it)"
 $PY scripts/check_quality.py parse || fail "QUALITY_SCORECARD malformed"
 
