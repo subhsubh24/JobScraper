@@ -43,33 +43,12 @@ app = FastAPI(
     version="1.1.0",
 )
 
-# Vercel Services STRIPS the service routePrefix ("/api") before the request reaches this
-# app — so a client call to "/api/auth/register" arrives here as "/auth/register". Re-add
-# the prefix at the ASGI layer so the SAME "/api/*" routes match both locally (no strip)
-# and on Vercel (stripped). Bare FastAPI paths (/health, /docs, /redoc, /openapi.json) and
-# "/" are left untouched (they exist without the prefix and are served as-is).
-_BARE_PREFIXES = ("/api", "/health", "/docs", "/redoc", "/openapi.json")
-
-
-class RestoreApiPrefix:
-    """ASGI middleware: re-add the /api prefix Vercel Services strips."""
-
-    def __init__(self, app):
-        self.app = app
-
-    async def __call__(self, scope, receive, send):
-        if scope.get("type") == "http":
-            path = scope.get("path", "")
-            if path != "/" and not path.startswith(_BARE_PREFIXES):
-                scope = dict(scope)
-                scope["path"] = "/api" + path
-                raw = scope.get("raw_path")
-                if raw is not None:
-                    scope["raw_path"] = b"/api" + raw
-        await self.app(scope, receive, send)
-
-
-app.add_middleware(RestoreApiPrefix)
+# NOTE on routing: Vercel Services may deliver requests to this app with the "/api"
+# routePrefix STRIPPED (e.g. "/api/auth/register" arrives as "/auth/register"). Rather
+# than guess the transform (a scope-rewriting middleware was NOT honored by Vercel's ASGI
+# adapter), we register every /api/* route ALSO at its bare path at the bottom of this
+# file — so the SAME endpoint matches whether or not the prefix arrives. This mirrors how
+# /health and /api/health already both work.
 
 # CORS. Auth is Bearer-token (no cookies), so when no explicit allowlist is configured
 # we allow any origin WITHOUT credentials — this lets the web app call the API from its
@@ -574,6 +553,35 @@ def _ensure_schema() -> None:
 
 
 _ensure_schema()
+
+
+def _mirror_api_routes_at_bare_path() -> None:
+    """Register every /api/* route ALSO at its bare path (drop the leading /api).
+
+    Vercel Services may strip the "/api" routePrefix before the request reaches this app,
+    so the same endpoint must match whether the prefix arrives or not. This is the
+    routing-layer equivalent of /health + /api/health both existing — proven to work.
+    """
+    from fastapi.routing import APIRoute
+
+    existing = {r.path for r in app.router.routes if isinstance(r, APIRoute)}
+    for r in list(app.router.routes):
+        if isinstance(r, APIRoute) and r.path.startswith("/api/"):
+            bare = r.path[len("/api"):]  # "/api/auth/login" -> "/auth/login"
+            if bare and bare not in existing:
+                app.router.add_api_route(
+                    bare,
+                    r.endpoint,
+                    methods=list(r.methods or []),
+                    response_model=r.response_model,
+                    status_code=r.status_code,
+                    dependencies=r.dependencies,
+                    include_in_schema=False,
+                )
+                existing.add(bare)
+
+
+_mirror_api_routes_at_bare_path()
 
 
 if __name__ == "__main__":
