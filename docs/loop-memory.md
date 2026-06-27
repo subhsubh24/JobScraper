@@ -16,7 +16,7 @@ Durable lessons for the factory loop. Append dated entries. Keep it honest and s
   signatures** in `src/`. Only `/health` is functionally real. Import-success and
   HTTP-200 prove nothing; assert the user-visible outcome.
 - **Graceful degradation is a release gate, not a nicety.** Scoring/prep/coach hard-fail
-  with no `OPENAI_API_KEY`. The core journey must work (heuristic fallback) in a seeded
+  with no `GEMINI_API_KEY`. The core journey must work (heuristic fallback) in a seeded
   env with no paid key, so the journey suite can run anywhere.
 - **No CI exists and the loop may not add it** (`.github/` is off-limits). The gate is
   `scripts/preflight.sh` run locally + the two-gate readiness audit. CI wiring is an

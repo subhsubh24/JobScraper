@@ -1,10 +1,10 @@
-"""Test harness: a throwaway sqlite DB + a TestClient, with NO OpenAI key so the
+"""Test harness: a throwaway sqlite DB + a TestClient, with NO Gemini key so the
 graceful-degradation paths are exercised deterministically."""
 import os
 
 # Force a known, key-free environment BEFORE importing the app. python-dotenv's
 # load_dotenv(override=False) will not clobber these already-present values.
-os.environ["OPENAI_API_KEY"] = ""
+os.environ["GEMINI_API_KEY"] = ""
 os.environ["JWT_SECRET"] = "test-secret"
 os.environ.setdefault("ALLOWED_ORIGINS", "http://testserver")
 # Tests build their own in-memory schema; don't let importing asgi create a real DB.

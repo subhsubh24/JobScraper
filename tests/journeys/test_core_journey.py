@@ -5,7 +5,7 @@ not HTTP<400, not "the handler is wired". A dead end / wrong result fails the bu
 
 Covers: signup -> login -> a WORKING dashboard -> core product loop (add job ->
 scored result renders -> save/track/update status -> pipeline analytics) -> graceful
-paywall/AI-degradation states. Runs with NO OpenAI key, so it works anywhere.
+paywall/AI-degradation states. Runs with NO Gemini key, so it works anywhere.
 """
 
 
@@ -128,7 +128,7 @@ def test_paywall_and_ai_degrade_gracefully(client):
     # Prep pack with no LLM key configured -> truthful 503, not a crash/fake result.
     prep = client.post("/api/prep-packs/generate", headers=h, json={"job_id": job_id})
     assert prep.status_code == 503
-    assert "OPENAI_API_KEY" in prep.json()["detail"]
+    assert "GEMINI_API_KEY" in prep.json()["detail"]
 
 
 def test_auth_failures_are_safe(client):
