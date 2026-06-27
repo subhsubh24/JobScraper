@@ -37,6 +37,19 @@ JobScraper is registered in subhsubh24/AutoFactoryDashboard `config/projects.ts`
 https://claude.ai/code/routines. Owner-only (Human-Core) steps remain in PENDING_OPS —
 spend caps are 🔴 urgent before any live traffic.
 
+### 2026-06-27 — ONE Vercel deployment via Vercel Services (web + API together)
+Owner wants a single Vercel project (like the other products), not two. Implemented with
+**Vercel Services** (`experimentalServices` in vercel.json): `web` (Next.js) at routePrefix
+`/` + `api` (FastAPI, entrypoint asgi.py) at routePrefix `/api`, one domain, shared env.
+Vercel does NOT strip the route prefix, so FastAPI's existing `/api/*` routes match as-is.
+Web app calls `/api/*` same-origin (api base URL = ''), so no CORS needed. Removed the
+old `api/index.py` single-function shim (Services loads `asgi.py:app` directly) and added
+`/api/health`. Caveat: Services is experimental/permission-gated — if unavailable, fall
+back to two projects. The owner must set the project's Framework Preset to "Services".
+Mobile (Expo) is NOT in this project — it points at the deployment's `/api`.
+LESSON (process): always `git checkout -b <branch>` BEFORE editing — a prior run committed
+to main then `git reset --hard origin/main` and lost the work. Branch first, then edit.
+
 ### 2026-06-27 — Frontend split: Next.js web (/web) + Expo mobile (/mobile)
 Owner chose a Next.js web app over the React-Native-Web export. Architecture now:
 - `/web` = Next.js (App Router, TS, Tailwind) → Vercel project #2 (Root Directory = web),
