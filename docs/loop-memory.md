@@ -36,3 +36,18 @@ JobScraper is registered in subhsubh24/AutoFactoryDashboard `config/projects.ts`
 (slug `jobscraper`, kind `web+mobile`). Manage routines at
 https://claude.ai/code/routines. Owner-only (Human-Core) steps remain in PENDING_OPS —
 spend caps are 🔴 urgent before any live traffic.
+
+### 2026-06-27 — Deploy target = Vercel (serverless), NOT Railway
+Owner chose Vercel-for-everything (serverless Python API). Consequences baked into the
+repo (see docs/DEPLOY_VERCEL.md):
+- `api.py` → renamed `asgi.py` (FastAPI `app`), Vercel entry at `api/index.py`,
+  `vercel.json` rewrites all routes there. The `/api` dir is the Vercel functions dir,
+  hence the rename to avoid a package/module clash.
+- `requirements.txt` slimmed to LEAN runtime deps (Vercel ~250MB function limit);
+  full set moved to `requirements-dev.txt` (CI installs that). Removed unused heavy
+  deps (sentence-transformers/torch, celery, redis, pandas, etc.) — they had ZERO
+  imports and would blow the size limit.
+- Serverless realities: external **Postgres required** (no SQLite persistence);
+  `src/db` uses NullPool on serverless+Postgres; in-memory rate-limit/spend-ceiling are
+  per-instance (Track F: move to shared store); watch the 60s function timeout for LLM
+  calls. Railway/Docker configs kept as a fallback in `docs/legacy/`.

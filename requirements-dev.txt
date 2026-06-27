@@ -1,0 +1,44 @@
+# Career Operator — full dev/CI deps. Installs the lean runtime set plus everything
+# the API does NOT need at runtime: the Flask web app, the CLI, migrations, tests,
+# and lint. CI installs THIS file; Vercel installs only requirements.txt.
+-r requirements.txt
+
+# Migrations
+alembic==1.13.1
+
+# Flask web app (app.py)
+flask==3.0.0
+flask-cors==4.0.0
+flask-login==0.6.3
+flask-session==0.6.0
+werkzeug==3.1.0
+
+# CLI (cli.py)
+click==8.1.7
+rich==13.7.0
+tabulate==0.9.0
+
+# Payments (Track C — Stripe server-side)
+stripe==7.9.0
+
+# Ingestion / parsing (used by scrapers as they come online)
+beautifulsoup4==4.12.2
+lxml==5.1.0
+requests-cache==1.1.1
+
+# Misc utilities
+pyyaml==6.0.1
+tqdm==4.66.1
+
+# Testing
+pytest==7.4.4
+pytest-mock==3.12.0
+pytest-cov==4.1.0
+
+# Lint / format
+black==24.1.1
+flake8==7.0.0
+
+# NOTE: previously-listed deps removed as UNUSED by any code path (re-add only when a
+# real import exists): sentence-transformers, tiktoken, pandas, apscheduler, gunicorn,
+# celery, redis, sendgrid, pyjwt (auth uses stdlib hmac/hashlib, not PyJWT).

@@ -13,11 +13,11 @@ OWNER_ACTIONS:
   as_of: 2026-06-27
   items:
     - id: spend-caps
-      title: "Set HARD provider spend caps + alerts (Railway, OpenAI, Stripe) NOW"
+      title: "Set HARD provider spend caps + alerts (OpenAI, Vercel, Stripe) NOW"
       priority: urgent
       status: open
       why: "LLM + scrape + hosting are wallet-drain targets; a capless loop once burned $47k."
-      how: "OpenAI usage limits dashboard; Railway usage alerts; Stripe Radar/limits. Set monthly hard caps before any live traffic."
+      how: "OpenAI usage limits dashboard; Vercel usage/spend alerts; Stripe Radar/limits. Set monthly hard caps before any live traffic."
     - id: stripe-account
       title: "Create Stripe account + products/prices (Pro/Career+ monthly+annual)"
       priority: high
@@ -55,15 +55,15 @@ OWNER_ACTIONS:
       why: "Growth Agent stays in prepare-mode until a connected, funded, authorized channel exists."
       how: "Follow docs/growth/CONNECT.md (~20 min). Then the Growth Agent can queue/measure for real."
     - id: deploy-env
-      title: "Apply deploy env + DB migrations on Railway"
-      priority: normal
+      title: "Provision Postgres + set Vercel env vars + run DB migrations"
+      priority: high
       status: open
-      why: "OPENAI_API_KEY, JWT_SECRET, DATABASE_URL, STRIPE_* must be set server-side; migrations applied."
-      how: "Set Railway variables; run alembic upgrade head on deploy. Never commit .env."
+      why: "Vercel serverless has no SQLite persistence; the API needs an external (pooled) Postgres plus OPENAI_API_KEY, JWT_SECRET, ALLOWED_ORIGINS, STRIPE_* set server-side."
+      how: "See docs/DEPLOY_VERCEL.md: create Neon/Supabase/Vercel Postgres (pooled URL), set Vercel env vars, run alembic upgrade head. Never commit .env."
     - id: ci-wiring
       title: "Wire preflight + journey suite + mobile build into CI (needs workflow scope)"
       priority: normal
       status: open
       why: "The loop must NOT edit .github/; CI cannot be added by the loop."
-      how: "Add a GitHub Actions workflow running scripts/preflight.sh on PRs (backend + cd mobile build)."
+      how: "Add a GitHub Actions workflow: pip install -r requirements-dev.txt, run scripts/preflight.sh ci (backend + cd mobile && npm ci && tsc/lint)."
 ```

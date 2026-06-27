@@ -14,7 +14,7 @@ from sqlalchemy import create_engine  # noqa: E402
 from sqlalchemy.orm import sessionmaker  # noqa: E402
 from sqlalchemy.pool import StaticPool  # noqa: E402
 
-import api  # noqa: E402
+import asgi  # noqa: E402
 from src.db import get_db  # noqa: E402
 from src.db.models import Base  # noqa: E402
 
@@ -36,8 +36,8 @@ def client():
         finally:
             db.close()
 
-    api.app.dependency_overrides[get_db] = override_get_db
-    with TestClient(api.app) as c:
+    asgi.app.dependency_overrides[get_db] = override_get_db
+    with TestClient(asgi.app) as c:
         yield c
-    api.app.dependency_overrides.clear()
+    asgi.app.dependency_overrides.clear()
     Base.metadata.drop_all(bind=engine)

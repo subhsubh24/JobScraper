@@ -54,7 +54,8 @@ independent of code completeness.
 ## Costs (per-user, order of magnitude)
 - LLM (scoring + prep + coach): ~$0.20–$0.60 / active user / mo (capped by a per-user/day
   spend ceiling — see Track F). Heuristic degradation keeps free-tier near-zero cost.
-- Hosting (Railway + Postgres): ~$20–$50 / mo at low scale.
+- Hosting (Vercel serverless + external Postgres e.g. Neon/Supabase): ~$0–$20 / mo at
+  low scale (free tiers cover early usage; watch function-invocation + DB limits).
 - Store + processing fees: Apple/Google 15–30%, Stripe ~2.9%+30¢.
 
 Gross margin is healthy at subscription pricing **if** the spend ceiling is enforced

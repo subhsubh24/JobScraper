@@ -82,7 +82,11 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
 
 
 # ---------------------------------------------------------------------------
-# Rate limiting + per-user/day LLM spend ceiling (in-memory; swap for Redis in prod)
+# Rate limiting + per-user/day LLM spend ceiling.
+# NOTE: in-memory state. On Vercel serverless each invocation may run on a fresh
+# instance, so these limits are per-instance, NOT global — they slow abuse within a
+# warm instance but are not a hard cross-instance guarantee. Track F: back these with
+# a shared store (Upstash Redis / Postgres) before relying on them in production.
 # ---------------------------------------------------------------------------
 _RATE_BUCKET: Dict[Tuple[str, str], List[float]] = defaultdict(list)
 _LLM_DAY_COUNT: Dict[Tuple[str, str], int] = defaultdict(int)

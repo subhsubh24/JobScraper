@@ -1,0 +1,14 @@
+# Keep the serverless Python function small and focused on the API.
+mobile/
+mobile-flutter-legacy/
+docs/
+tests/
+data/
+*.db
+*.sqlite3
+.venv/
+venv/
+__pycache__/
+# Flask web app + CLI are not part of the serverless API deploy.
+app.py
+cli.py
