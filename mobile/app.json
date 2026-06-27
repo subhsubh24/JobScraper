@@ -8,7 +8,7 @@
     "scheme": "careeroperator",
     "userInterfaceStyle": "dark",
     "extra": {
-      "apiUrl": "http://localhost:8000"
+      "apiUrl": "https://job-scraper-tawny.vercel.app"
     },
     "ios": {
       "bundleIdentifier": "com.careeroperator.app",
@@ -26,7 +26,7 @@
       "predictiveBackGestureEnabled": false
     },
     "web": {
-      "output": "static",
+      "output": "single",
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [

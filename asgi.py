@@ -43,17 +43,15 @@ app = FastAPI(
     version="1.1.0",
 )
 
-# CORS locked to known origins (override via ALLOWED_ORIGINS, comma-separated).
-_origins = os.getenv("ALLOWED_ORIGINS", "").strip()
-allow_origins = [o.strip() for o in _origins.split(",") if o.strip()] or [
-    "http://localhost",
-    "http://localhost:8081",  # Expo dev
-    "http://localhost:19006",
-]
+# CORS. Auth is Bearer-token (no cookies), so when no explicit allowlist is configured
+# we allow any origin WITHOUT credentials — this lets the web app call the API from its
+# own Vercel domain out of the box. Set ALLOWED_ORIGINS (comma-separated) to lock it
+# down to specific origins (which also re-enables credentials).
+_explicit_origins = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", "").split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allow_origins,
-    allow_credentials=True,
+    allow_origins=_explicit_origins or ["*"],
+    allow_credentials=bool(_explicit_origins),  # cannot combine credentials with "*"
     allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type"],
 )

@@ -1,13 +1,16 @@
 // Typed client for the Career Operator Python API.
 // Base URL comes from app.json -> expo.extra.apiUrl (owner sets the live Railway URL).
 import Constants from 'expo-constants';
-import * as SecureStore from 'expo-secure-store';
 
+import * as storage from '@/services/storage';
 import type { Job, PipelineStats, User } from '@/types';
 
 const TOKEN_KEY = 'career_operator_token';
 
+// Resolution order: build-time env (EXPO_PUBLIC_API_URL) -> app.json extra.apiUrl ->
+// localhost. Set EXPO_PUBLIC_API_URL in the Vercel web project to your live API.
 const API_URL: string =
+  process.env.EXPO_PUBLIC_API_URL ??
   (Constants.expoConfig?.extra as { apiUrl?: string } | undefined)?.apiUrl ??
   'http://localhost:8000';
 
@@ -23,14 +26,14 @@ let cachedToken: string | null = null;
 
 export async function getToken(): Promise<string | null> {
   if (cachedToken) return cachedToken;
-  cachedToken = await SecureStore.getItemAsync(TOKEN_KEY);
+  cachedToken = await storage.getItem(TOKEN_KEY);
   return cachedToken;
 }
 
 async function setToken(token: string | null): Promise<void> {
   cachedToken = token;
-  if (token) await SecureStore.setItemAsync(TOKEN_KEY, token);
-  else await SecureStore.deleteItemAsync(TOKEN_KEY);
+  if (token) await storage.setItem(TOKEN_KEY, token);
+  else await storage.deleteItem(TOKEN_KEY);
 }
 
 interface ReqOptions {
