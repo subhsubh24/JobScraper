@@ -19,7 +19,8 @@ npm start           # then press i / a, or scan in Expo Go
 ## Configure the API URL
 Set `expo.extra.apiUrl` in `app.json` to your backend:
 - local dev: `http://localhost:8000` (default)
-- production: your Railway URL, e.g. `https://career-operator.up.railway.app`
+- production: your Vercel API deployment URL, e.g. `https://career-operator-api.vercel.app`
+  (see `../docs/DEPLOY_VERCEL.md`)
 
 The base URL is read in `src/services/api.ts` via `expo-constants`.
 

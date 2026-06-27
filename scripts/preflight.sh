@@ -36,8 +36,10 @@ else
 fi
 
 sect "backend: import/serve smoke"
-$PY -c "import api; assert hasattr(api, 'app'), 'api.app missing'" || fail "api import smoke failed"
-ok "api:app imports"
+$PY -c "import asgi; assert hasattr(asgi, 'app'), 'asgi.app missing'" || fail "asgi import smoke failed"
+ok "asgi:app imports"
+# Running the Vercel entry executes its import-time `from asgi import app`.
+$PY api/index.py && ok "vercel entry (api/index.py) loads app" || fail "vercel entry import failed"
 
 sect "backend: tests (pytest)"
 if [ -d tests ]; then

@@ -1,69 +1,23 @@
-# Core dependencies
-python-dotenv==1.0.0
-requests==2.31.0
-requests-cache==1.1.1
-beautifulsoup4==4.12.2
-lxml==5.1.0
+# Career Operator — LEAN runtime deps for the deployed serverless API (Vercel).
+# Keep this small: Vercel's Python function bundle has a ~250MB unzipped limit.
+# Anything not imported by asgi.py + src/* belongs in requirements-dev.txt, NOT here.
+# (sentence-transformers/torch, celery, redis, pandas, etc. were removed — unused by
+#  the API and they blow the size limit. See docs/DEPLOY_VERCEL.md.)
 
-# Database
-sqlalchemy==2.0.25
-alembic==1.13.1
-
-# LLM and embeddings
-openai==1.10.0
-sentence-transformers==2.3.1
-tiktoken==0.5.2
-
-# Data processing
-pandas==2.2.0
-numpy==1.26.3
-python-dateutil==2.8.2
-
-# Scheduling
-apscheduler==3.10.4
-
-# Web framework (Flask for MVP web app)
-flask==3.0.0
-flask-cors==4.0.0
-flask-login==0.6.3
-flask-session==0.6.0
-
-# API framework (FastAPI for mobile app)
+# Web API framework
 fastapi==0.109.0
-uvicorn[standard]==0.27.0
+uvicorn[standard]==0.27.0          # local dev / container fallback; Vercel wraps ASGI itself
 
-# Authentication & Security
-pyjwt==2.8.0
-werkzeug==3.1.0
+# Database (Postgres in production — SQLite has no persistence on serverless)
+sqlalchemy==2.0.25
+psycopg2-binary==2.9.9
 
-# Payments
-stripe==7.9.0
+# LLM (optional at runtime — degrades gracefully without OPENAI_API_KEY)
+openai==1.10.0
 
-# Production server
-gunicorn==21.2.0
-
-# Background tasks
-celery==5.3.4
-redis==5.0.1
-
-# Email
-sendgrid==6.11.0
-
-# CLI
-click==8.1.7
-rich==13.7.0
-tabulate==0.9.0
-
-# Utilities
+# Core utilities actually imported by the API
+numpy==1.26.3
+requests==2.31.0
+python-dotenv==1.0.0
+python-dateutil==2.8.2
 pydantic==2.5.3
-pyyaml==6.0.1
-tqdm==4.66.1
-
-# Testing
-pytest==7.4.4
-pytest-mock==3.12.0
-pytest-cov==4.1.0
-
-# Development
-black==24.1.1
-flake8==7.0.0

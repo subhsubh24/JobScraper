@@ -19,7 +19,8 @@ gate green this run**. Never mass-tick. Un-tick any box whose proof later fails.
 - [ ] ATS ingestion (Greenhouse/Lever) returns real listings or a truthful empty state
 - [ ] Consistent error envelope + structured logging across the API
 - [ ] DB migrations (alembic) generated and applied cleanly; seed script for dev
-- [ ] Health/readiness endpoints + Railway deploy verified live
+- [ ] External Postgres wired for serverless (no SQLite persistence on Vercel)
+- [ ] Health/readiness endpoints + **Vercel serverless deploy** verified live (see docs/DEPLOY_VERCEL.md)
 
 ### B — Native mobile app (NEW Expo / React Native, iOS + Android, TypeScript, `/mobile`)
 - [ ] Expo app scaffolded, `tsc --noEmit` clean, lint clean
@@ -64,6 +65,7 @@ gate green this run**. Never mass-tick. Un-tick any box whose proof later fails.
 - [ ] CAPTCHA on public forms (signup/waitlist)
 - [ ] CORS locked to known origins + security headers
 - [ ] Per-user/day spend ceiling on scrape + LLM (wallet-drain defense)
+- [ ] Make rate-limit + spend-ceiling **cross-instance** (Upstash Redis/Postgres) — current in-memory state is per-instance on Vercel serverless
 - [ ] Secrets server-side only — never in the mobile app, never committed
 
 ### G — Marketing engine + brand
