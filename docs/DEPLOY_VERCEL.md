@@ -11,46 +11,26 @@ Vercel project "career-operator-api"  (root of this repo)
   asgi.py       -> the FastAPI app (was api.py; renamed to avoid the /api dir clash)
   requirements.txt -> LEAN runtime deps only (size-bound: ~250MB function limit)
 
-External: Supabase Postgres — SQLite has no persistence on serverless.
-          Use the Transaction pooler (Supavisor, port 6543), not the direct 5432 conn.
+External: Neon Postgres — SQLite has no persistence on serverless.
+          Use the POOLED endpoint (host has `-pooler`), not the direct connection.
 ```
 
-## Supabase (the chosen DB — consistent with the other products)
-Use the **Transaction pooler (Supavisor)** connection string, verified against current
-Supabase docs:
-- **Port 6543**, host `aws-[REGION].pooler.supabase.com`, username `postgres.[PROJECT-REF]`.
-- It is **IPv4-only on every tier** → works from Vercel without the IPv4 add-on.
-  (The direct `:5432` connection is IPv6 and the *session* pooler is not ideal for
-  short-lived functions — use the transaction pooler.)
+## Neon (the chosen DB)
+Use the **pooled connection string**, verified against current Neon docs:
+- The pooled host **adds `-pooler` to the endpoint id**, e.g.
+  `ep-cool-darkness-123456-pooler.us-east-2.aws.neon.tech` (the direct host omits it).
+- Neon's guidance: serverless functions should use the **pooled** connection (many
+  short-lived connections) to avoid exhausting `max_connections`.
 - Append `?sslmode=require`.
-- Transaction mode **does not support prepared statements**, but we use **psycopg2**
-  (no persistent prepared statements) + **NullPool**, so it works with **no code change**.
+- PgBouncer **doesn't support SQL-level `PREPARE`/`EXECUTE`**, but we don't issue those —
+  psycopg2 + **NullPool** work with **no code change**.
 
 ```
-DATABASE_URL=postgresql://postgres.[PROJECT-REF]:[PASSWORD]@aws-[REGION].pooler.supabase.com:6543/postgres?sslmode=require
+DATABASE_URL=postgresql://[USER]:[PASSWORD]@ep-[ID]-pooler.[REGION].aws.neon.tech/[DB]?sslmode=require
 ```
 
-### Security hardening (defense in depth)
-The app connects as Supabase's privileged `postgres` role, so it **bypasses RLS** and our
-own JWT auth (in FastAPI) is the real gate. But our tables (incl. `users.password_hash`)
-live in the `public` schema, which Supabase's **Data API (PostgREST)** can expose. By
-default SQLAlchemy-created tables are NOT granted to `anon`/`authenticated`, so they are
-not reachable via the Data API — but enable RLS anyway (free, since the app's role
-bypasses it) so a future misconfig can't leak data. In the Supabase SQL editor:
-```sql
-alter table users            enable row level security;
-alter table job_postings     enable row level security;
-alter table job_scores       enable row level security;
-alter table applications     enable row level security;
-alter table prep_artifacts   enable row level security;
-alter table chat_messages    enable row level security;
-alter table companies        enable row level security;
-alter table contacts         enable row level security;
-alter table outreach_sequences enable row level security;
--- no policies needed for `anon`/`authenticated`: this app does not use the Data API.
-```
-Alternatively, disable the Data API entirely for this project if you only ever reach
-Postgres via this backend.
+(Neon has no PostgREST/Data API exposing tables — unlike Supabase — so no RLS/anon-key
+hardening is needed here. Auth is enforced in the FastAPI layer.)
 
 ## Hard constraints (why things are the way they are)
 1. **Bundle size ≤ ~250MB.** `requirements.txt` is deliberately lean. Do NOT add
@@ -65,8 +45,8 @@ Postgres via this backend.
    relying on them as a hard guarantee.
 
 ## One-time setup (owner — Human-Core)
-1. Create a **Supabase** project. Settings → Database → Connection string → **Transaction
-   pooler** (port 6543). Copy it (see the Supabase section above for the exact shape).
+1. Create a **Neon** project. Dashboard → Connection Details → toggle **Pooled
+   connection** → copy the string (host contains `-pooler`). See the Neon section above.
 2. In the Vercel project → Settings → Environment Variables, set:
    - `DATABASE_URL` = the pooled Postgres URL (`?sslmode=require`)
    - `JWT_SECRET` = `openssl rand -hex 32`
