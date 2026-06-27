@@ -20,6 +20,25 @@ def test_root_is_friendly(client):
     assert r.json()["docs"] == "/docs"
 
 
+def test_vercel_stripped_prefix_is_restored(client):
+    # Vercel Services strips the "/api" routePrefix, so the app receives "/auth/register".
+    # RestoreApiPrefix must re-add it so the same routes work stripped (Vercel) AND
+    # prefixed (local/clients). Both forms must reach the real endpoint, not a 404.
+    stripped = client.post(
+        "/auth/register",  # the form Vercel delivers after stripping /api
+        json={"email": "stripped@example.com", "password": "supersecret123", "full_name": "S"},
+    )
+    assert stripped.status_code == 200, stripped.text
+    prefixed = client.post(
+        "/api/auth/login",  # the form local/clients send (not stripped)
+        json={"email": "stripped@example.com", "password": "supersecret123"},
+    )
+    assert prefixed.status_code == 200, prefixed.text
+    # Bare health stays reachable both ways.
+    assert client.get("/health").status_code == 200
+    assert client.get("/api/health").status_code == 200
+
+
 def test_health_reports_llm_disabled(client):
     r = client.get("/health")
     assert r.status_code == 200

@@ -43,6 +43,34 @@ app = FastAPI(
     version="1.1.0",
 )
 
+# Vercel Services STRIPS the service routePrefix ("/api") before the request reaches this
+# app — so a client call to "/api/auth/register" arrives here as "/auth/register". Re-add
+# the prefix at the ASGI layer so the SAME "/api/*" routes match both locally (no strip)
+# and on Vercel (stripped). Bare FastAPI paths (/health, /docs, /redoc, /openapi.json) and
+# "/" are left untouched (they exist without the prefix and are served as-is).
+_BARE_PREFIXES = ("/api", "/health", "/docs", "/redoc", "/openapi.json")
+
+
+class RestoreApiPrefix:
+    """ASGI middleware: re-add the /api prefix Vercel Services strips."""
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope.get("type") == "http":
+            path = scope.get("path", "")
+            if path != "/" and not path.startswith(_BARE_PREFIXES):
+                scope = dict(scope)
+                scope["path"] = "/api" + path
+                raw = scope.get("raw_path")
+                if raw is not None:
+                    scope["raw_path"] = b"/api" + raw
+        await self.app(scope, receive, send)
+
+
+app.add_middleware(RestoreApiPrefix)
+
 # CORS. Auth is Bearer-token (no cookies), so when no explicit allowlist is configured
 # we allow any origin WITHOUT credentials — this lets the web app call the API from its
 # own Vercel domain out of the box. Set ALLOWED_ORIGINS (comma-separated) to lock it
