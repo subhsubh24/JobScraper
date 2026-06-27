@@ -37,6 +37,19 @@ JobScraper is registered in subhsubh24/AutoFactoryDashboard `config/projects.ts`
 https://claude.ai/code/routines. Owner-only (Human-Core) steps remain in PENDING_OPS —
 spend caps are 🔴 urgent before any live traffic.
 
+### 2026-06-27 — Gitignored-source foot-gun broke the Vercel build
+The first Vercel deploy failed: `Can't resolve @/lib/api|auth|types`. Cause: the root
+.gitignore's Python `lib/` pattern (unanchored) ALSO matched `web/lib/`, so those 3 web
+source files were never committed. It built locally (files on disk) but Vercel clones a
+repo missing them — a local-green-but-repo-broken trap, same family as BUILDS ≠ WORKS.
+Fix: anchored the Python packaging ignores to repo root (`/lib/`, `/lib64/`, `/build/`,
+`/dist/`), committed `web/lib/*`, and verified with a CLEAN-ROOM build from `git archive
+HEAD` (committed files only) — the real replica of a Vercel clone. Added a preflight
+guard asserting critical source dirs (web/lib, web/app, web/components, mobile/src, src)
+have tracked files. LESSON: a local gate can pass while the repo is missing gitignored
+source; validate from a clean checkout, and never use unanchored generic ignore patterns
+(`lib/`, `build/`, `dist/`) in a polyglot repo.
+
 ### 2026-06-27 — Consume the independent Quality grade (maker ≠ checker)
 A separate Quality Auditor routine grades the product A+→F and OWNS
 docs/quality/{QUALITY_RUBRIC,QUALITY_SCORECARD}.md — the factory must NOT author or
