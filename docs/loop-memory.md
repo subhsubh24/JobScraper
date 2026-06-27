@@ -37,6 +37,20 @@ JobScraper is registered in subhsubh24/AutoFactoryDashboard `config/projects.ts`
 https://claude.ai/code/routines. Owner-only (Human-Core) steps remain in PENDING_OPS —
 spend caps are 🔴 urgent before any live traffic.
 
+### 2026-06-27 — Frontend split: Next.js web (/web) + Expo mobile (/mobile)
+Owner chose a Next.js web app over the React-Native-Web export. Architecture now:
+- `/web` = Next.js (App Router, TS, Tailwind) → Vercel project #2 (Root Directory = web),
+  the real website + web app. Reads NEXT_PUBLIC_API_URL (defaults to live API).
+- `/mobile` = Expo → App Store / Play only (NOT Vercel). Removed mobile/vercel.json.
+- API stays as Vercel project #1. Three surfaces, one FastAPI backend.
+- preflight `ci` now gates web too (tsc + lint). CORS opened (Bearer-token API: any
+  origin, no credentials, unless ALLOWED_ORIGINS is set) so the web app calls the API
+  cross-origin. Two frontends = the cost; each best-in-class per platform = the benefit.
+
+### 2026-06-27 — Provider/DB choices: Gemini (LLM) + Neon (Postgres) + Vercel
+- LLM = Google Gemini via the OpenAI-compatible endpoint (key GEMINI_API_KEY). No OpenAI.
+- DB = Neon Postgres (pooled endpoint). Supabase was dropped (per-instance charges).
+
 ### 2026-06-27 — Deploy target = Vercel (serverless), NOT Railway
 Owner chose Vercel-for-everything (serverless Python API). Consequences baked into the
 repo (see docs/DEPLOY_VERCEL.md):

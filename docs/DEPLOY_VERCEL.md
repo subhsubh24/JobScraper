@@ -1,15 +1,23 @@
-# Deploy — Vercel (serverless)
+# Deploy — Vercel
 
-JobScraper deploys to **Vercel**. The Python FastAPI API runs as a **serverless
-function**; the mobile/web frontend is a separate Vercel project.
+Three surfaces, all on Vercel except the native app:
+1. **API** — Python FastAPI as a serverless function (this repo root).
+2. **Web app** — Next.js in `/web` (a SECOND Vercel project, Root Directory = `web`).
+3. **Mobile** — Expo app in `/mobile` → App Store / Play (NOT Vercel; built via EAS).
+
+All three talk to the same FastAPI API.
 
 ## Architecture
 ```
-Vercel project "career-operator-api"  (root of this repo)
+Vercel project 1 — API  (Root Directory = repo root)
   vercel.json   -> rewrites /(.*) to /api/index
   api/index.py  -> ASGI entry, re-exports `app` from asgi.py
   asgi.py       -> the FastAPI app (was api.py; renamed to avoid the /api dir clash)
   requirements.txt -> LEAN runtime deps only (size-bound: ~250MB function limit)
+
+Vercel project 2 — Web  (Root Directory = web)
+  Next.js (App Router, TS, Tailwind). Auto-detected by Vercel — no extra config.
+  Reads NEXT_PUBLIC_API_URL (defaults to the live API).
 
 External: Neon Postgres — SQLite has no persistence on serverless.
           Use the POOLED endpoint (host has `-pooler`), not the direct connection.
@@ -68,10 +76,15 @@ hardening is needed here. Auth is enforced in the FastAPI layer.)
   `api/index.py` with `@vercel/python` and installs `requirements.txt`.
 - Verify: `GET https://<deployment>/health` → `{"status":"healthy", ...}`.
 
-## Frontend (separate Vercel project)
-Create a second Vercel project with **Root Directory = `mobile`**, build = Expo web
-export (`npx expo export -p web`, output `dist`). Set the API base URL via
-`app.json` → `expo.extra.apiUrl` = the API deployment URL.
+## Web frontend (second Vercel project — Next.js)
+Create a second Vercel project from the SAME repo with **Root Directory = `web`**.
+Vercel auto-detects Next.js — no build config needed. Optionally set
+`NEXT_PUBLIC_API_URL` to the API deployment URL (it already defaults to the live API).
+This deploys the real website + web app (login, pipeline, job detail, coach, pricing).
+
+## Mobile (not Vercel)
+The Expo app in `/mobile` ships to the App Store / Play Store via EAS — it is NOT a
+Vercel deploy. Set `expo.extra.apiUrl` (or `EXPO_PUBLIC_API_URL`) to the API URL.
 
 ## Container fallback
 A Docker/Railway path is preserved in `docs/legacy/` (`Dockerfile.api`, `railway.json`,

@@ -12,10 +12,13 @@ gate green this run**. Never mass-tick. Un-tick any box whose proof later fails.
 
 ## Tracks
 
-### A — Web / API product quality + reliability (Python backend + served web app)
-- [ ] `api.py` endpoints actually work end-to-end against `src/` (no method/sig mismatches)
+### A — Web / API product quality + reliability (FastAPI backend + Next.js web app)
+- [ ] `asgi.py` endpoints actually work end-to-end against `src/` (no method/sig mismatches)
 - [ ] Core flow works with **no Gemini key** via graceful heuristic degradation
-- [ ] Flask web app (`app.py`) core journey works at runtime (login → dashboard → core loop)
+- [ ] **Next.js web app (`/web`)**: auth + pipeline + job detail + coach + pricing wired to the API
+- [ ] Web app: typecheck + lint + `next build` green; deployed live on Vercel
+- [ ] Web app: real loading/empty/error states; SEO metadata; polished to the design bar
+- [ ] (legacy) Flask `app.py` — superseded by the Next.js web app; keep or retire
 - [ ] ATS ingestion (Greenhouse/Lever) returns real listings or a truthful empty state
 - [ ] Consistent error envelope + structured logging across the API
 - [ ] DB migrations (alembic) generated and applied cleanly; seed script for dev
