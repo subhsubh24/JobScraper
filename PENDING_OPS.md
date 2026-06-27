@@ -59,7 +59,7 @@ OWNER_ACTIONS:
       priority: high
       status: open
       why: "Vercel serverless has no SQLite persistence; the API needs an external (pooled) Postgres plus OPENAI_API_KEY, JWT_SECRET, ALLOWED_ORIGINS, STRIPE_* set server-side."
-      how: "See docs/DEPLOY_VERCEL.md: create Neon/Supabase/Vercel Postgres (pooled URL), set Vercel env vars, run alembic upgrade head. Never commit .env."
+      how: "See docs/DEPLOY_VERCEL.md: create Neon/Supabase/Vercel Postgres (pooled URL), set Vercel env vars. Schema auto-creates on cold start (AUTO_CREATE_TABLES=1) or run `python scripts/init_db.py` once. Never commit .env."
     - id: ci-wiring
       title: "Wire preflight + journey suite + mobile build into CI (needs workflow scope)"
       priority: normal

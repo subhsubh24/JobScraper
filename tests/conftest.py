@@ -7,6 +7,8 @@ import os
 os.environ["OPENAI_API_KEY"] = ""
 os.environ["JWT_SECRET"] = "test-secret"
 os.environ.setdefault("ALLOWED_ORIGINS", "http://testserver")
+# Tests build their own in-memory schema; don't let importing asgi create a real DB.
+os.environ["AUTO_CREATE_TABLES"] = "0"
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402

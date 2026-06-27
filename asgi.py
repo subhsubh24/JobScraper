@@ -512,6 +512,29 @@ def health():
     return {"status": "healthy", "version": app.version, "llm_enabled": llm_available()}
 
 
+def _ensure_schema() -> None:
+    """Create any missing tables on cold start (idempotent).
+
+    Runs once per process import, which on Vercel serverless means once per cold
+    start — guaranteed regardless of whether the ASGI adapter fires lifespan events.
+    Safe: create_all only adds missing tables, never drops/alters. Disable by setting
+    AUTO_CREATE_TABLES=0 once you adopt real alembic migrations. Wrapped so a slow/down
+    DB never crashes the import (the request would surface the error instead).
+    """
+    if os.getenv("AUTO_CREATE_TABLES", "1") != "1":
+        return
+    try:
+        from src.db import engine
+        from src.db.models import Base
+
+        Base.metadata.create_all(bind=engine)
+    except Exception:
+        logger.exception("AUTO_CREATE_TABLES: schema init skipped (DB unreachable?)")
+
+
+_ensure_schema()
+
+
 if __name__ == "__main__":
     import uvicorn
 
