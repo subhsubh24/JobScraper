@@ -37,6 +37,22 @@ JobScraper is registered in subhsubh24/AutoFactoryDashboard `config/projects.ts`
 https://claude.ai/code/routines. Owner-only (Human-Core) steps remain in PENDING_OPS —
 spend caps are 🔴 urgent before any live traffic.
 
+### 2026-06-27 — Factory-process parity with the sibling products
+Aligned JobScraper's FACTORY (not product) to AptDesignerAI / GroceryManager /
+HighlightMagic so all four run the identical process, building different things. Ported:
+the full DESIGN BAR into VISION.md (THE DESIGNER QUESTION + AVOID-BY-DEFAULT AI-slop list +
+GENERATE-BETTER + RECURRING TASTE AUDIT + "a surface that reads as AI-generated is a design
+BUG"), enforced by Reviewer B + the deep-audit design lens; preflight security guards
+(spend-ceiling/circuit-breaker, security headers, captcha) + a stub/placeholder-marker guard
+on critical paths; the loop charter `docs/autonomous-loop/PROMPT.md` (ORIENT→HILL-CLIMB→
+BOOTSTRAP→PICK ONE→IMPLEMENT→VERIFY→REVIEW(maker≠checker)→MERGE→RECORD→STOP); `AGENTS.md`
+(gate commands + conventions + the ratchet); `IMPROVEMENT_LOG.md`. Documented the canonical
+quality-rubric dimension set in check_quality.py.
+DELIBERATELY NOT done (maker ≠ checker): did NOT create docs/quality/QUALITY_RUBRIC.md or
+QUALITY_SCORECARD.md — the independent Quality Auditor routine owns/bootstraps them. Our
+guard already handles their absence. The sibling AptDesignerAI ships the rubric because its
+grader bootstrapped it there; ours will appear when the auditor runs.
+
 ### 2026-06-27 — Gitignored-source foot-gun broke the Vercel build
 The first Vercel deploy failed: `Can't resolve @/lib/api|auth|types`. Cause: the root
 .gitignore's Python `lib/` pattern (unanchored) ALSO matched `web/lib/`, so those 3 web

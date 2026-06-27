@@ -7,11 +7,18 @@ scorecard so a malformed one can't ship, and (in readiness mode) enforces A/A+ o
 ship-critical dimension and >= B elsewhere.
 
 Consumption contract the auditor populates (a fenced ```yaml block keyed
-QUALITY_SCORECARD inside docs/quality/QUALITY_SCORECARD.md):
+QUALITY_SCORECARD inside docs/quality/QUALITY_SCORECARD.md). The CANONICAL dimension set
+(same across the sibling factories — the auditor should grade these):
+  ship-critical: functional-reality, correctness, security, design-taste,
+                 store-readiness, artifact-integrity, business-case-strength
+  not ship-critical (still graded): tests-evals, performance
+Grade scale per dimension: A+ A B C D F (or null when ungraded). A = ship bar; a ticked
+box with no real artifact is an F.
 
     QUALITY_SCORECARD:
       as_of: 2026-06-27
       overall: null            # one of A+ A B C D F, or null when ungraded
+      ship_gate_met: false
       dimensions:
         - name: functional-reality
           grade: null          # one of A+ A B C D F, or null

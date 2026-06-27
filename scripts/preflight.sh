@@ -124,7 +124,23 @@ ok "billing wired"
 
 sect "security mechanisms present"
 grep -rqs "rate" --include=*.py . || fail "no rate limiting found"
+# Per-user/day spend ceiling / circuit breaker (wallet-drain defense — LLM+scrape).
+grep -rqiE 'ceiling|spend.?(cap|limit)|circuit.?breaker|daily.?(cap|limit)|quota' --include=*.py . \
+  || fail "no per-user/day API spend ceiling — one abuser can run up the paid-API bill"
+# Security headers / CORS lockdown (API or web).
+grep -rqiE 'X-Content-Type-Options|X-Frame-Options|Strict-Transport-Security|Content-Security-Policy' asgi.py web/ 2>/dev/null \
+  || fail "no security headers (X-Content-Type-Options/X-Frame-Options/CSP) found"
+# CAPTCHA / bot-protection on public forms (signup/waitlist).
+grep -rqiE 'turnstile|hcaptcha|recaptcha|captcha' asgi.py src/ web/ 2>/dev/null \
+  || fail "no captcha/bot-protection on public forms"
 ok "security mechanisms present"
+
+sect "no stub/placeholder markers on critical paths (BUILDS != WORKS)"
+if grep -rniE 'not (yet )?implemented|FIXME|placeholder|\bstub\b|\bTODO\b' asgi.py src --include=*.py \
+   | grep -viE 'no .*stub|TODO\(P[0-9]\)'; then
+  fail "stub/TODO/placeholder marker on a critical path — 'code exists' is not 'it works'"
+fi
+ok "no stub markers on critical paths"
 
 sect "runtime FUNCTIONAL journey suite ran green this attempt"
 if $PY -m pytest -q tests/journeys >/tmp/journeys.out 2>&1; then
