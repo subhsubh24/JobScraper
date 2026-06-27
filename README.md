@@ -64,7 +64,7 @@ pip install -r requirements.txt
 
 # 2. Set up environment
 cp .env.example .env
-# Edit .env and add your OPENAI_API_KEY
+# Edit .env and add your GEMINI_API_KEY (optional — AI degrades gracefully without it)
 
 # 3. Run API locally
 ./start_api.sh
@@ -143,7 +143,7 @@ Connect to your deployed API and you're ready!
 **Backend:**
 - FastAPI (Python) - API server
 - PostgreSQL - Database
-- OpenAI GPT-4o - AI features
+- Google Gemini - AI features (via OpenAI-compatible API)
 - Railway - Hosting ($5/month)
 
 **Mobile:**

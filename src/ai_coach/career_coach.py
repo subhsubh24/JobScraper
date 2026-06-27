@@ -4,13 +4,13 @@ from typing import List, Optional
 from sqlalchemy.orm import Session
 
 from src.db.models import ChatMessage, User, JobPosting, Application
-from src.llm import get_openai_client, llm_available
+from src.llm import get_llm_client, llm_available, chat_model
 
 
 class CareerCoach:
     """AI-powered career coaching through a chat interface."""
 
-    MODEL = "gpt-4o"
+    MODEL = chat_model()
     MAX_CONTEXT_MESSAGES = 20
 
     SYSTEM_PROMPT = """You are an expert career coach specializing in tech careers. You help professionals:
@@ -31,7 +31,7 @@ You have access to the user's profile and job applications for context."""
 
     def __init__(self, db: Session):
         self.db = db
-        self.client = get_openai_client()
+        self.client = get_llm_client()
 
     @staticmethod
     def available() -> bool:
@@ -98,7 +98,7 @@ You have access to the user's profile and job applications for context."""
     ) -> str:
         """Send a message and get a response from the coach."""
         if self.client is None:
-            raise RuntimeError("OPENAI_API_KEY not configured")
+            raise RuntimeError("GEMINI_API_KEY not configured")
 
         # Create session if needed
         if not session_id:

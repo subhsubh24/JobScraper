@@ -14,7 +14,7 @@ gate green this run**. Never mass-tick. Un-tick any box whose proof later fails.
 
 ### A — Web / API product quality + reliability (Python backend + served web app)
 - [ ] `api.py` endpoints actually work end-to-end against `src/` (no method/sig mismatches)
-- [ ] Core flow works with **no OpenAI key** via graceful heuristic degradation
+- [ ] Core flow works with **no Gemini key** via graceful heuristic degradation
 - [ ] Flask web app (`app.py`) core journey works at runtime (login → dashboard → core loop)
 - [ ] ATS ingestion (Greenhouse/Lever) returns real listings or a truthful empty state
 - [ ] Consistent error envelope + structured logging across the API

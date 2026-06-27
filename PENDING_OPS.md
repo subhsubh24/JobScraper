@@ -13,11 +13,11 @@ OWNER_ACTIONS:
   as_of: 2026-06-27
   items:
     - id: spend-caps
-      title: "Set HARD provider spend caps + alerts (OpenAI, Vercel, Stripe) NOW"
+      title: "Set HARD provider spend caps + alerts (Gemini/Google AI, Vercel, Stripe) NOW"
       priority: urgent
       status: open
       why: "LLM + scrape + hosting are wallet-drain targets; a capless loop once burned $47k."
-      how: "OpenAI usage limits dashboard; Vercel usage/spend alerts; Stripe Radar/limits. Set monthly hard caps before any live traffic."
+      how: "Google AI Studio / Gemini API usage limits; Vercel usage/spend alerts; Stripe Radar/limits. Set monthly hard caps before any live traffic."
     - id: stripe-account
       title: "Create Stripe account + products/prices (Pro/Career+ monthly+annual)"
       priority: high
@@ -59,7 +59,7 @@ OWNER_ACTIONS:
       priority: high
       status: in_progress
       why: "Neon project 'JobScraper' is provisioned and the schema is created + verified (full journey ran green against it). Remaining: set server-side env vars in Vercel and deploy."
-      how: "DONE: Neon DB + 9 tables via pooled endpoint. TODO: in Vercel set DATABASE_URL (Neon pooled string), JWT_SECRET (openssl rand -hex 32), optional OPENAI_API_KEY + ALLOWED_ORIGINS; deploy; verify GET /health. See docs/DEPLOY_VERCEL.md. Never commit .env."
+      how: "DONE: Neon DB + 9 tables via pooled endpoint. TODO: in Vercel set DATABASE_URL (Neon pooled string), JWT_SECRET (openssl rand -hex 32), optional GEMINI_API_KEY + ALLOWED_ORIGINS; deploy; verify GET /health. See docs/DEPLOY_VERCEL.md. Never commit .env."
     - id: ci-wiring
       title: "Wire preflight + journey suite + mobile build into CI (needs workflow scope)"
       priority: normal

@@ -3,22 +3,22 @@ import json
 from sqlalchemy.orm import Session
 
 from src.db.models import JobPosting, PrepArtifact, User
-from src.llm import get_openai_client
+from src.llm import get_llm_client, chat_model
 
 
 class LLMWorkflows:
     """Handles all LLM-powered workflows for job enrichment and prep generation."""
 
-    MODEL = "gpt-4o"  # Use gpt-4o-mini for cost savings
+    MODEL = chat_model()  # Gemini model (env-overridable via GEMINI_MODEL)
 
     def __init__(self, db: Session):
         self.db = db
-        self.client = get_openai_client()
+        self.client = get_llm_client()
 
     def _call_llm(self, system_prompt: str, user_prompt: str, json_mode: bool = False) -> str:
         """Make a call to the LLM."""
         if self.client is None:
-            raise RuntimeError("OPENAI_API_KEY not configured")
+            raise RuntimeError("GEMINI_API_KEY not configured")
         kwargs = {
             "model": self.MODEL,
             "messages": [

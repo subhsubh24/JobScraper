@@ -50,11 +50,13 @@ hardening is needed here. Auth is enforced in the FastAPI layer.)
 2. In the Vercel project → Settings → Environment Variables, set:
    - `DATABASE_URL` = the pooled Postgres URL (`?sslmode=require`)
    - `JWT_SECRET` = `openssl rand -hex 32`
-   - `OPENAI_API_KEY` = your key (optional — API degrades gracefully without it)
+   - `GEMINI_API_KEY` = your Google Gemini key (optional — API degrades gracefully
+     without it; uses Gemini via its OpenAI-compatible endpoint). Optional overrides:
+     `GEMINI_MODEL` (default `gemini-2.5-flash`), `GEMINI_EMBEDDING_MODEL` (default `gemini-embedding-001`).
    - `ALLOWED_ORIGINS` = your web + app origins
    - `LLM_DAILY_CEILING` = e.g. `25`
    - (Track C) `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`
-3. **Set spend caps NOW** (OpenAI usage limit; Stripe limits). Wallet-drain defense.
+3. **Set spend caps NOW** (Gemini/Google AI usage limit; Stripe limits). Wallet-drain defense.
 4. **Schema:** the API auto-creates missing tables on cold start (`AUTO_CREATE_TABLES=1`,
    the default), so a fresh Postgres works on first request. To create it explicitly
    instead, run once: `DATABASE_URL='postgresql://...' python scripts/init_db.py`.

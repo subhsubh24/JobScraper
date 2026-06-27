@@ -5,22 +5,22 @@ import numpy as np
 from sqlalchemy.orm import Session
 
 from src.db.models import JobPosting, JobScore, User
-from src.llm import get_openai_client
+from src.llm import get_llm_client, embedding_model
 
 
 class JobScorer:
     """Scores jobs based on resume match using embeddings and heuristics."""
 
-    EMBEDDING_MODEL = "text-embedding-3-small"
+    EMBEDDING_MODEL = embedding_model()
 
     def __init__(self, db: Session):
         self.db = db
-        self.client = get_openai_client()
+        self.client = get_llm_client()
 
     def get_embedding(self, text: str) -> List[float]:
         """Get embedding vector for text."""
         if self.client is None:
-            raise RuntimeError("OPENAI_API_KEY not configured; using heuristic fallback")
+            raise RuntimeError("GEMINI_API_KEY not configured; using heuristic fallback")
         response = self.client.embeddings.create(
             model=self.EMBEDDING_MODEL,
             input=text[:8000]  # Limit input length

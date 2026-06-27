@@ -2,7 +2,7 @@
 
 Talks to the real `src/` services and models. Designed to DEGRADE GRACEFULLY:
 the core journey (auth + job tracking + scoring + pipeline analytics) works with NO
-OpenAI key via heuristic scoring; AI features (prep packs, coach) return a truthful
+Gemini key via heuristic scoring; AI features (prep packs, coach) return a truthful
 "needs configuration" response instead of crashing when the key is absent.
 """
 import logging
@@ -296,7 +296,7 @@ def create_job(
     db.add(job)
     db.flush()
 
-    # Score (heuristic fallback when no OpenAI key — never crashes).
+    # Score (heuristic fallback when no Gemini key — never crashes).
     try:
         JobScorer(db).score_job(job, user)
     except Exception:
@@ -402,7 +402,7 @@ def generate_prep_pack(
         # Truthful graceful degradation — not a crash, not a fake result.
         raise HTTPException(
             status_code=503,
-            detail="AI prep packs require the server's OPENAI_API_KEY to be configured.",
+            detail="AI prep packs require the server's GEMINI_API_KEY to be configured.",
         )
 
     check_llm_ceiling(user)
@@ -442,7 +442,7 @@ def coach_chat(
     if not CareerCoach.available():
         raise HTTPException(
             status_code=503,
-            detail="The AI Coach requires the server's OPENAI_API_KEY to be configured.",
+            detail="The AI Coach requires the server's GEMINI_API_KEY to be configured.",
         )
 
     check_llm_ceiling(user)
