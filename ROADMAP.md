@@ -13,8 +13,15 @@
 > drive it to A/A+. Do NOT author/overwrite the rubric or scorecard — they are the
 > grader's.
 
+**Operating standard (read every run):** [FACTORY_STANDARD.md](./FACTORY_STANDARD.md) is the shared, product-agnostic discipline EVERY factory follows identically — the loop, two-gate readiness, BUILDS≠WORKS, the independent QUALITY_SCORECARD, the business-case strength loop-back, growth-data-as-signal, the model split, the value bar, the disjoint rule, and the brakes. FOLLOW IT. This ROADMAP + VISION.md hold the product-specific details (what to build, the security model, the ship target, the stack) and win on any specific. Identical factories, different products.
+
 Every box is `[ ]` until there is **verifiable proof on the default branch with the
 gate green this run**. Never mass-tick. Un-tick any box whose proof later fails.
+
+## STABLE ANCHORS (do not churn)
+These change only by deliberate intent, never as loop work: `VISION.md`, the guard rules,
+the guard tests, and **`FACTORY_STANDARD.md`**.
+- **FACTORY_STANDARD.md is the shared cross-factory discipline, byte-identical across every factory repo: NEVER edit or paraphrase it to fit this product (product-specifics belong in ROADMAP/VISION); it changes ONLY by a deliberate canonical sync, never as loop work.**
 
 ---
 

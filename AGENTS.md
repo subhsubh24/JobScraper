@@ -45,6 +45,12 @@ When an agent slips: add a rule here, add a deterministic guard (preflight check
 and record the lesson in `docs/loop-memory.md` so it can't recur. Remove a rule only when a
 guard makes it redundant.
 
+## Shared standard
+`FACTORY_STANDARD.md` (repo root) is the shared, product-agnostic factory discipline — read
+it every run; it is a STABLE ANCHOR (never edit/paraphrase it to fit this product; it syncs
+canonically across all factory repos). Product-specifics live in ROADMAP/VISION.
+
 ## Hard don'ts
 Never edit `.claude/` or `.github/`. Never commit secrets. Never weaken a guard/test to go
-green. Always branch before editing; one merged change per loop run.
+green. Always branch before editing; one merged change per loop run. Never edit
+`FACTORY_STANDARD.md` as loop work.
