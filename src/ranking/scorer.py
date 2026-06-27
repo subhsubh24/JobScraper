@@ -1,12 +1,11 @@
 """Job scoring algorithm using embeddings and heuristics."""
-import os
 import json
-from typing import Optional, List
+from typing import List
 import numpy as np
-from openai import OpenAI
 from sqlalchemy.orm import Session
 
 from src.db.models import JobPosting, JobScore, User
+from src.llm import get_openai_client
 
 
 class JobScorer:
@@ -16,10 +15,12 @@ class JobScorer:
 
     def __init__(self, db: Session):
         self.db = db
-        self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        self.client = get_openai_client()
 
     def get_embedding(self, text: str) -> List[float]:
         """Get embedding vector for text."""
+        if self.client is None:
+            raise RuntimeError("OPENAI_API_KEY not configured; using heuristic fallback")
         response = self.client.embeddings.create(
             model=self.EMBEDDING_MODEL,
             input=text[:8000]  # Limit input length

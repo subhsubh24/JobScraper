@@ -1,13 +1,9 @@
 #!/usr/bin/env python3
 """JobScraper CLI."""
-import os
 import click
 import json
-from pathlib import Path
 from rich.console import Console
 from rich.table import Table
-from rich.panel import Panel
-from rich import print as rprint
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -220,15 +216,15 @@ def view_prep(job_pk):
     console.print("\n[bold cyan]═══ JD STRUCTURED SPEC ═══[/bold cyan]\n")
     console.print(f"[bold]Role Family:[/bold] {jd_spec.get('role_family', 'N/A')}")
     console.print(f"[bold]Level:[/bold] {jd_spec.get('inferred_level', 'N/A')}")
-    console.print(f"[bold]Must-Haves:[/bold]")
+    console.print("[bold]Must-Haves:[/bold]")
     for item in jd_spec.get('must_haves', [])[:5]:
         console.print(f"  • {item}")
 
     # Fit Mapping
     console.print("\n[bold cyan]═══ FIT MAPPING ═══[/bold cyan]\n")
-    console.print(f"[bold]Positioning Angle:[/bold]")
+    console.print("[bold]Positioning Angle:[/bold]")
     console.print(f"{fit_mapping.get('positioning_angle', 'N/A')}\n")
-    console.print(f"[bold]Strongest Matches:[/bold]")
+    console.print("[bold]Strongest Matches:[/bold]")
     for match in fit_mapping.get('strongest_matches', [])[:3]:
         console.print(f"  • {match.get('skill', 'N/A')}")
 

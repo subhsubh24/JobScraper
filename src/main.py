@@ -1,12 +1,11 @@
 """Main orchestrator for JobScraper CLI operations."""
-from typing import List, Optional
+from typing import List
 from sqlalchemy.orm import Session
 
 from src.db.models import Company, JobPosting, ATSType
 from src.ingestion.detector import ATSDetector
 from src.ingestion.greenhouse import GreenhouseClient
 from src.ingestion.lever import LeverClient
-from src.ranking.scorer import JobScorer
 
 
 class JobScraperOrchestrator:
@@ -37,7 +36,7 @@ class JobScraperOrchestrator:
         companies = self.db.query(Company).filter(
             Company.ats_type == ATSType.UNKNOWN,
             Company.careers_url.isnot(None),
-            Company.is_active == True,
+            Company.is_active.is_(True),
         ).all()
 
         updated = []
@@ -122,7 +121,7 @@ class JobScraperOrchestrator:
         companies = self.db.query(Company).filter(
             Company.ats_type != ATSType.UNKNOWN,
             Company.ats_identifier.isnot(None),
-            Company.is_active == True,
+            Company.is_active.is_(True),
         ).all()
 
         all_jobs = []

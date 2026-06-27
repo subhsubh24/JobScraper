@@ -1,90 +1,50 @@
-# Career Operator - Flutter Mobile App
+# Career Operator — Mobile (Expo / React Native, TypeScript)
 
-This is the Flutter mobile app for Career Operator.
+Native iOS + Android app for Career Operator. Full-parity client for the Python
+backend API (`/api/*`). Replaces the earlier Flutter prototype (now in
+`../mobile-flutter-legacy/`).
 
-## Setup
+## Stack
+- Expo SDK 56, React Native 0.85, React 19, TypeScript (strict)
+- expo-router (file-based routing), expo-secure-store (token storage)
 
-### Prerequisites
-- Flutter SDK 3.0+
-- Dart SDK
-- Xcode (for iOS)
-- Android Studio (for Android)
-
-### Installation
-
+## Run
 ```bash
-# Navigate to mobile directory
-cd mobile
-
-# Get dependencies
-flutter pub get
-
-# Run the app
-flutter run
+npm install
+npm run typecheck   # tsc --noEmit
+npm run lint        # expo lint
+npm start           # then press i / a, or scan in Expo Go
 ```
 
-### Configuration
+## Configure the API URL
+Set `expo.extra.apiUrl` in `app.json` to your backend:
+- local dev: `http://localhost:8000` (default)
+- production: your Railway URL, e.g. `https://career-operator.up.railway.app`
 
-1. Update the API URL in `lib/services/api_client.dart`:
-```dart
-static const String baseUrl = 'https://your-railway-app.railway.app';
+The base URL is read in `src/services/api.ts` via `expo-constants`.
+
+## Structure
+```
+src/
+  app/                 # expo-router routes
+    _layout.tsx        # root stack + AuthProvider
+    index.tsx          # auth gate / redirect
+    (auth)/            # login, register
+    (tabs)/            # Pipeline (jobs+stats), Coach, Settings
+    job/new.tsx        # add a job
+    job/[id].tsx       # job detail + status + prep pack
+    paywall.tsx        # subscription paywall (purchase flow = Track C)
+  contexts/auth.tsx    # session state
+  services/api.ts      # typed API client + secure token storage
+  components/ui.tsx    # Button / Field / Card / EmptyState
+  theme.ts, types.ts
 ```
 
-2. For production, configure:
-- App icons
-- Splash screen
-- App signing keys
-
-## Project Structure
-
-```
-lib/
-├── main.dart              # App entry point
-├── theme.dart             # App theming
-├── models/                # Data models
-│   ├── user.dart
-│   ├── job.dart
-│   └── chat_message.dart
-├── services/              # API & services
-│   └── api_client.dart
-├── providers/             # State management
-│   ├── auth_provider.dart
-│   ├── jobs_provider.dart
-│   └── coach_provider.dart
-├── screens/               # UI screens
-│   ├── auth/
-│   ├── home/
-│   ├── jobs/
-│   ├── coach/
-│   └── settings/
-└── widgets/               # Reusable widgets
-    ├── job_card.dart
-    └── stat_card.dart
-```
-
-## Features
-
-- **Authentication**: Login, register, JWT tokens
-- **Job Tracking**: Add, view, update job applications
-- **AI Scoring**: View match scores for jobs
-- **Prep Packs**: Generate AI-powered interview prep
-- **AI Coach**: Chat with career coach
-- **Pipeline**: Track application status
-
-## Building for Release
-
-### iOS
-```bash
-flutter build ios --release
-```
-
-### Android
-```bash
-flutter build apk --release
-# or
-flutter build appbundle --release
-```
-
-## App Store Submission
-
-See the main project's `SHIP_IT.md` for complete launch guide.
+## Status (honest)
+- ✅ Typecheck-clean, lint-clean. Auth + pipeline + job detail + coach + paywall UI
+  wired to the real API with real loading/empty/error states.
+- ⏳ In-app purchase (RevenueCat/StoreKit/Play Billing) — Track C, needs owner store
+  accounts + product IDs.
+- ⏳ Account-deletion server endpoint — Track D (required before store submission).
+- ⏳ Component/integration test suite + native device runs — Track E / human checklist.
+- ⏳ Real rendered store assets (icon/screenshots/feature graphic) — Track D.
