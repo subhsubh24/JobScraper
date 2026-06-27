@@ -518,7 +518,10 @@ def root():
 
 
 @app.get("/health")
+@app.get("/api/health")
 def health():
+    # /api/health is reachable in the unified Vercel deployment (backend mounted at /api);
+    # /health is for local/container runs where the app owns the root.
     return {"status": "healthy", "version": app.version, "llm_enabled": llm_available()}
 
 

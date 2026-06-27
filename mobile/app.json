@@ -8,7 +8,7 @@
     "scheme": "careeroperator",
     "userInterfaceStyle": "dark",
     "extra": {
-      "apiUrl": "https://job-scraper-tawny.vercel.app"
+      "apiUrl": "http://localhost:8000"
     },
     "ios": {
       "bundleIdentifier": "com.careeroperator.app",

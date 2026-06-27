@@ -1,11 +1,17 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "functions": {
-    "api/index.py": {
-      "maxDuration": 60
+  "experimentalServices": {
+    "web": {
+      "entrypoint": "web",
+      "routePrefix": "/",
+      "framework": "nextjs"
+    },
+    "api": {
+      "entrypoint": "asgi.py",
+      "routePrefix": "/api",
+      "framework": "fastapi",
+      "maxDuration": 60,
+      "excludeFiles": "{mobile/**,mobile-flutter-legacy/**,web/**,tests/**,docs/**,data/**}"
     }
-  },
-  "rewrites": [
-    { "source": "/(.*)", "destination": "/api/index" }
-  ]
+  }
 }
