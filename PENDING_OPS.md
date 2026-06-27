@@ -55,11 +55,11 @@ OWNER_ACTIONS:
       why: "Growth Agent stays in prepare-mode until a connected, funded, authorized channel exists."
       how: "Follow docs/growth/CONNECT.md (~20 min). Then the Growth Agent can queue/measure for real."
     - id: deploy-env
-      title: "Provision Neon Postgres + set Vercel env vars"
+      title: "Set Vercel env vars + deploy (Neon DB done)"
       priority: high
-      status: open
-      why: "Vercel serverless has no SQLite persistence; the API needs Neon Postgres (pooled endpoint) plus OPENAI_API_KEY, JWT_SECRET, ALLOWED_ORIGINS, STRIPE_* set server-side."
-      how: "See docs/DEPLOY_VERCEL.md: create a Neon project, use the POOLED connection string (host has -pooler) with sslmode=require, set Vercel env vars. Schema auto-creates on cold start (AUTO_CREATE_TABLES=1) or run `DATABASE_URL=... python scripts/init_db.py` once. Never commit .env."
+      status: in_progress
+      why: "Neon project 'JobScraper' is provisioned and the schema is created + verified (full journey ran green against it). Remaining: set server-side env vars in Vercel and deploy."
+      how: "DONE: Neon DB + 9 tables via pooled endpoint. TODO: in Vercel set DATABASE_URL (Neon pooled string), JWT_SECRET (openssl rand -hex 32), optional OPENAI_API_KEY + ALLOWED_ORIGINS; deploy; verify GET /health. See docs/DEPLOY_VERCEL.md. Never commit .env."
     - id: ci-wiring
       title: "Wire preflight + journey suite + mobile build into CI (needs workflow scope)"
       priority: normal
