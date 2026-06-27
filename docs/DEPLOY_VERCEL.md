@@ -37,7 +37,11 @@ External: Postgres (Neon / Supabase / Vercel Postgres) — SQLite has no persist
    - `LLM_DAILY_CEILING` = e.g. `25`
    - (Track C) `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`
 3. **Set spend caps NOW** (OpenAI usage limit; Stripe limits). Wallet-drain defense.
-4. Run migrations against the Postgres DB (alembic) before first real traffic.
+4. **Schema:** the API auto-creates missing tables on cold start (`AUTO_CREATE_TABLES=1`,
+   the default), so a fresh Postgres works on first request. To create it explicitly
+   instead, run once: `DATABASE_URL='postgresql://...' python scripts/init_db.py`.
+   There are **no alembic migrations yet** — once you add them, set
+   `AUTO_CREATE_TABLES=0` and run `alembic upgrade head`.
 
 ## Deploy
 - Connect the GitHub repo to Vercel (root = repo root). Push to `main` → Vercel builds
