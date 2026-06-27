@@ -2,7 +2,6 @@
 import re
 import requests
 from typing import Optional, Tuple
-from urllib.parse import urlparse
 
 from src.db.models import ATSType
 

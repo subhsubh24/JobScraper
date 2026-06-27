@@ -1,11 +1,9 @@
 """LLM workflows for job enrichment and prep pack generation."""
-import os
 import json
-from typing import Optional
-from openai import OpenAI
 from sqlalchemy.orm import Session
 
 from src.db.models import JobPosting, PrepArtifact, User
+from src.llm import get_openai_client
 
 
 class LLMWorkflows:
@@ -15,10 +13,12 @@ class LLMWorkflows:
 
     def __init__(self, db: Session):
         self.db = db
-        self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        self.client = get_openai_client()
 
     def _call_llm(self, system_prompt: str, user_prompt: str, json_mode: bool = False) -> str:
         """Make a call to the LLM."""
+        if self.client is None:
+            raise RuntimeError("OPENAI_API_KEY not configured")
         kwargs = {
             "model": self.MODEL,
             "messages": [

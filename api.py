@@ -1,470 +1,514 @@
-"""
-FastAPI backend for Career Operator mobile app.
-Optimized for $4.99 one-time purchase model.
-"""
-from fastapi import FastAPI, HTTPException, Depends, Header
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
-from typing import List, Optional, Dict
-from datetime import datetime
-import os
-from dotenv import load_dotenv
+"""FastAPI backend for Career Operator.
 
-from src.db import get_session
-from src.db.models import User, JobPosting, JobScore, Application, PrepArtifact, ChatMessage
-from src.ranking.scorer import JobScorer
-from src.enrichment.llm_workflows import LLMWorkflows
+Talks to the real `src/` services and models. Designed to DEGRADE GRACEFULLY:
+the core journey (auth + job tracking + scoring + pipeline analytics) works with NO
+OpenAI key via heuristic scoring; AI features (prep packs, coach) return a truthful
+"needs configuration" response instead of crashing when the key is absent.
+"""
+import logging
+import os
+import time
+from collections import defaultdict
+from datetime import datetime, date
+from typing import Dict, List, Optional, Tuple
+
+from dotenv import load_dotenv
+from fastapi import Depends, FastAPI, Header, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel, Field
+from sqlalchemy.orm import Session
+
 from src.ai_coach.career_coach import CareerCoach
 from src.auth.auth_service import AuthService
+from src.db import get_db
+from src.db.models import (
+    Application,
+    ApplicationStatus,
+    JobPosting,
+    PrepArtifact,
+    User,
+    UserTier,
+)
+from src.enrichment.llm_workflows import LLMWorkflows
+from src.llm import llm_available
+from src.ranking.scorer import JobScorer
 
 load_dotenv()
+logger = logging.getLogger("career_operator")
 
 app = FastAPI(
     title="Career Operator API",
-    description="AI-powered job search platform for mobile apps",
-    version="1.0.0"
+    description="AI-powered job search platform (web + mobile)",
+    version="1.1.0",
 )
 
-# CORS for mobile apps
+# CORS locked to known origins (override via ALLOWED_ORIGINS, comma-separated).
+_origins = os.getenv("ALLOWED_ORIGINS", "").strip()
+allow_origins = [o.strip() for o in _origins.split(",") if o.strip()] or [
+    "http://localhost",
+    "http://localhost:8081",  # Expo dev
+    "http://localhost:19006",
+]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, restrict to your app
+    allow_origins=allow_origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
-# ============================================================================
-# Request/Response Models
-# ============================================================================
+# Security headers on every response.
+SECURITY_HEADERS = {
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Referrer-Policy": "no-referrer",
+}
 
+
+@app.middleware("http")
+async def security_headers(request: Request, call_next):
+    response = await call_next(request)
+    for k, v in SECURITY_HEADERS.items():
+        response.headers[k] = v
+    return response
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    """Error hygiene: never leak stack traces / internals to clients."""
+    logger.exception("Unhandled error on %s", request.url.path)
+    return JSONResponse(status_code=500, content={"detail": "Internal server error"})
+
+
+# ---------------------------------------------------------------------------
+# Rate limiting + per-user/day LLM spend ceiling (in-memory; swap for Redis in prod)
+# ---------------------------------------------------------------------------
+_RATE_BUCKET: Dict[Tuple[str, str], List[float]] = defaultdict(list)
+_LLM_DAY_COUNT: Dict[Tuple[str, str], int] = defaultdict(int)
+
+# Per-user/day ceiling on expensive LLM operations (wallet-drain defense).
+LLM_DAILY_CEILING = int(os.getenv("LLM_DAILY_CEILING", "25"))
+
+
+def rate_limit(bucket: str, limit: int, window_seconds: int = 60):
+    """Fixed-window limiter dependency factory, keyed by client + bucket."""
+    def _dep(request: Request) -> None:
+        client = request.client.host if request.client else "unknown"
+        key = (client, bucket)
+        now = time.time()
+        hits = [t for t in _RATE_BUCKET[key] if now - t < window_seconds]
+        if len(hits) >= limit:
+            raise HTTPException(status_code=429, detail="Too many requests. Slow down.")
+        hits.append(now)
+        _RATE_BUCKET[key] = hits
+    return _dep
+
+
+def check_llm_ceiling(user: User) -> None:
+    key = (user.id, date.today().isoformat())
+    if _LLM_DAY_COUNT[key] >= LLM_DAILY_CEILING:
+        raise HTTPException(
+            status_code=429,
+            detail="Daily AI usage limit reached. Try again tomorrow.",
+        )
+    _LLM_DAY_COUNT[key] += 1
+
+
+# ---------------------------------------------------------------------------
+# Schemas
+# ---------------------------------------------------------------------------
 class UserCreate(BaseModel):
     email: str
-    password: str
-    full_name: str
-    target_roles: List[str] = Field(default_factory=list)
-    target_salary_min: float = 150000
-    target_locations: List[str] = Field(default_factory=lambda: ["Remote US"])
+    password: str = Field(min_length=8, max_length=128)
+    full_name: Optional[str] = None
+    resume_text: Optional[str] = None
+
 
 class UserLogin(BaseModel):
     email: str
     password: str
 
+
 class JobCreate(BaseModel):
-    title: str
-    company_name: str
-    location: str
-    salary_min: Optional[float] = None
-    salary_max: Optional[float] = None
-    description: str
-    apply_url: Optional[str] = None
+    title: str = Field(min_length=1, max_length=255)
+    company_name: str = Field(min_length=1, max_length=255)
+    location: Optional[str] = None
+    salary_min: Optional[int] = None
+    salary_max: Optional[int] = None
+    description: Optional[str] = None
+    requirements: Optional[str] = None
+    url: Optional[str] = None
+
 
 class JobUpdate(BaseModel):
-    status: Optional[str] = None
+    status: str
+
 
 class PrepPackRequest(BaseModel):
-    job_pk: str
+    job_id: str
+
 
 class ChatRequest(BaseModel):
-    message: str
-    job_pk: Optional[str] = None
-    context_type: str = "general"
+    message: str = Field(min_length=1, max_length=4000)
+    job_id: Optional[str] = None
+    session_id: Optional[str] = None
+
 
 class AppPurchase(BaseModel):
-    receipt_data: str  # Apple/Google receipt
-    device_id: str
+    receipt_data: str
+    platform: str = "ios"
 
-# ============================================================================
-# Authentication
-# ============================================================================
 
-def get_current_user(authorization: str = Header(None)):
-    """Verify JWT token and return user."""
+# ---------------------------------------------------------------------------
+# Serialization helpers
+# ---------------------------------------------------------------------------
+def user_public(user: User, db: Session) -> dict:
+    limits = AuthService(db).check_usage_limits(user)
+    return {
+        "id": user.id,
+        "email": user.email,
+        "full_name": user.full_name,
+        "tier": user.tier.value if isinstance(user.tier, UserTier) else user.tier,
+        "jobs_remaining": limits["jobs_remaining"],
+        "prep_packs_remaining": limits["prep_packs_remaining"],
+        "ai_coach": user.tier == UserTier.PREMIUM,
+    }
+
+
+def job_public(job: JobPosting) -> dict:
+    status = job.application.status if job.application else ApplicationStatus.SAVED
+    return {
+        "id": job.id,
+        "title": job.title,
+        "company": job.company_name or (job.company.name if job.company else None),
+        "location": job.location,
+        "salary_min": job.salary_min,
+        "salary_max": job.salary_max,
+        "score": round(job.score.overall_score, 1) if job.score else None,
+        "score_explanation": job.score.score_explanation if job.score else None,
+        "status": status.value if hasattr(status, "value") else status,
+        "url": job.url,
+        "created_at": job.created_at.isoformat() if job.created_at else None,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Auth dependency
+# ---------------------------------------------------------------------------
+def get_current_user(
+    authorization: str = Header(None),
+    db: Session = Depends(get_db),
+) -> User:
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Missing or invalid token")
-
-    token = authorization.split(" ")[1]
-    payload = AuthService.verify_token(token)
-
-    if not payload:
+    token = authorization.split(" ", 1)[1]
+    user = AuthService(db).get_user_from_token(token)
+    if not user:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
-
-    db = get_session()
-    user = db.query(User).filter_by(user_id=payload['user_id']).first()
-
-    if not user or not user.is_active:
-        raise HTTPException(status_code=401, detail="User not found or inactive")
-
     return user
 
-# ============================================================================
-# Auth Endpoints
-# ============================================================================
 
-@app.post("/api/auth/register")
-def register(data: UserCreate):
-    """Register new user (free tier)."""
-    db = get_session()
-
+# ---------------------------------------------------------------------------
+# Auth endpoints
+# ---------------------------------------------------------------------------
+@app.post("/api/auth/register", dependencies=[Depends(rate_limit("auth", 10))])
+def register(data: UserCreate, db: Session = Depends(get_db)):
+    auth = AuthService(db)
     try:
-        user = AuthService.create_user(
-            session=db,
-            email=data.email,
-            password=data.password,
-            full_name=data.full_name,
-            subscription_tier='free'
-        )
+        user, token = auth.register(data.email, data.password, data.full_name)
+    except ValueError:
+        # Do NOT reveal whether the email already exists (enumeration defense).
+        raise HTTPException(status_code=400, detail="Could not register with those details")
+    if data.resume_text:
+        user.resume_text = data.resume_text
+    db.commit()
+    db.refresh(user)
+    return {"success": True, "token": token, "user": user_public(user, db)}
 
-        # Set preferences
-        user.target_salary_min = data.target_salary_min
-        user.target_role_families = ','.join(data.target_roles)
-        user.target_locations = ','.join(data.target_locations)
-        db.commit()
 
-        token = AuthService.generate_token(user)
+@app.post("/api/auth/login", dependencies=[Depends(rate_limit("auth", 10))])
+def login(data: UserLogin, db: Session = Depends(get_db)):
+    auth = AuthService(db)
+    try:
+        user, token = auth.login(data.email, data.password)
+    except ValueError:
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+    db.commit()
+    return {"success": True, "token": token, "user": user_public(user, db)}
 
-        return {
-            'success': True,
-            'token': token,
-            'user': {
-                'user_id': user.user_id,
-                'email': user.email,
-                'full_name': user.full_name,
-                'subscription_tier': user.subscription_tier,
-                'prep_packs_remaining': 1 if user.subscription_tier == 'free' else 5,
-                'ai_messages_remaining': 0 if user.subscription_tier == 'free' else 20
-            }
-        }
 
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+@app.get("/api/auth/me")
+def me(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    return {"success": True, "user": user_public(user, db)}
 
-@app.post("/api/auth/login")
-def login(data: UserLogin):
-    """Login user."""
-    db = get_session()
-
-    user = AuthService.authenticate_user(db, data.email, data.password)
-
-    if not user:
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-
-    token = AuthService.generate_token(user)
-
-    return {
-        'success': True,
-        'token': token,
-        'user': {
-            'user_id': user.user_id,
-            'email': user.email,
-            'full_name': user.full_name,
-            'subscription_tier': user.subscription_tier,
-            'prep_packs_remaining': max(0, (5 if user.subscription_tier == 'premium' else 1) - user.prep_packs_used_this_month),
-            'ai_messages_remaining': max(0, (20 if user.subscription_tier == 'premium' else 0) - user.ai_messages_used_this_month)
-        }
-    }
 
 @app.post("/api/auth/verify-purchase")
-def verify_purchase(data: AppPurchase, user: User = Depends(get_current_user)):
-    """Verify app store purchase and upgrade to premium."""
-    db = get_session()
+def verify_purchase(
+    data: AppPurchase,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Upgrade to premium after a verified store purchase.
 
-    # TODO: Implement actual receipt verification
-    # For now, just upgrade user
-
-    user.subscription_tier = 'premium'
-    user.subscription_status = 'active'
-    user.subscription_start_date = datetime.utcnow()
+    NOTE: real receipt/signature verification (Apple/Google/RevenueCat) is Track C and
+    NOT yet implemented — this endpoint trusts the client and must not ship to
+    production as-is. Tracked in ROADMAP Track C + ACCEPTANCE_AUDIT (A4/G4).
+    """
+    AuthService(db).upgrade_to_premium(user, data.receipt_data)
     db.commit()
+    db.refresh(user)
+    return {"success": True, "user": user_public(user, db)}
 
-    return {
-        'success': True,
-        'message': 'Purchase verified! You now have Premium access.',
-        'user': {
-            'subscription_tier': user.subscription_tier,
-            'prep_packs_remaining': 5,
-            'ai_messages_remaining': 20
-        }
-    }
 
-# ============================================================================
-# Job Endpoints
-# ============================================================================
-
-@app.post("/api/jobs")
-def create_job(data: JobCreate, user: User = Depends(get_current_user)):
-    """Add a new job to track."""
-    db = get_session()
-
-    # Check job limit (free: 5, premium: unlimited)
-    job_count = db.query(JobPosting).filter_by(user_id=user.user_id).count()
-
-    if user.subscription_tier == 'free' and job_count >= 5:
+# ---------------------------------------------------------------------------
+# Job endpoints
+# ---------------------------------------------------------------------------
+@app.post("/api/jobs", dependencies=[Depends(rate_limit("write", 30))])
+def create_job(
+    data: JobCreate,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    auth = AuthService(db)
+    limits = auth.check_usage_limits(user)
+    if not limits["can_add_job"]:
         raise HTTPException(
             status_code=403,
-            detail="Free tier limited to 5 jobs. Upgrade to Premium for unlimited."
+            detail="Free tier is limited to 5 tracked jobs. Upgrade to Pro for unlimited.",
         )
 
-    # Create job
-    import uuid
     job = JobPosting(
-        job_pk=str(uuid.uuid4()),
-        user_id=user.user_id,
-        source='manual',
-        source_job_id=str(uuid.uuid4()),
-        company_id=1,  # TODO: Create company if not exists
+        user_id=user.id,
         title=data.title,
-        location_raw=data.location,
+        company_name=data.company_name,
+        location=data.location,
         salary_min=data.salary_min,
         salary_max=data.salary_max,
-        description_text=data.description,
-        apply_url=data.apply_url,
-        status='new'
+        description=data.description,
+        requirements=data.requirements,
+        url=data.url,
     )
-
     db.add(job)
+    db.flush()
 
-    # Score the job
-    scorer = JobScorer()
-    score_result = scorer.score_job(
-        job={'title': data.title, 'description': data.description, 'salary_min': data.salary_min or 0},
-        company={'name': data.company_name},
-        user_resume=user.resume_text or ""
-    )
+    # Score (heuristic fallback when no OpenAI key — never crashes).
+    try:
+        JobScorer(db).score_job(job, user)
+    except Exception:
+        logger.exception("Scoring failed for job %s; continuing unscored", job.id)
 
-    job_score = JobScore(
-        job_pk=job.job_pk,
-        total_score=score_result['total_score'],
-        score_breakdown_json=str(score_result['breakdown']),
-        mode='standard'
-    )
-
-    db.add(job_score)
+    # Track it: create the pipeline Application row in SAVED.
+    db.add(Application(user_id=user.id, job_id=job.id, status=ApplicationStatus.SAVED))
+    auth.increment_job_usage(user)
     db.commit()
+    db.refresh(job)
+    return {"success": True, "job": job_public(job)}
 
-    return {
-        'success': True,
-        'job': {
-            'job_pk': job.job_pk,
-            'title': job.title,
-            'company': data.company_name,
-            'location': job.location_raw,
-            'salary_min': job.salary_min,
-            'salary_max': job.salary_max,
-            'score': score_result['total_score'],
-            'status': job.status
-        }
-    }
 
 @app.get("/api/jobs")
-def get_jobs(user: User = Depends(get_current_user)):
-    """Get all user's jobs."""
-    db = get_session()
+def list_jobs(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    jobs = (
+        db.query(JobPosting)
+        .filter(JobPosting.user_id == user.id)
+        .order_by(JobPosting.created_at.desc())
+        .all()
+    )
+    return {"success": True, "jobs": [job_public(j) for j in jobs]}
 
-    jobs = db.query(JobPosting).filter_by(user_id=user.user_id).all()
 
-    return {
-        'success': True,
-        'jobs': [{
-            'job_pk': job.job_pk,
-            'title': job.title,
-            'company': job.company.name if job.company else 'Unknown',
-            'location': job.location_raw,
-            'salary_min': job.salary_min,
-            'salary_max': job.salary_max,
-            'score': job.job_score.total_score if job.job_score else 0,
-            'status': job.status,
-            'created_at': job.created_at.isoformat()
-        } for job in jobs]
-    }
+@app.get("/api/jobs/{job_id}")
+def get_job(
+    job_id: str,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    job = (
+        db.query(JobPosting)
+        .filter(JobPosting.id == job_id, JobPosting.user_id == user.id)
+        .first()
+    )
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return {"success": True, "job": job_public(job)}
 
-@app.patch("/api/jobs/{job_pk}")
-def update_job(job_pk: str, data: JobUpdate, user: User = Depends(get_current_user)):
-    """Update job status."""
-    db = get_session()
 
-    job = db.query(JobPosting).filter_by(job_pk=job_pk, user_id=user.user_id).first()
+VALID_STATUSES = {s.value for s in ApplicationStatus}
 
+
+@app.patch("/api/jobs/{job_id}", dependencies=[Depends(rate_limit("write", 60))])
+def update_job_status(
+    job_id: str,
+    data: JobUpdate,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if data.status not in VALID_STATUSES:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Invalid status. Must be one of: {sorted(VALID_STATUSES)}",
+        )
+    job = (
+        db.query(JobPosting)
+        .filter(JobPosting.id == job_id, JobPosting.user_id == user.id)
+        .first()
+    )
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
 
-    if data.status:
-        job.status = data.status
-
+    application = job.application
+    if not application:
+        application = Application(user_id=user.id, job_id=job.id)
+        db.add(application)
+    application.status = ApplicationStatus(data.status)
+    application.last_activity_at = datetime.utcnow()
+    if data.status == ApplicationStatus.APPLIED.value and not application.applied_at:
+        application.applied_at = datetime.utcnow()
     db.commit()
+    db.refresh(job)
+    return {"success": True, "job": job_public(job)}
 
-    return {
-        'success': True,
-        'job': {
-            'job_pk': job.job_pk,
-            'status': job.status
-        }
-    }
 
-# ============================================================================
-# Prep Pack Endpoints
-# ============================================================================
+# ---------------------------------------------------------------------------
+# Prep packs (LLM — degrades gracefully)
+# ---------------------------------------------------------------------------
+@app.post("/api/prep-packs/generate", dependencies=[Depends(rate_limit("llm", 10))])
+def generate_prep_pack(
+    data: PrepPackRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    auth = AuthService(db)
+    limits = auth.check_usage_limits(user)
+    if not limits["can_generate_prep"]:
+        raise HTTPException(
+            status_code=403,
+            detail="Free tier is limited to 1 prep pack/month. Upgrade to Pro for more.",
+        )
 
-@app.post("/api/prep-packs/generate")
-def generate_prep_pack(data: PrepPackRequest, user: User = Depends(get_current_user)):
-    """Generate AI interview prep pack."""
-    db = get_session()
-
-    # Check if user has credits
-    if user.subscription_tier == 'free':
-        if user.prep_packs_used_this_month >= 1:
-            raise HTTPException(
-                status_code=403,
-                detail="Free tier limited to 1 prep pack/month. Upgrade to Premium for 5/month."
-            )
-    elif user.subscription_tier == 'premium':
-        if user.prep_packs_used_this_month >= 5:
-            raise HTTPException(
-                status_code=403,
-                detail="You've used all 5 prep packs this month. Resets in {} days.".format(
-                    (user.usage_reset_date - datetime.utcnow()).days
-                )
-            )
-
-    # Get job
-    job = db.query(JobPosting).filter_by(job_pk=data.job_pk, user_id=user.user_id).first()
-
+    job = (
+        db.query(JobPosting)
+        .filter(JobPosting.id == data.job_id, JobPosting.user_id == user.id)
+        .first()
+    )
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
 
-    # Generate prep pack (this will use OpenAI)
-    workflows = LLMWorkflows()
+    if not llm_available():
+        # Truthful graceful degradation — not a crash, not a fake result.
+        raise HTTPException(
+            status_code=503,
+            detail="AI prep packs require the server's OPENAI_API_KEY to be configured.",
+        )
 
+    check_llm_ceiling(user)
     try:
-        # This is simplified - in production, run all 6 workflows
-        company_dossier = workflows.workflow_company_dossier(
-            company_name=job.company.name if job.company else "Unknown",
-            job_pk=job.job_pk
-        )
+        artifact: PrepArtifact = LLMWorkflows(db).generate_prep_pack(job, user)
+    except Exception:
+        logger.exception("Prep pack generation failed")
+        raise HTTPException(status_code=502, detail="AI provider error generating prep pack")
 
-        # Increment usage
-        AuthService.increment_prep_pack_usage(db, user.user_id)
+    auth.increment_prep_usage(user)
+    db.commit()
+    return {
+        "success": True,
+        "prep_pack": {
+            "id": artifact.id,
+            "title": artifact.title,
+            "content": artifact.content,
+        },
+        "prep_packs_remaining": auth.check_usage_limits(user)["prep_packs_remaining"],
+    }
 
-        # Save prep artifact
-        prep = PrepArtifact(
-            job_pk=job.job_pk,
-            company_dossier_json=str(company_dossier)
-        )
-        db.add(prep)
-        db.commit()
 
-        return {
-            'success': True,
-            'prep_pack': {
-                'company_dossier': company_dossier,
-                'credits_remaining': max(0, (5 if user.subscription_tier == 'premium' else 1) - user.prep_packs_used_this_month)
-            }
-        }
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to generate prep pack: {str(e)}")
-
-# ============================================================================
-# AI Career Coach Endpoints
-# ============================================================================
-
-@app.post("/api/coach/chat")
-def chat_with_coach(data: ChatRequest, user: User = Depends(get_current_user)):
-    """Chat with AI Career Coach."""
-    db = get_session()
-
-    # Check tier
-    if user.subscription_tier == 'free':
+# ---------------------------------------------------------------------------
+# AI coach (Premium; LLM — degrades gracefully)
+# ---------------------------------------------------------------------------
+@app.post("/api/coach/chat", dependencies=[Depends(rate_limit("llm", 20))])
+def coach_chat(
+    data: ChatRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if user.tier != UserTier.PREMIUM:
         raise HTTPException(
             status_code=403,
-            detail="AI Career Coach is only available in Premium. Upgrade for $4.99!"
+            detail="The AI Career Coach is a Premium feature. Upgrade to unlock it.",
         )
-
-    # Check credits
-    if user.ai_messages_used_this_month >= 20:
+    if not CareerCoach.available():
         raise HTTPException(
-            status_code=403,
-            detail="You've used all 20 AI messages this month. Resets in {} days.".format(
-                (user.usage_reset_date - datetime.utcnow()).days
-            )
+            status_code=503,
+            detail="The AI Coach requires the server's OPENAI_API_KEY to be configured.",
         )
 
-    coach = CareerCoach()
-
+    check_llm_ceiling(user)
+    job = None
+    if data.job_id:
+        job = (
+            db.query(JobPosting)
+            .filter(JobPosting.id == data.job_id, JobPosting.user_id == user.id)
+            .first()
+        )
     try:
-        response = coach.chat(
-            db=db,
+        reply = CareerCoach(db).chat(
             user=user,
             message=data.message,
-            context_type=data.context_type,
-            job_pk=data.job_pk
+            session_id=data.session_id,
+            job_context=job,
         )
+    except Exception:
+        logger.exception("Coach chat failed")
+        raise HTTPException(status_code=502, detail="AI provider error in coach chat")
+    db.commit()
+    return {"success": True, "message": reply}
 
-        AuthService.increment_ai_message_usage(db, user.user_id)
-
-        return {
-            'success': True,
-            'message': response['message'],
-            'credits_remaining': max(0, 20 - user.ai_messages_used_this_month)
-        }
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"AI Coach error: {str(e)}")
 
 @app.get("/api/coach/suggestions")
-def get_coach_suggestions(user: User = Depends(get_current_user)):
-    """Get suggested questions for AI Coach."""
-    db = get_session()
+def coach_suggestions(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    # Works without an LLM key — deterministic, context-aware suggestions.
+    suggestions = CareerCoach(db).get_suggested_questions(user)
+    return {"success": True, "suggestions": suggestions}
 
-    coach = CareerCoach()
-    suggestions = coach.get_suggested_questions(user, db)
 
-    return {
-        'success': True,
-        'suggestions': suggestions
-    }
-
-# ============================================================================
-# Analytics Endpoints
-# ============================================================================
-
+# ---------------------------------------------------------------------------
+# Analytics
+# ---------------------------------------------------------------------------
 @app.get("/api/analytics/pipeline")
-def get_pipeline_stats(user: User = Depends(get_current_user)):
-    """Get pipeline statistics."""
-    db = get_session()
-
-    jobs = db.query(JobPosting).filter_by(user_id=user.user_id).all()
-
-    status_counts = {}
+def pipeline_stats(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    jobs = db.query(JobPosting).filter(JobPosting.user_id == user.id).all()
+    status_counts: Dict[str, int] = {}
+    scores = []
     for job in jobs:
-        status_counts[job.status] = status_counts.get(job.status, 0) + 1
-
-    avg_score = sum(job.job_score.total_score for job in jobs if job.job_score) / max(len(jobs), 1)
-
+        status = job.application.status.value if job.application else ApplicationStatus.SAVED.value
+        status_counts[status] = status_counts.get(status, 0) + 1
+        if job.score:
+            scores.append(job.score.overall_score)
+    avg = round(sum(scores) / len(scores), 1) if scores else 0.0
+    top = sorted(
+        (j for j in jobs if j.score),
+        key=lambda j: j.score.overall_score,
+        reverse=True,
+    )[:5]
     return {
-        'success': True,
-        'stats': {
-            'total_jobs': len(jobs),
-            'status_breakdown': status_counts,
-            'average_score': round(avg_score, 1),
-            'top_jobs': [{
-                'job_pk': job.job_pk,
-                'title': job.title,
-                'company': job.company.name if job.company else 'Unknown',
-                'score': job.job_score.total_score if job.job_score else 0
-            } for job in sorted(jobs, key=lambda j: j.job_score.total_score if j.job_score else 0, reverse=True)[:5]]
-        }
+        "success": True,
+        "stats": {
+            "total_jobs": len(jobs),
+            "status_breakdown": status_counts,
+            "average_score": avg,
+            "top_jobs": [job_public(j) for j in top],
+        },
     }
 
-# ============================================================================
-# Health Check
-# ============================================================================
 
 @app.get("/health")
-def health_check():
-    """Health check endpoint."""
-    return {"status": "healthy", "version": "1.0.0"}
+def health():
+    return {"status": "healthy", "version": app.version, "llm_enabled": llm_available()}
+
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+
+    uvicorn.run(app, host="0.0.0.0", port=int(os.getenv("PORT", "8000")))

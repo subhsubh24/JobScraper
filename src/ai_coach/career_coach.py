@@ -1,11 +1,10 @@
 """AI Career Coach - Chat interface for career guidance."""
-import os
 import uuid
 from typing import List, Optional
-from openai import OpenAI
 from sqlalchemy.orm import Session
 
 from src.db.models import ChatMessage, User, JobPosting, Application
+from src.llm import get_openai_client, llm_available
 
 
 class CareerCoach:
@@ -32,7 +31,12 @@ You have access to the user's profile and job applications for context."""
 
     def __init__(self, db: Session):
         self.db = db
-        self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        self.client = get_openai_client()
+
+    @staticmethod
+    def available() -> bool:
+        """Whether the coach can call the LLM (key configured)."""
+        return llm_available()
 
     def _get_user_context(self, user: User) -> str:
         """Build context string from user's profile and applications."""
@@ -93,6 +97,9 @@ You have access to the user's profile and job applications for context."""
         job_context: Optional[JobPosting] = None
     ) -> str:
         """Send a message and get a response from the coach."""
+        if self.client is None:
+            raise RuntimeError("OPENAI_API_KEY not configured")
+
         # Create session if needed
         if not session_id:
             session_id = str(uuid.uuid4())
@@ -102,7 +109,7 @@ You have access to the user's profile and job applications for context."""
         system_content = f"{self.SYSTEM_PROMPT}\n\n--- USER CONTEXT ---\n{user_context}"
 
         if job_context:
-            system_content += f"\n\n--- CURRENT JOB FOCUS ---\n"
+            system_content += "\n\n--- CURRENT JOB FOCUS ---\n"
             system_content += f"Title: {job_context.title}\n"
             system_content += f"Company: {job_context.company_name}\n"
             system_content += f"Description: {job_context.description[:500] if job_context.description else 'N/A'}"
@@ -202,7 +209,10 @@ You have access to the user's profile and job applications for context."""
             messages=[
                 {
                     "role": "system",
-                    "content": "Summarize this career coaching session in 3-4 bullet points. Focus on key advice given and action items."
+                    "content": (
+                        "Summarize this career coaching session in 3-4 bullet "
+                        "points. Focus on key advice given and action items."
+                    ),
                 },
                 {"role": "user", "content": conversation_text}
             ],

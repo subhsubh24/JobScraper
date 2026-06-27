@@ -2,7 +2,6 @@
 import uuid
 from datetime import datetime
 from enum import Enum as PyEnum
-from typing import Optional, List
 
 from sqlalchemy import (
     Column, String, Integer, Float, Text, Boolean, DateTime,
