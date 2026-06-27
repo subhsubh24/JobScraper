@@ -17,6 +17,10 @@ gate green this run**. Never mass-tick. Un-tick any box whose proof later fails.
 - [ ] Core flow works with **no Gemini key** via graceful heuristic degradation
 - [ ] **Next.js web app (`/web`)**: auth + pipeline + job detail + coach + pricing wired to the API
 - [ ] Web app: typecheck + lint + `next build` green; deployed live on Vercel
+- [ ] **Web production deploy config is REAL + backed by an artifact (not just a ticked
+      "deploy-ready" box):** build command + env contract (`NEXT_PUBLIC_API_URL`) + output
+      documented and verified; the single-project Vercel Services routing (`/` web, `/api`
+      FastAPI) confirmed on a live deploy. Un-tick if not backed.
 - [ ] Web app: real loading/empty/error states; SEO metadata; polished to the design bar
 - [ ] (legacy) Flask `app.py` — superseded by the Next.js web app; keep or retire
 - [ ] ATS ingestion (Greenhouse/Lever) returns real listings or a truthful empty state
@@ -34,6 +38,13 @@ gate green this run**. Never mass-tick. Un-tick any box whose proof later fails.
 - [ ] Paywall screen wired to entitlement state
 - [ ] Polished design-bar UI; real empty/loading/error states; not a thin wrapper
 - [ ] Component/integration tests green; typecheck-clean release build (native device run = human/CI)
+- [ ] **Distribution/release config is REAL (don't trust a ticked "build-ready" box):**
+      `mobile/eas.json` build+submit profiles + `app.json`/`app.config.ts` with bundle id,
+      version + `buildNumber`/`versionCode`, icon/splash, permission strings (only for
+      permissions actually used), EAS `projectId` from env — and the production build
+      config VALIDATED without a signed build (`expo config` resolves, `eas.json` parses).
+      Un-tick this if any piece isn't backed by an artifact. (Signed cloud build + store
+      submit are Human-Core → PENDING_OPS.)
 
 ### C — Monetization (subscription)
 - [ ] Pricing tiers defined (good-better-best + annual) — see BUSINESS_CASE
