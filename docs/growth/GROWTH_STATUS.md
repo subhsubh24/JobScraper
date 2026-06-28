@@ -18,7 +18,7 @@ All metrics below are null/0 — the honest pre-launch state. Nothing is fabrica
 ```yaml
 GROWTH_STATUS:
   project: jobscraper
-  as_of: 2026-06-27
+  as_of: 2026-06-28
   phase: pre_launch
   engine_built: false
   engine_pct: 0
@@ -58,8 +58,11 @@ GROWTH_STATUS:
   next_actions:
     - "Owner connects an email provider + analytics (see CONNECT.md) to move engine off 0%"
     - "Stand up waitlist capture so visitor_to_signup_rate becomes measurable"
+    - "Build Track G item 1 (Pre-launch SITE GATE) to unblock site_gate_up: true"
+    - "Establish docs/quality/QUALITY_SCORECARD.md so quality grades are verifiable"
   owner_blockers:
     - "No marketing channels connected — Growth Agent stays in prepare-mode"
+    - "docs/quality/QUALITY_SCORECARD.md does not exist — quality grades unverifiable; launch gate unassessable"
   links:
     connect_runbook: docs/growth/CONNECT.md
     playbook: docs/growth/ANALYSIS_PLAYBOOK.md
