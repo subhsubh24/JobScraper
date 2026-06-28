@@ -41,10 +41,12 @@ issues, `IMPROVEMENT_LOG.md` (per-run handoffs), and `docs/loop-memory.md` (less
 Continue the trajectory; don't redo what's done or what a prior run flagged dead.
 
 ## BOOTSTRAP (idempotent — only if missing)
-The gate is local (no CI workflow; the loop may not add one — `.github/` is off-limits):
-`bash scripts/preflight.sh ci`. If `IMPROVEMENT_LOG.md`, `docs/loop-memory.md`, or
-`PENDING_OPS.md` are missing, create them. If a `.github/workflows/*` change is ever needed
-it is an OWNER action (workflow scope) — open an issue, never force it.
+Run the fast local gate the loop ships behind: `bash scripts/preflight.sh ci`. This gate is
+ALSO enforced in CI — `.github/workflows/ci.yml` runs `preflight (lint + typecheck + tests)`
++ `functional journeys (web E2E)` as REQUIRED status checks on `main` (administrators
+included), so a red change CANNOT merge even with `--admin`. The loop still may NOT edit
+`.github/` — a workflow change is an OWNER action (workflow scope); open an issue, never force
+it. If `IMPROVEMENT_LOG.md`, `docs/loop-memory.md`, or `PENDING_OPS.md` are missing, create them.
 
 ## PICK ONE (rotate across areas run-to-run)
 A single change, rotating so coverage is even, across: web (Next.js) · mobile (Expo) ·
@@ -74,8 +76,11 @@ approve AND the gate is green. Else abandon + FYI issue.
 
 ## MERGE
 Commit (end the message with `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`),
-push, `gh pr create` (base `main`) summarizing the change + green gate + both approvals →
-auto-merge. The owner does not review PRs.
+push, `gh pr create` (base `main`) summarizing the change + green gate + both approvals, then
+enable auto-merge: `gh pr merge --squash --auto --delete-branch`. This WAITS for the required
+CI checks to pass before merging — do NOT use `--admin` to bypass (branch protection enforces
+the checks for admins too). If a required check goes RED on the PR, fix it (≤2 cycles) or
+abandon (clean tree) + FYI issue — NEVER force-merge a red gate. The owner does not review PRs.
 
 ## RECORD → STOP
 Append a one-line handoff to `IMPROVEMENT_LOG.md`; add any durable lesson to
