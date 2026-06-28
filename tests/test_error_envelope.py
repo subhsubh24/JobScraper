@@ -51,6 +51,24 @@ def test_success_response_has_request_id_header():
     assert r.headers["X-Request-ID"]
 
 
+def test_extra_keys_cannot_overwrite_fixed_fields():
+    # A stray extra={"level":...} must NOT corrupt reserved fields — fixed fields are
+    # stamped last and always win, while genuine extra context is still merged.
+    import json
+    import logging
+    from src.api.logging_config import JsonFormatter
+
+    rec = logging.makeLogRecord(
+        {"name": "t", "levelno": logging.INFO, "levelname": "INFO", "msg": "hi"}
+    )
+    rec.level = "HACKED"  # collides with a fixed field name
+    rec.user_id = "u1"  # legitimate structured context
+    out = json.loads(JsonFormatter().format(rec))
+    assert out["level"] == "INFO"  # fixed field preserved, not "HACKED"
+    assert out["user_id"] == "u1"  # genuine extra merged
+    assert out["message"] == "hi"
+
+
 def test_code_for_status_mapping():
     assert code_for_status(404) == "not_found"
     assert code_for_status(429) == "rate_limited"

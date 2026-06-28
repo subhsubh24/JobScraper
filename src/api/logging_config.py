@@ -33,21 +33,26 @@ class JsonFormatter(logging.Formatter):
     """Render each log record as a single-line JSON object."""
 
     def format(self, record: logging.LogRecord) -> str:
-        payload = {
-            "ts": datetime.fromtimestamp(record.created, tz=timezone.utc).isoformat(),
-            "level": record.levelname,
-            "logger": record.name,
-            "message": record.getMessage(),
-        }
+        # Merge caller-supplied `extra=` context FIRST, then stamp the fixed fields on top, so
+        # a stray extra key (e.g. extra={"level": ...} or {"exc": ...}) can never overwrite a
+        # reserved field or silently drop the traceback.
+        payload = {}
+        for key, value in record.__dict__.items():
+            if key not in _RESERVED and not key.startswith("_"):
+                payload[key] = value
+        payload.update(
+            {
+                "ts": datetime.fromtimestamp(record.created, tz=timezone.utc).isoformat(),
+                "level": record.levelname,
+                "logger": record.name,
+                "message": record.getMessage(),
+            }
+        )
         rid = request_id_var.get()
         if rid:
             payload["request_id"] = rid
         if record.exc_info:
             payload["exc"] = self.formatException(record.exc_info)
-        # Merge any structured context passed via `extra=`.
-        for key, value in record.__dict__.items():
-            if key not in _RESERVED and not key.startswith("_"):
-                payload[key] = value
         return json.dumps(payload, default=str)
 
 

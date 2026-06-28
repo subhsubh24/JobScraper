@@ -165,7 +165,11 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception):
     """Error hygiene: never leak stack traces / internals to clients."""
-    logger.exception("Unhandled error on %s", request.url.path)
+    logger.exception(
+        "Unhandled error on %s",
+        request.url.path,
+        extra={"path": request.url.path, "method": request.method, "status": 500},
+    )
     return JSONResponse(
         status_code=500,
         content=error_body(500, "Internal server error", _request_id(request)),
