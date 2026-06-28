@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import { LinkButton } from '@/components/ui';
 
 export const metadata: Metadata = {
-  title: 'Career Operator — AI fit scoring, interview prep & a job pipeline CRM',
+  title: 'Career Operator — AI fit scoring, interview prep & pipeline CRM',
   description:
     'Run your job search like an operator: AI fit-scoring against your resume, role-specific interview prep, an AI career coach, and a pipeline CRM. Start free.',
   alternates: { canonical: '/' },
