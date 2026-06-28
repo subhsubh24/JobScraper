@@ -46,6 +46,21 @@ One Gmail DRAFT per target containing —
 Track in the `GROWTH_STATUS` outreach block (real numbers; replies owner-reported, never
 fabricated); durable lessons in `GROWTH_MEMORY.md`.
 
+## Surfacing on the factory dashboard
+When outreach drafts are queued and awaiting the owner, file/refresh exactly ONE
+`OWNER_ACTIONS` item in `PENDING_OPS.md` so the review surfaces on the factory dashboard
+(which already renders OWNER_ACTIONS):
+- **id:** `review-outreach-drafts`
+- **title:** `Review + send N strategic outreach drafts (Gmail)` (set N to the real count of
+  drafts awaiting send)
+- **status:** `open` while any draft awaits the owner.
+
+Keep it HONEST and never stale: decrement N as the owner reports sends, and **close**
+(`status: done`) the item when zero drafts remain awaiting send. Do not leave a stale count
+or a closed-but-pending item. Keep the `GROWTH_STATUS.outreach` block current too (it feeds
+the dashboard tile). The count is the real number of drafts the owner still needs to act on
+— never inflated.
+
 ## When NOT to
 No genuinely strategic, researchable target this run → do NONE. A quiet run with zero
 outreach drafts is success; a pile of generic cold drafts is failure.
