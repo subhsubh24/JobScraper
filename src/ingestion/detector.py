@@ -1,9 +1,15 @@
 """ATS detection from company careers pages."""
+import logging
 import re
 import requests
 from typing import Optional, Tuple
 
 from src.db.models import ATSType
+
+logger = logging.getLogger("career_operator.ingestion.detector")
+
+# Keep the careers-page probe well under the serverless budget (DEEP_DIAGNOSIS rule a).
+HTTP_TIMEOUT = 12
 
 
 class ATSDetector:
@@ -65,13 +71,13 @@ class ATSDetector:
         try:
             response = requests.get(
                 careers_url,
-                timeout=15,
+                timeout=HTTP_TIMEOUT,
                 headers={"User-Agent": "Mozilla/5.0 (compatible; CareerOperator/1.0)"},
                 allow_redirects=True,
             )
             response.raise_for_status()
         except requests.RequestException as e:
-            print(f"Error fetching careers page: {e}")
+            logger.warning("Careers page probe failed for %s: %s", careers_url, e)
             return ATSType.UNKNOWN, None
 
         # Check final URL after redirects
