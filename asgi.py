@@ -228,12 +228,16 @@ def job_public(job: JobPosting) -> dict:
     }
 
 
-def ats_listing_public(listing, company: Optional[str]) -> dict:
-    """Serialize a normalized ATS JobListing for the import-preview response."""
+def ats_listing_public(listing, company_slug: Optional[str]) -> dict:
+    """Serialize a normalized ATS JobListing for the import-preview response.
+
+    `company_slug` is the ATS board token (e.g. Greenhouse "acme"), NOT a display name —
+    named accordingly so a UI doesn't render the slug where a company name belongs.
+    """
     return {
         "external_id": listing.external_id,
         "title": listing.title,
-        "company": company,
+        "company_slug": company_slug,
         "location": listing.location,
         "url": listing.url,
         "department": listing.department,
@@ -431,9 +435,18 @@ def update_job_status(
 def import_jobs_preview(
     data: ImportPreviewRequest,
     user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
 ):
     from src.ingestion.detector import ATSDetector
+    from src.ingestion.url_guard import assert_public_http_url, UnsafeURLError
+
+    # SSRF defense: refuse to fetch internal/non-public targets before any network call.
+    try:
+        assert_public_http_url(data.careers_url)
+    except UnsafeURLError:
+        raise HTTPException(
+            status_code=400,
+            detail="Enter a public http(s) careers URL (internal/private addresses are not allowed).",
+        )
 
     detector = ATSDetector()
     try:
@@ -444,36 +457,41 @@ def import_jobs_preview(
 
     supported = {ATSType.GREENHOUSE, ATSType.LEVER}
     if ats_type not in supported or not identifier:
-        # Honest: we could not find a supported board. Not an error, not a fake result.
+        # Honest: no SUPPORTED board to fetch. Distinguish "found an unsupported board"
+        # (Ashby/Workday) from "found nothing", and never imply an empty board.
+        if ats_type in (ATSType.ASHBY, ATSType.WORKDAY):
+            message = (
+                f"We detected a {ats_type.value.title()} job board, but only Greenhouse and "
+                "Lever are supported right now. Add the role manually for now."
+            )
+        else:
+            message = (
+                "We couldn't find a supported job board (Greenhouse or Lever) at that link. "
+                "Paste the company's Greenhouse or Lever careers URL, or add the role manually."
+            )
         return {
             "success": True,
             "ats": ats_type.value,
-            "reachable": ats_type != ATSType.UNKNOWN,
+            "supported": False,
             "jobs": [],
             "truncated": False,
-            "message": (
-                "We couldn't find a supported job board (Greenhouse or Lever) at that link. "
-                "Paste the company's Greenhouse or Lever careers URL, or add the role manually."
-            ),
+            "message": message,
         }
 
+    # ats_type is GREENHOUSE/LEVER here, so get_client_for_company never raises.
+    client = detector.get_client_for_company(ats_type, identifier)
     try:
-        client = detector.get_client_for_company(ats_type, identifier)
         listings = client.fetch_jobs()
     except Exception:
         logger.exception("ATS fetch raised for %s/%s", ats_type.value, identifier)
-        return {
-            "success": True, "ats": ats_type.value, "reachable": False, "jobs": [],
-            "truncated": False,
-            "message": "That job board was temporarily unreachable. Please try again shortly.",
-        }
+        listings, client.last_error = [], "fetch raised"
 
     # fetch_jobs() swallows network errors and returns []; last_error tells us whether the
     # empty result is "unreachable" (a real failure) vs "genuinely no open roles" (truthful).
-    if not listings and getattr(client, "last_error", None):
+    if not listings and client.last_error:
         return {
-            "success": True, "ats": ats_type.value, "reachable": False, "jobs": [],
-            "truncated": False,
+            "success": True, "ats": ats_type.value, "supported": True, "reachable": False,
+            "jobs": [], "truncated": False,
             "message": "That job board was temporarily unreachable. Please try again shortly.",
         }
 
@@ -481,6 +499,7 @@ def import_jobs_preview(
     return {
         "success": True,
         "ats": ats_type.value,
+        "supported": True,
         "reachable": True,
         "jobs": [ats_listing_public(j, identifier) for j in capped],
         "truncated": len(listings) > ATS_PREVIEW_LIMIT,

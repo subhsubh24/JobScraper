@@ -67,6 +67,15 @@ class ATSDetector:
         if ats_type != ATSType.UNKNOWN:
             return ats_type, identifier
 
+        # SSRF guard: this fetches a user-supplied URL server-side. Refuse internal hosts.
+        from .url_guard import assert_public_http_url, UnsafeURLError
+
+        try:
+            assert_public_http_url(careers_url)
+        except UnsafeURLError as e:
+            logger.warning("Refusing unsafe careers URL %s: %s", careers_url, e)
+            return ATSType.UNKNOWN, None
+
         # Fetch the page and look for ATS indicators
         try:
             response = requests.get(

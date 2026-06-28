@@ -54,6 +54,7 @@ class GreenhouseClient(BaseATSClient):
         """Fetch full details for a specific job."""
         url = f"{self.BASE_URL}/{self.company_identifier}/jobs/{job_id}"
 
+        self.last_error = None
         try:
             response = requests.get(url, timeout=HTTP_TIMEOUT)
             response.raise_for_status()
