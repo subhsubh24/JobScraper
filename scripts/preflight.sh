@@ -41,12 +41,14 @@ ok "asgi:app imports (Vercel Services entrypoint)"
 
 sect "backend: tests (pytest) + coverage floor"
 if [ -d tests ]; then
-  # Enforce the coverage floor (setup.cfg [coverage:report] fail_under) when pytest-cov is
-  # available; fall back to a plain run otherwise so the gate still works without the plugin.
+  # Enforce the coverage floor when pytest-cov is available; fall back to a plain run
+  # otherwise so the gate still works without the plugin. The threshold lives ONLY in
+  # setup.cfg ([coverage:report] fail_under) — coverage.py reads it automatically, so there
+  # is no duplicated number here to drift out of sync.
   if $PY -c "import pytest_cov" >/dev/null 2>&1; then
-    $PY -m pytest -q --cov --cov-report=term-missing --cov-fail-under=65 tests \
-      || fail "pytest failed or coverage below floor (65%)"
-    ok "pytest green + coverage >= 65%"
+    $PY -m pytest -q --cov --cov-report=term-missing tests \
+      || fail "pytest failed or coverage below the setup.cfg floor"
+    ok "pytest green + coverage floor met (setup.cfg)"
   else
     $PY -m pytest -q tests || fail "pytest failed"
     ok "pytest green (coverage skipped: pytest-cov not installed)"

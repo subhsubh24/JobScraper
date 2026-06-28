@@ -44,3 +44,18 @@ def test_suggestions_adapt_to_pipeline_state(db_session):
     # The interviewing user gets interview-prep prompts that the empty-pipeline user does not.
     assert interviewing != no_apps
     assert any("interview" in s.lower() for s in interviewing)
+
+
+def test_suggestions_applied_branch(db_session):
+    # The third branch: has applications but none interviewing -> follow-up/response prompts,
+    # distinct from both the empty-pipeline and interviewing lists.
+    user = _user(db_session)
+    coach = CareerCoach(db_session)
+    no_apps = coach.get_suggested_questions(user)
+
+    _job_with_status(db_session, user.id, ApplicationStatus.APPLIED)
+    applied = coach.get_suggested_questions(user)
+
+    assert applied != no_apps
+    assert any("follow up" in s.lower() or "response rate" in s.lower() for s in applied)
+    assert not any("what should i wear" in s.lower() for s in applied)  # not the interview list
