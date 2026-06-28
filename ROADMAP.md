@@ -102,6 +102,15 @@ the guard tests, and **`FACTORY_STANDARD.md`**.
 - [x] Per-user/day spend ceiling on scrape + LLM (wallet-drain defense)
 - [ ] Make rate-limit + spend-ceiling **cross-instance** (Upstash Redis/Postgres) — current in-memory state is per-instance on Vercel serverless
 - [x] Secrets server-side only — never in the mobile app, never committed
+- [ ] **F4.1 — Side-effect round-trip (enforced):** the journey suite proves every claimed
+      side-effect actually occurs, never just that the UI showed success. NOW: verify-purchase
+      refuses honestly (501) and grants NOTHING on an unverified receipt — covered by
+      `test_no_fake_success_on_unverified_purchase` (gate-enforced; a fake-grant blocks merge).
+      WHEN email/2FA/reset/magic-link is added: stand up an email capture (Mailpit/Mailhog or
+      provider sandbox + fetch API) and assert a real round-trip (signup → receive the real
+      email → follow link → confirmed → logged-in) + that the provider client was invoked with
+      the right recipient/payload. WHEN Stripe/RevenueCat lands (Track C): assert the sandbox
+      charge/entitlement call actually fires before any success state.
 
 ### G — Marketing engine + brand
 - [ ] **Pre-launch SITE GATE** — env-driven middleware (`SITE_GATE_PASSWORD`; gate ON
@@ -161,6 +170,16 @@ Every page/screen/flow is validated **at RUNTIME, as a user**, asserting the INT
 OUTCOME — not `HTTP < 400`, not "the handler is wired." A build-but-broken flow (dead
 end, error / "not available" screen, a button that does nothing, a wrong result) is a
 **release-blocking FAIL equal to a red test.** "It compiles / passes" ≠ "it works."
+
+**SIDE-EFFECT INTEGRITY (FACTORY_STANDARD §6) — a "success" the user can't verify is a LIE:**
+(1) **No fake success.** Any user-facing success state ("sent / saved / submitted / charged /
+done") must be causally DOWNSTREAM of the real operation succeeding — await the result, check
+it, surface failure honestly. Optimistic messages (or success while a provider is in
+dry-run/unconfigured) are correctness bugs. (2) **Verify the EFFECT end-to-end** for every
+side-effecting integration (email, SMS, push, payment charge/refund, outbound webhook,
+storage/3rd-party write): "works" = the effect is OBSERVABLY produced in test/sandbox, never
+that the UI showed success. If a side-effect can't be exercised even in sandbox, gate/disable
+it with honest messaging or it's a release-blocking gap on the human checklist.
 
 ### Readiness audit gate (two gates; maker ≠ checker)
 The box-ticker is **not** the sole certifier. Submission-readiness requires BOTH:

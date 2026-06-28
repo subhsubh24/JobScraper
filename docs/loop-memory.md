@@ -66,6 +66,24 @@ Left partial items (web SEO/polish, mobile device screens, auth lockout, CORS-lo
 migrations, evals, coverage, visual screenshots) and ALL DoD boxes unticked. Headline
 stays 0% until the two-gate readiness passes — correct.
 
+### 2026-06-28 — SIDE-EFFECT INTEGRITY: a "success" the user can't verify is a LIE
+A sibling product shipped "confirmation email sent" while no email was delivered (provider
+in dry-run) — BUILDS≠WORKS missed it because the guard asserts SCREEN outcomes, not
+side-effects. Closed the blind spot:
+- FACTORY_STANDARD §6: appended the verbatim SIDE-EFFECT INTEGRITY paragraph (canonical
+  sync) — no fake success; verify the EFFECT end-to-end in sandbox; narrow escape hatch.
+- ROADMAP: two-rule bullet in the Builds≠works standard + Track F item **F4.1 Side-effect
+  round-trip** (enforced).
+- **P0 fix this run:** `verify-purchase` was fake-granting premium on an UNVERIFIED receipt
+  (returned success without checking) — a billing-path lie. Now it refuses honestly (501,
+  grants nothing) until real receipt verification (Track C) exists. Guarded by
+  `test_no_fake_success_on_unverified_purchase` (gate-enforced). Audited all other
+  `success:True` paths (register/login/jobs/coach/prep) — those are genuinely downstream of
+  the real op (DB write / real Gemini reply), not optimistic.
+- Generalization: JobScraper has no email flow yet, so the email Mailpit round-trip is part
+  of F4.1 for WHEN email/2FA/reset is added; same for the Stripe/RevenueCat sandbox charge
+  assertion when Track C lands. No routine change (factory reads FACTORY_STANDARD + ROADMAP).
+
 ### 2026-06-27 — Canonical sync: FACTORY_STANDARD §6b design-taste standard
 Sanctioned canonical sync (the only way the stable anchor changes). Inserted §6b "Design
 taste — ELIMINATE generic-AI frontend" VERBATIM between §6 and §7, byte-identical across

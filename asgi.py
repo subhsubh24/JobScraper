@@ -258,16 +258,19 @@ def verify_purchase(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Upgrade to premium after a verified store purchase.
+    """Upgrade to premium after a VERIFIED store purchase.
 
-    NOTE: real receipt/signature verification (Apple/Google/RevenueCat) is Track C and
-    NOT yet implemented — this endpoint trusts the client and must not ship to
-    production as-is. Tracked in ROADMAP Track C + ACCEPTANCE_AUDIT (A4/G4).
+    SIDE-EFFECT INTEGRITY (FACTORY_STANDARD §6): real receipt/signature verification
+    (Apple/Google/RevenueCat) is Track C and NOT yet implemented. We must NOT fake-grant
+    premium on an unverified receipt — a "purchase processed" the user can't trust is a
+    LIE and a billing-path correctness bug. Until verification exists, this endpoint
+    refuses honestly (501) and grants NOTHING. Tracked in ROADMAP Track C + PENDING_OPS.
     """
-    AuthService(db).upgrade_to_premium(user, data.receipt_data)
-    db.commit()
-    db.refresh(user)
-    return {"success": True, "user": user_public(user, db)}
+    raise HTTPException(
+        status_code=501,
+        detail="Purchase verification is not available yet. No charge was applied and "
+        "your plan is unchanged.",
+    )
 
 
 # ---------------------------------------------------------------------------
