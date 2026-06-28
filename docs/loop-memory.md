@@ -191,6 +191,22 @@ as the owner sends and close it at zero — honest counts, never stale. The dash
 renders OWNER_ACTIONS, so this makes the review surface there; keep GROWTH_STATUS.outreach
 current for the tile. Doc-only; CI green.
 
+### 2026-06-28 — Visual verification made DUAL-AXIS (functional AND design)
+Replaced FACTORY_STANDARD §6 "SEE WHAT THE USER SEES" paragraph VERBATIM with the dual-axis
+version: the journey suite screenshots every page AND every key journey STEP + key states at
+mobile+desktop widths; the deep-audit lens + readiness gate JUDGE each image on a
+vision-capable model on TWO axes — (1) FUNCTIONAL REALITY (does the screen visibly show the
+intended outcome / the REAL produced artifact, not a placeholder/empty/wrong/broken/dead-end
+the DOM missed) and (2) DESIGN (on-brand, not slop). A FAIL on EITHER axis is release-
+blocking. Sharpened the ROADMAP Track E item to BOTH: (1) ARTIFACTS = non-zero committed
+screenshots for every route/state + journey step (web Playwright -> web/e2e/__screenshots__,
+mobile -> mobile/__screenshots__) incl. the core-product OUTPUT (the populated fit score +
+the rendered prep pack); (2) DUAL-AXIS VISION VERDICT recorded per screenshot (capture-and-
+forget doesn't count). Added a preflight honest-tick guard: if the box is [x] but <5
+committed non-zero screenshots -> FAIL; no-op while [ ] (proved it fires on a fake-tick).
+Build ORDER: this comes AFTER the functional journey suite; spec+gate hardened now, code
+when the item is reached. CI green.
+
 ### 2026-06-28 — Strategic outreach (curated, DRAFT-ONLY) for the Growth Agent
 PART 1 (repo, PR pending): created docs/growth/OUTREACH.md (RAILS verbatim — DRAFT ONLY /
 agent never sends; high-confidence + strategic only; a few/run max; real published contacts

@@ -123,12 +123,24 @@ the guard tests, and **`FACTORY_STANDARD.md`**.
       + context-adaptive coach suggestions; deterministic (key-free), so they guard regressions
       in CI (`tests/evals/`, PR #52). (prep-pack golden eval = follow-up.)
 - [x] Runtime FUNCTIONAL journey suite green this run (`E2E_JOURNEYS_PASSED=1`)
-- [ ] **Visual verification (FACTORY_STANDARD §6):** journey suite CAPTURES + commits a
-      screenshot of every page + key state (empty/loading/error, authed + logged-out) —
-      web via Playwright, mobile via component snapshots — as artifacts; the deep-audit
-      design lens + readiness gate VISUALLY review them vs the VISION design bar (a
-      blank/broken/unstyled/off-brand/"vibe-coded" page is a release-blocking FAIL even if
-      DOM assertions pass)
+- [ ] **Visual verification — DUAL-AXIS (FACTORY_STANDARD §6).** Build AFTER the functional
+      journey suite (functional correctness first); the screenshots are captured BY it. DoD
+      = BOTH:
+  - **(1) ARTIFACTS** — a real, committed, NON-ZERO screenshot for EVERY route/state AND
+    every key journey STEP in `docs/ROUTE_INVENTORY.md`, captured by the journey suite (web:
+    Playwright `page.screenshot()` into `web/e2e/__screenshots__/` with screenshots enabled
+    in the Playwright config; mobile: committed Expo component/snapshot images under
+    `mobile/__screenshots__/`), at mobile + desktop widths — never placeholders/0-byte.
+    CRUCIALLY screenshot the core-product OUTPUT (the real deliverable — the populated job
+    **fit score** + breakdown, and the generated **prep-pack** content rendered) so the
+    judge sees the actual artifact, not just that a page loaded.
+  - **(2) DUAL-AXIS VISION VERDICT** — the deep-audit lens AND the readiness gate OPEN each
+    image on the vision-capable model and RECORD a per-screenshot verdict on BOTH axes:
+    FUNCTIONAL (intended-outcome-visible / wrong / empty / placeholder / broken / dead-end)
+    AND DESIGN (pass / blank / broken / overlapping / unstyled / off-brand) — in
+    `docs/loop-memory.md` for the deep audit and in the readiness-issue evidence for the
+    gate. A FAIL on EITHER axis is release-blocking even if DOM assertions pass.
+    Capture-and-forget (screenshots with no recorded verdict) does NOT satisfy this item.
 
 ### F — Security & abuse hardening
 - [x] Rate limiting on every paid/expensive/auth/scrape endpoint

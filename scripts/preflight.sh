@@ -95,6 +95,20 @@ for d in web/lib web/app web/components mobile/src src; do
 done
 ok "web + mobile + backend source is tracked"
 
+sect "visual-verification honest-tick guard"
+# If the dual-axis visual-verification box is ticked, there MUST be real committed
+# screenshots. No-op while it's [ ] so it never blocks current runs. (Completeness +
+# the dual-axis verdict are enforced by the deep audit + readiness auditors; this guard
+# just kills the egregious fake-tick.)
+if grep -qE '^- \[x\] \*\*Visual verification' ROADMAP.md; then
+  shots=$(find web/e2e/__screenshots__ mobile/__screenshots__ -type f \
+            \( -name '*.png' -o -name '*.jpg' -o -name '*.jpeg' \) -size +0c 2>/dev/null | wc -l | tr -d ' ')
+  [ "${shots:-0}" -ge 5 ] || fail "Visual-verification box is [x] but only ${shots:-0} committed non-zero screenshots (<5) — capture them or un-tick the box"
+  ok "visual-verification screenshots present ($shots)"
+else
+  ok "visual-verification not yet ticked — guard skipped (no-op)"
+fi
+
 sect "quality scorecard parse guard (auditor-owned; we never author it)"
 $PY scripts/check_quality.py parse || fail "QUALITY_SCORECARD malformed"
 
