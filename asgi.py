@@ -8,16 +8,22 @@ Gemini key via heuristic scoring; AI features (prep packs, coach) return a truth
 import logging
 import os
 import time
+import uuid
 from collections import defaultdict
 from datetime import datetime, date
 from typing import Dict, List, Optional, Tuple
 
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
+from starlette.exceptions import HTTPException as StarletteHTTPException
+
+from src.api.errors import error_body
+from src.api.logging_config import request_id_var, setup_logging
 
 from src.ai_coach.career_coach import CareerCoach
 from src.auth.auth_service import AuthService
@@ -37,6 +43,7 @@ from src.ranking.scorer import JobScorer
 from src import billing
 
 load_dotenv()
+setup_logging()
 logger = logging.getLogger("career_operator")
 
 
@@ -74,6 +81,14 @@ app = FastAPI(
 # own Vercel domain out of the box. Set ALLOWED_ORIGINS (comma-separated) to lock it
 # down to specific origins (which also re-enables credentials).
 _explicit_origins = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", "").split(",") if o.strip()]
+if os.getenv("VERCEL") and not _explicit_origins:
+    # Non-fatal (the unified deploy is same-origin so the web app still works), but a wide-open
+    # CORS policy in production is a hardening gap — set ALLOWED_ORIGINS to lock it down. We warn
+    # loudly rather than fail loud so a missing var can never take the live API down.
+    logger.warning(
+        "CORS is open to any origin in production (ALLOWED_ORIGINS unset). Set ALLOWED_ORIGINS "
+        "to the known web origins to lock it down (this also re-enables credentialed requests)."
+    )
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_explicit_origins or ["*"],
@@ -98,18 +113,67 @@ SECURITY_HEADERS = {
 
 
 @app.middleware("http")
-async def security_headers(request: Request, call_next):
-    response = await call_next(request)
+async def request_context(request: Request, call_next):
+    """Assign a correlation id to every request and stamp security headers on the response.
+
+    The id is exposed three ways: in `request.state` (for handlers), in the `request_id`
+    log contextvar (so every log line during this request carries it), and back to the
+    client as the `X-Request-ID` response header + inside the error envelope.
+    """
+    rid = request.headers.get("X-Request-ID") or uuid.uuid4().hex
+    request.state.request_id = rid
+    token = request_id_var.set(rid)
+    try:
+        response = await call_next(request)
+    finally:
+        request_id_var.reset(token)
+    response.headers["X-Request-ID"] = rid
     for k, v in SECURITY_HEADERS.items():
         response.headers[k] = v
     return response
 
 
+def _request_id(request: Request) -> Optional[str]:
+    return getattr(request.state, "request_id", None)
+
+
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+    """Return HTTPExceptions in the consistent envelope (keeps the native `detail`)."""
+    return JSONResponse(
+        status_code=exc.status_code,
+        content=error_body(exc.status_code, exc.detail, _request_id(request)),
+        headers=getattr(exc, "headers", None),
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """422 body validation errors, wrapped in the same envelope (detail = field errors).
+
+    `exc.errors()` can hold non-JSON-native objects (e.g. ValueError in `ctx`), so it goes
+    through `jsonable_encoder` exactly like FastAPI's default handler does.
+    """
+    from fastapi.encoders import jsonable_encoder
+
+    return JSONResponse(
+        status_code=422,
+        content=error_body(422, jsonable_encoder(exc.errors()), _request_id(request)),
+    )
+
+
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception):
     """Error hygiene: never leak stack traces / internals to clients."""
-    logger.exception("Unhandled error on %s", request.url.path)
-    return JSONResponse(status_code=500, content={"detail": "Internal server error"})
+    logger.exception(
+        "Unhandled error on %s",
+        request.url.path,
+        extra={"path": request.url.path, "method": request.method, "status": 500},
+    )
+    return JSONResponse(
+        status_code=500,
+        content=error_body(500, "Internal server error", _request_id(request)),
+    )
 
 
 # ---------------------------------------------------------------------------
