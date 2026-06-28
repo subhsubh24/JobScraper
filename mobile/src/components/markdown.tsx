@@ -107,8 +107,8 @@ const styles = StyleSheet.create({
   h1: { color: colors.text, fontSize: 18, fontWeight: '800', marginTop: spacing.sm },
   h2: { color: colors.text, fontSize: 16, fontWeight: '700', marginTop: spacing.sm },
   h3: { color: colors.text, fontSize: 14, fontWeight: '700', marginTop: spacing.xs },
-  p: { color: colors.textMuted, fontSize: 14, lineHeight: 21 },
+  p: { color: colors.text, fontSize: 14, lineHeight: 21 },
   liRow: { flexDirection: 'row', gap: spacing.sm, paddingRight: spacing.sm },
-  liMarker: { color: colors.primary, fontSize: 14, lineHeight: 21, minWidth: 18 },
-  liText: { color: colors.textMuted, fontSize: 14, lineHeight: 21, flex: 1 },
+  liMarker: { color: colors.primary, fontSize: 14, lineHeight: 21, minWidth: 24 },
+  liText: { color: colors.text, fontSize: 14, lineHeight: 21, flex: 1 },
 });
