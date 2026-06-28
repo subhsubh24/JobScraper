@@ -154,6 +154,16 @@ class AuthService:
         token = self.create_token(user)
         return user, token
 
+    def delete_user(self, user: User) -> None:
+        """Permanently delete a user and all their owned data (cascade).
+
+        The User -> jobs/applications/chat_messages relationships use
+        cascade="all, delete-orphan", and JobPosting cascades to its score, application, and
+        prep_artifacts, so deleting the user removes the whole object graph. Caller commits.
+        """
+        self.db.delete(user)
+        self.db.flush()
+
     # ============ TIER MANAGEMENT ============
 
     def upgrade_to_premium(self, user: User, receipt_data: Optional[str] = None) -> User:

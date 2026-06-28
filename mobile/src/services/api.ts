@@ -109,6 +109,12 @@ export const api = {
     await setToken(null);
   },
 
+  async deleteAccount(): Promise<void> {
+    // Real deletion server-side, then clear the local session.
+    await request('/api/auth/me', { method: 'DELETE' });
+    await setToken(null);
+  },
+
   async listJobs(): Promise<Job[]> {
     const r = await request<{ jobs: Job[] }>('/api/jobs');
     return r.jobs;

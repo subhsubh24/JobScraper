@@ -29,6 +29,7 @@ def _reset_rate_limit_state():
     journey suite stays deterministic as more tests are added."""
     asgi._RATE_BUCKET.clear()
     asgi._LLM_DAY_COUNT.clear()
+    asgi._LOGIN_FAILURES.clear()
     yield
 
 

@@ -82,10 +82,17 @@ app.add_middleware(
 )
 
 # Security headers on every response.
+# CSP here is intentionally limited to frame-ancestors (clickjacking defense) rather than
+# a restrictive default-src/script-src: this app also serves the Swagger UI at /docs, which
+# loads its assets from a CDN — a strict CSP would break it. Responses are JSON anyway, so
+# resource-loading CSP adds little; frame-ancestors complements X-Frame-Options. HSTS forces
+# HTTPS for a year (Vercel serves TLS); harmless on localhost (browsers ignore it on http).
 SECURITY_HEADERS = {
     "X-Content-Type-Options": "nosniff",
     "X-Frame-Options": "DENY",
     "Referrer-Policy": "no-referrer",
+    "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+    "Content-Security-Policy": "frame-ancestors 'none'",
 }
 
 
@@ -116,6 +123,36 @@ _LLM_DAY_COUNT: Dict[Tuple[str, str], int] = defaultdict(int)
 
 # Per-user/day ceiling on expensive LLM operations (wallet-drain defense).
 LLM_DAILY_CEILING = int(os.getenv("LLM_DAILY_CEILING", "25"))
+
+# Per-ACCOUNT login lockout (defends one account against a distributed password
+# brute-force that spreads across IPs, which the per-IP rate limit alone misses). In-memory
+# like the rate limiter above, so it's per-instance on serverless — Track F tracks moving
+# both to a shared store. Keyed by email so it never reveals whether the account exists.
+_LOGIN_FAILURES: Dict[str, Tuple[int, float]] = {}  # email -> (consecutive_failures, locked_until_ts)
+LOGIN_MAX_FAILURES = int(os.getenv("LOGIN_MAX_FAILURES", "5"))
+LOGIN_LOCKOUT_SECONDS = int(os.getenv("LOGIN_LOCKOUT_SECONDS", "900"))  # 15 min
+
+
+def _login_locked(email: str) -> bool:
+    record = _LOGIN_FAILURES.get(email)
+    if not record:
+        return False
+    failures, locked_until = record
+    if locked_until and time.time() < locked_until:
+        return True
+    if locked_until and time.time() >= locked_until:
+        _LOGIN_FAILURES.pop(email, None)  # lockout expired — reset
+    return False
+
+
+def _record_login_failure(email: str) -> None:
+    failures = _LOGIN_FAILURES.get(email, (0, 0.0))[0] + 1
+    locked_until = time.time() + LOGIN_LOCKOUT_SECONDS if failures >= LOGIN_MAX_FAILURES else 0.0
+    _LOGIN_FAILURES[email] = (failures, locked_until)
+
+
+def _clear_login_failures(email: str) -> None:
+    _LOGIN_FAILURES.pop(email, None)
 
 
 def rate_limit(bucket: str, limit: int, window_seconds: int = 60):
@@ -282,11 +319,21 @@ def register(data: UserCreate, db: Session = Depends(get_db)):
 
 @app.post("/api/auth/login", dependencies=[Depends(rate_limit("auth", 10))])
 def login(data: UserLogin, db: Session = Depends(get_db)):
+    email_key = (data.email or "").lower()
+    # Per-account lockout. Same generic 429 whether or not the account exists, so it can't
+    # be used to enumerate emails.
+    if _login_locked(email_key):
+        raise HTTPException(
+            status_code=429,
+            detail="Too many failed attempts. Try again in a few minutes.",
+        )
     auth = AuthService(db)
     try:
         user, token = auth.login(data.email, data.password)
     except ValueError:
+        _record_login_failure(email_key)
         raise HTTPException(status_code=401, detail="Invalid email or password")
+    _clear_login_failures(email_key)
     db.commit()
     return {"success": True, "token": token, "user": user_public(user, db)}
 
@@ -294,6 +341,22 @@ def login(data: UserLogin, db: Session = Depends(get_db)):
 @app.get("/api/auth/me")
 def me(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     return {"success": True, "user": user_public(user, db)}
+
+
+@app.delete("/api/auth/me", dependencies=[Depends(rate_limit("auth", 10))])
+def delete_account(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Permanently delete the signed-in user and all their data.
+
+    Required by Apple (App Store Review 5.1.1(v)) and Google Play for any app with account
+    creation. A REAL deletion: cascades remove the user's jobs, scores, applications, prep
+    artifacts, and chat history (see the relationship cascades on the User/JobPosting models),
+    so nothing user-owned is left orphaned. Honest by design — we only report success after
+    the row is actually gone.
+    """
+    AuthService(db).delete_user(user)
+    db.commit()
+    _clear_login_failures((user.email or "").lower())
+    return {"success": True, "deleted": True}
 
 
 @app.post("/api/auth/verify-purchase")

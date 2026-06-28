@@ -17,20 +17,28 @@ export default function SettingsScreen() {
     ]);
   }
 
+  async function deleteAccount() {
+    // Required by Apple (5.1.1v) & Google. A REAL deletion: the server removes the user
+    // and all their data, then we clear the local session (signOut sets user -> null, so
+    // the root layout routes back to the auth screen).
+    try {
+      await api.deleteAccount();
+      await signOut();
+    } catch (e) {
+      Alert.alert(
+        'Could not delete account',
+        e instanceof Error ? e.message : 'Something went wrong. Please try again.',
+      );
+    }
+  }
+
   function confirmDelete() {
-    // Account deletion is required by Apple (5.1.1v) & Google. Server endpoint is
-    // tracked in ROADMAP Track D; we surface the entry point honestly.
     Alert.alert(
       'Delete account',
-      'This permanently deletes your account and data. This cannot be undone.',
+      'This permanently deletes your account and all your data. This cannot be undone.',
       [
         { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () =>
-            Alert.alert('Not yet available', 'Account deletion ships before store submission.'),
-        },
+        { text: 'Delete', style: 'destructive', onPress: deleteAccount },
       ],
     );
   }
