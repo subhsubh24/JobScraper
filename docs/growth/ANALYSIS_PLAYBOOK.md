@@ -87,3 +87,14 @@ NOT scaling acquisition** (don't pour growth into a leaky bucket).
 
 Reconcile the business case against real cohort data the moment it exists; if the metrics
 contradict the model, the METRICS win. Write the read into `GROWTH_STATUS.pmf` each run.
+
+## Strategic outreach (curated, DRAFT-ONLY)
+
+A high-leverage channel: a FEW deeply-personalized 1:1 outreach emails to genuinely
+strategic targets (press / partners / creators / curators), drafted as **Gmail DRAFTS for
+the OWNER to review and send** — the agent NEVER sends. Full playbook + hard rails:
+[OUTREACH.md](./OUTREACH.md). Draft only when you can name the specific recipient + why
+they'd care + the anticipated reply; a few/run max; real published contacts only (never
+invent/scrape); honest + opt-out (CAN-SPAM/GDPR); pre-launch links → the public waitlist;
+maker≠checker review each draft. Some runs = zero drafts (correct). Track in
+`GROWTH_STATUS.outreach`.
