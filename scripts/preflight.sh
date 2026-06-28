@@ -39,10 +39,18 @@ sect "backend: import/serve smoke"
 $PY -c "import asgi; assert hasattr(asgi, 'app'), 'asgi.app missing'" || fail "asgi import smoke failed"
 ok "asgi:app imports (Vercel Services entrypoint)"
 
-sect "backend: tests (pytest)"
+sect "backend: tests (pytest) + coverage floor"
 if [ -d tests ]; then
-  $PY -m pytest -q tests || fail "pytest failed"
-  ok "pytest green"
+  # Enforce the coverage floor (setup.cfg [coverage:report] fail_under) when pytest-cov is
+  # available; fall back to a plain run otherwise so the gate still works without the plugin.
+  if $PY -c "import pytest_cov" >/dev/null 2>&1; then
+    $PY -m pytest -q --cov --cov-report=term-missing --cov-fail-under=65 tests \
+      || fail "pytest failed or coverage below floor (65%)"
+    ok "pytest green + coverage >= 65%"
+  else
+    $PY -m pytest -q tests || fail "pytest failed"
+    ok "pytest green (coverage skipped: pytest-cov not installed)"
+  fi
 else
   fail "no tests/ directory"
 fi
