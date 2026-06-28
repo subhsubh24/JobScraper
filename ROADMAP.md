@@ -253,6 +253,13 @@ When the live funnel names the binding constraint (signup/activation, free→pai
 churn, or a core-loop drop-off), weight that run toward the lever that moves it. Source
 of truth stays ROADMAP + business case; growth **informs** pricing, the factory
 **sets** it; neither agent commands the other; the human integrates.
+- **PMF FIRST (the leading indicator — FACTORY_STANDARD §9):** PMF precedes revenue.
+  Read the live `GROWTH_STATUS.pmf` (activation, retention d1/d7/d30, organic share,
+  signal) each run. **Pre-PMF, prioritize the PRODUCT** — fix activation, retention, the
+  core loop, the "aha" — NOT scaling acquisition (no pouring growth into a leaky bucket).
+  Reconcile the business case against real cohort data the moment it exists; if metrics
+  contradict the model, the METRICS win. Scale acquisition only once retention/activation
+  says the product HOLDS users.
 
 ### 3-tier model split
 Orchestrator (maker) + the ≥ 3 readiness auditors on **Opus** (`claude-opus-4-8`); the

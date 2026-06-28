@@ -53,6 +53,16 @@ def main() -> None:
         sys.exit(f"FAIL: GROWTH_STATUS.phase invalid: {gs['phase']}")
     if not isinstance(gs["site_gate_up"], bool):
         sys.exit("FAIL: GROWTH_STATUS.site_gate_up must be a boolean")
+    # PMF leading indicator (FACTORY_STANDARD §9)
+    pmf = gs.get("pmf")
+    if not isinstance(pmf, dict):
+        sys.exit("FAIL: GROWTH_STATUS missing `pmf` block")
+    for f in ("activation_rate", "retention_d1", "retention_d7", "retention_d30",
+              "organic_share_rate", "signal"):
+        if f not in pmf:
+            sys.exit(f"FAIL: GROWTH_STATUS.pmf missing `{f}`")
+    if pmf["signal"] not in ("none", "weak", "emerging", "strong"):
+        sys.exit(f"FAIL: GROWTH_STATUS.pmf.signal invalid: {pmf['signal']}")
     # Pinned invariant: engine_built iff engine_pct == 100
     if bool(gs["engine_built"]) != (gs["engine_pct"] == 100):
         sys.exit("FAIL: engine_built must equal (engine_pct == 100)")
