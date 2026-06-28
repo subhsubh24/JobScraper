@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button, Card } from '@/components/ui';
@@ -71,7 +71,11 @@ export default function SettingsScreen() {
         </View>
 
         <Button label="Log out" variant="secondary" onPress={confirmSignOut} />
-        <Button label="Delete account" variant="secondary" onPress={confirmDelete} />
+        {/* Destructive action set apart from preferences and visually marked as danger,
+            so deleting an account never reads like just another button. */}
+        <Pressable accessibilityRole="button" onPress={confirmDelete} style={styles.deleteBtn}>
+          <Text style={styles.deleteText}>Delete account</Text>
+        </Pressable>
       </ScrollView>
     </SafeAreaView>
   );
@@ -89,4 +93,6 @@ const styles = StyleSheet.create({
   usage: { color: colors.textMuted, marginTop: spacing.sm, fontSize: 13 },
   meta: { alignItems: 'center' },
   metaText: { color: colors.textMuted, fontSize: 12 },
+  deleteBtn: { paddingVertical: 14, alignItems: 'center', marginTop: spacing.sm },
+  deleteText: { color: colors.danger, fontWeight: '600', fontSize: 15 },
 });

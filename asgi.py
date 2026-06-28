@@ -325,7 +325,7 @@ def login(data: UserLogin, db: Session = Depends(get_db)):
     if _login_locked(email_key):
         raise HTTPException(
             status_code=429,
-            detail="Too many failed attempts. Try again in a few minutes.",
+            detail=f"Too many failed attempts. Try again in about {LOGIN_LOCKOUT_SECONDS // 60} minutes.",
         )
     auth = AuthService(db)
     try:

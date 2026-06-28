@@ -110,9 +110,9 @@ export const api = {
   },
 
   async deleteAccount(): Promise<void> {
-    // Real deletion server-side, then clear the local session.
+    // Real deletion server-side. Local session state is owned by the auth context
+    // (the caller signs out on success), so we don't clear the token here.
     await request('/api/auth/me', { method: 'DELETE' });
-    await setToken(null);
   },
 
   async listJobs(): Promise<Job[]> {
