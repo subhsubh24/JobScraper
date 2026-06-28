@@ -4,6 +4,19 @@ Durable lessons for the factory loop. Append dated entries. Keep it honest and s
 
 ---
 
+### 2026-06-28 — Enforcement turned ON: required checks (admins included) + `--auto` merge protocol
+After CI was verified GREEN on the first run, the owner authorized turning enforcement on.
+Changes: (1) branch protection on `main` requires `preflight (lint + typecheck + tests)` +
+`functional journeys (web E2E)` with enforce_admins=ON, and repo auto-merge enabled; (2) the
+merge protocol changed from `gh pr merge --admin` (bypasses checks) to `gh pr merge --squash
+--auto --delete-branch` (WAITS for required CI). KEY CONSEQUENCE for the loop: `--admin` no
+longer bypasses — a red required check BLOCKS merge for admins too, so the loop MUST fix a red
+gate (≤2 cycles) or abandon, never force. PROMPT.md + ROADMAP shipping protocol updated to say
+this. enforce_admins means even an emergency needs the owner to (temporarily) relax protection —
+that's intentional (the rail is the point). strict=false so file-disjoint parallel PRs still
+auto-merge without serial rebases. The `migrate` job is push-to-main only, so it is NOT a
+required PR check.
+
 ### 2026-06-28 — Applied .github/workflows/ci.yml (owner-authorized, interactive — a deliberate exception)
 STANDING RULE is the loop NEVER edits .github/ (hangs the headless run; it's the tamper-proof
 enforcement rail). The OWNER explicitly asked, in an interactive session, to create the workflow

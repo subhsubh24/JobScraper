@@ -328,5 +328,9 @@ submission. **Build everything else.**
 ---
 
 ## Shipping protocol
-Branch → PR → auto-merge through the CI gate (owner does not review PRs). Keep the gate
-green. **NEVER edit `.claude/` or `.github/`.** Never commit secrets (`.env`).
+Branch → PR → **`gh pr merge --squash --auto --delete-branch`** (auto-merge WAITS for the
+required CI checks; the owner does not review PRs). The gate is ENFORCED in CI
+(`.github/workflows/ci.yml`: `preflight (lint + typecheck + tests)` + `functional journeys
+(web E2E)` are REQUIRED on `main`, administrators included) — never `--admin`-bypass a red
+check; fix it (≤2 cycles) or abandon. Keep the gate green. **NEVER edit `.claude/` or
+`.github/`** (a workflow change is an OWNER action — open an issue). Never commit secrets (`.env`).
