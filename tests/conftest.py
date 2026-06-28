@@ -34,14 +34,20 @@ def _reset_rate_limit_state():
 
 
 @pytest.fixture()
-def client():
+def _engine():
     engine = create_engine(
         "sqlite://",
         connect_args={"check_same_thread": False},
         poolclass=StaticPool,
     )
     Base.metadata.create_all(bind=engine)
-    TestingSession = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+    yield engine
+    Base.metadata.drop_all(bind=engine)
+
+
+@pytest.fixture()
+def client(_engine):
+    TestingSession = sessionmaker(autocommit=False, autoflush=False, bind=_engine)
 
     def override_get_db():
         db = TestingSession()
@@ -54,4 +60,15 @@ def client():
     with TestClient(asgi.app) as c:
         yield c
     asgi.app.dependency_overrides.clear()
-    Base.metadata.drop_all(bind=engine)
+
+
+@pytest.fixture()
+def db_session(_engine):
+    """A session on the SAME in-memory DB the `client` fixture uses, so a test can seed
+    rows the API can't easily create (LLM-gated prep/chat) and assert on them directly."""
+    TestingSession = sessionmaker(autocommit=False, autoflush=False, bind=_engine)
+    s = TestingSession()
+    try:
+        yield s
+    finally:
+        s.close()

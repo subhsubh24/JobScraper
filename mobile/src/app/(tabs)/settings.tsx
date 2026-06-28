@@ -23,12 +23,20 @@ export default function SettingsScreen() {
     // the root layout routes back to the auth screen).
     try {
       await api.deleteAccount();
-      await signOut();
     } catch (e) {
+      // Only the deletion request itself failing should surface as a failure.
       Alert.alert(
         'Could not delete account',
         e instanceof Error ? e.message : 'Something went wrong. Please try again.',
       );
+      return;
+    }
+    // Account is gone server-side. Clear the session; if signOut hiccups, force the user
+    // back to auth rather than wrongly reporting a delete failure.
+    try {
+      await signOut();
+    } catch {
+      router.replace('/(auth)/login');
     }
   }
 

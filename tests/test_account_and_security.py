@@ -18,13 +18,25 @@ def _hdr(token):
 # ---------------------------------------------------------------------------
 # Account deletion (Apple/Google requirement) — a REAL delete, not a stub.
 # ---------------------------------------------------------------------------
-def test_delete_account_removes_user_and_data(client):
+def test_delete_account_removes_user_and_data(client, db_session):
+    from src.db.models import Application, ChatMessage, JobPosting, JobScore, PrepArtifact, User
+
     reg = _reg(client, "del@example.com")
     h = _hdr(reg["token"])
+    user_id = reg["user"]["id"]
 
-    # Create a job so there is owned data to cascade-delete.
+    # Create a job via the API (auto-creates an Application + JobScore).
     r = client.post("/api/jobs", headers=h, json={"title": "Eng", "company_name": "Co", "description": "python"})
     assert r.status_code == 200, r.text
+    job_id = r.json()["job"]["id"]
+
+    # Seed a prep artifact + chat message directly (the API paths are LLM-gated/premium),
+    # so we can prove they too are cascade-deleted — not just the easy rows.
+    db_session.add(PrepArtifact(job_id=job_id, artifact_type="prep_pack", title="P", content="x"))
+    db_session.add(ChatMessage(user_id=user_id, role="user", content="hi"))
+    db_session.commit()
+    assert db_session.query(PrepArtifact).count() == 1
+    assert db_session.query(ChatMessage).count() == 1
 
     # Delete the account.
     d = client.delete("/api/auth/me", headers=h)
@@ -33,6 +45,14 @@ def test_delete_account_removes_user_and_data(client):
 
     # The token no longer resolves to a user -> 401 (the row is gone, not just flagged).
     assert client.get("/api/auth/me", headers=h).status_code == 401
+    # Every user-owned table is empty — nothing orphaned.
+    db_session.expire_all()
+    assert db_session.query(User).count() == 0
+    assert db_session.query(JobPosting).count() == 0
+    assert db_session.query(JobScore).count() == 0
+    assert db_session.query(Application).count() == 0
+    assert db_session.query(PrepArtifact).count() == 0
+    assert db_session.query(ChatMessage).count() == 0
     # Re-registering the same email succeeds (no leftover unique-email row).
     again = client.post("/api/auth/register", json={"email": "del@example.com", "password": "supersecret123"})
     assert again.status_code == 200, again.text

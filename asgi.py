@@ -126,11 +126,17 @@ LLM_DAILY_CEILING = int(os.getenv("LLM_DAILY_CEILING", "25"))
 
 # Per-ACCOUNT login lockout (defends one account against a distributed password
 # brute-force that spreads across IPs, which the per-IP rate limit alone misses). In-memory
-# like the rate limiter above, so it's per-instance on serverless — Track F tracks moving
-# both to a shared store. Keyed by email so it never reveals whether the account exists.
+# like the rate limiter above, so it's per-instance on serverless. Keyed by email so it
+# never reveals whether the account exists.
+# KNOWN TRADEOFF (honest): a hard lockout is a targeted-DoS vector — someone who knows a
+# victim's email can keep the account locked by failing 5 logins every window. Moving to a
+# shared store (Track F) does NOT fix this (it would centralize the lock). The real fix is
+# CAPTCHA on the auth form (Track F / PENDING_OPS, needs owner keys) so automated failure
+# floods are stopped before they count. The short window (15 min) bounds the harm meanwhile.
 _LOGIN_FAILURES: Dict[str, Tuple[int, float]] = {}  # email -> (consecutive_failures, locked_until_ts)
 LOGIN_MAX_FAILURES = int(os.getenv("LOGIN_MAX_FAILURES", "5"))
 LOGIN_LOCKOUT_SECONDS = int(os.getenv("LOGIN_LOCKOUT_SECONDS", "900"))  # 15 min
+_LOGIN_FAILURES_MAXSIZE = 50000  # bound memory: ghost-email floods can't grow this unbounded
 
 
 def _login_locked(email: str) -> bool:
@@ -145,7 +151,20 @@ def _login_locked(email: str) -> bool:
     return False
 
 
+def _sweep_login_failures() -> None:
+    """Drop expired/decayed entries when the map gets large (ghost-email flood defense).
+    Entries with no active lock and stale activity are evicted; if still too large after
+    that, clear the whole map (correctness-safe: it only loosens lockouts, never tightens)."""
+    now = time.time()
+    for key in [k for k, (_, lu) in _LOGIN_FAILURES.items() if lu and now >= lu]:
+        _LOGIN_FAILURES.pop(key, None)
+    if len(_LOGIN_FAILURES) > _LOGIN_FAILURES_MAXSIZE:
+        _LOGIN_FAILURES.clear()
+
+
 def _record_login_failure(email: str) -> None:
+    if len(_LOGIN_FAILURES) >= _LOGIN_FAILURES_MAXSIZE:
+        _sweep_login_failures()
     failures = _LOGIN_FAILURES.get(email, (0, 0.0))[0] + 1
     locked_until = time.time() + LOGIN_LOCKOUT_SECONDS if failures >= LOGIN_MAX_FAILURES else 0.0
     _LOGIN_FAILURES[email] = (failures, locked_until)
