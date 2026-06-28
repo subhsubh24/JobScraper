@@ -25,6 +25,11 @@
 **Password** is stored only as a salted PBKDF2 hash (`users.password_hash`) — never in
 plaintext, never transmitted to third parties.
 
+> The data model also contains `contacts` / `outreach_sequences` tables (a planned
+> networking/outreach CRM). There is **no shipped user path to populate them yet**, so the
+> app does not currently collect that data — add it to this disclosure (user-entered
+> business contact info) the moment the outreach feature ships.
+
 ## What the app does NOT collect
 Location, precise or coarse · Photos / camera / microphone · Contacts · Calendar · Health
 or fitness · Browsing/search history outside the app · Advertising identifiers (IDFA/GAID)
@@ -55,6 +60,8 @@ not Tracking, not Third-Party Advertising):
   messages, generated prep artifacts)
 - **Identifiers** → User ID
 - **Purchases** → Purchase History (subscription plan/status) — *applies once billing is live*
+- **Usage Data** → Other Usage Data (free-tier counters: jobs added / prep packs generated
+  this month — used solely for entitlement enforcement, not analytics or tracking)
 
 **Data Not Linked to You:**
 - **Diagnostics** → Other Diagnostic Data (server request logs: IP + timestamp, retained
@@ -73,15 +80,19 @@ independent third parties): No — data goes only to service providers processin
 behalf, which Google classifies as collection-with-processing, not sharing/selling.
 
 **Data types collected:**
-- **Personal info** → Email address; Name (optional)
+- **Personal info** → Email address; Name (optional); **User IDs** (the account identifier)
 - **Financial info** → Purchase history (subscription status) — *once billing is live*
 - **App activity** → Other user-generated content (resume, saved jobs/applications, coach
   messages, prep artifacts)
-- **App info & performance** → Crash logs / Diagnostics (server-side request logs)
-- **Device or other IDs** → User ID (account identifier)
+- **App info & performance** → **Diagnostics** only (server-side request logs: IP +
+  timestamp). No crash-reporting SDK is present, so "Crash logs" is NOT collected.
+
+(The account User ID is a server-side identifier under *Personal info → User IDs* — NOT a
+device/advertising ID, so "Device or other IDs" is **not** collected.)
 
 **Security practices:**
 - Data is **encrypted in transit** (HTTPS/TLS everywhere; HSTS enforced).
+- Data is **encrypted at rest** (Neon managed Postgres encrypts at rest by default).
 - Users can **request that data be deleted** — in-app **Delete account** (`DELETE
   /api/auth/me`) cascade-removes all user-owned rows.
 - Passwords are stored hashed (PBKDF2-HMAC-SHA256, per-user salt), never plaintext.

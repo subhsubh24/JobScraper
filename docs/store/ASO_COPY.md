@@ -16,10 +16,10 @@
 > and keep every application on track. Free to start.
 
 ## Keywords (App Store keyword field, ≤ 100 chars, comma-separated, no spaces)
-`job search,interview prep,career coach,resume,job tracker,application tracker,job fit,offer,hiring,ATS`
+`job search,interview prep,career coach,resume,job tracker,application tracker,job fit,offer,hiring`
 
 ## Short description (Play, ≤ 80 chars)
-> Score job fit, generate interview prep, and track every application in one place.
+> Score job fit, generate prep, and track every application in one place.
 
 ## Full description (App Store ≤ 4000 chars / Play ≤ 4000 chars)
 
@@ -52,7 +52,7 @@ needs attention so nothing slips.
 
 **Free vs Premium**
 - **Free:** track up to 5 jobs, 1 prep pack/month, fit scoring.
-- **Premium:** unlimited jobs, 10 prep packs/month, the AI Career Coach, and salary
+- **Premium:** unlimited jobs, unlimited prep packs, the AI Career Coach, and salary
   negotiation help. Monthly or annual (annual saves ~33%).
 
 Start free today and run your search like an operator.
@@ -63,7 +63,10 @@ Start free today and run your search like an operator.
 > Career Operator Premium is an auto-renewing subscription. Pro: $12/month or $96/year.
 > Payment is charged to your account at confirmation. Subscriptions renew automatically
 > unless cancelled at least 24 hours before the end of the period; manage or cancel in your
-> account settings. (iOS adds the standard Apple EULA + privacy/terms links.)
+> account settings. **Restore purchases is available in the app** (Settings → Restore).
+> The subscription Terms of Use and Privacy Policy are linked at the point of purchase
+> (Apple 3.1.2 requires the functional Terms + Privacy links + a Restore action in the
+> paywall UI, not just this text — wire them when StoreKit lands).
 
 ## Release notes — v1.0.0
 > First release. Score job fit, generate role-specific interview prep, chat with the AI
