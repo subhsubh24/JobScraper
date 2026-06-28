@@ -66,6 +66,23 @@ Left partial items (web SEO/polish, mobile device screens, auth lockout, CORS-lo
 migrations, evals, coverage, visual screenshots) and ALL DoD boxes unticked. Headline
 stays 0% until the two-gate readiness passes — correct.
 
+### 2026-06-27 — Marketing maturity gate + pre-launch SITE GATE
+Growth markets autonomously but never before the product is ready, and never exposes a
+half-baked app. Added: (1) ANALYSIS_PLAYBOOK marketing maturity gate (pre_launch
+WAITLIST-ONLY with a HARD BLOCK on execute-mode until a channel is connected AND
+GROWTH_STATUS.site_gate_up==true; launching; post_launch) — gated on the independent
+QUALITY_SCORECARD + readiness, never eagerness. (2) GROWTH_STATUS.site_gate_up: false
+(preflight check_blocks now requires it as a bool). (3) web/middleware.ts SITE GATE:
+SITE_GATE_PASSWORD set -> Basic-auth the web app, EXEMPT marketing/legal routes (/,
+/waitlist, /coming-soon, /privacy, /terms, /legal); ROADMAP Track G item (BLOCKING note)
++ PENDING_OPS site-gate owner action (set SITE_GATE_PASSWORD=deepster pre-launch, unset at
+launch; mobile via TestFlight). (4) Growth Agent ROUTINE reinforced via /schedule:
+execute-mode requires engine+channel AND (pre_launch => site_gate_up==true), else stay
+PREPARE / zero external traffic; routine also writes site_gate_up each run. The SITE GATE
+gates the Next.js web only; the FastAPI /api is a separate Vercel service (own JWT auth);
+mobile pre-launch via TestFlight. Follow-up (Track G): build the waitlist landing + legal
+pages the gate exempts, and repoint the pre-launch landing CTA to the waitlist.
+
 ### 2026-06-27 — Synced FACTORY_STANDARD.md to canonical (visual verification)
 Canonical sync (kept byte-identical across factories): added visual-verification to the
 shared standard — §6 "SEE WHAT THE USER SEES" (journey suite captures + commits a

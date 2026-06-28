@@ -12,6 +12,12 @@ OWNER_ACTIONS:
   project: jobscraper
   as_of: 2026-06-27
   items:
+    - id: site-gate
+      title: "Pre-launch SITE GATE: set SITE_GATE_PASSWORD=deepster now; unset at launch"
+      priority: high
+      status: open
+      why: "Don't expose the half-baked app pre-launch. The gate (web/middleware.ts) password-protects the web app but exempts the public marketing/legal routes so waitlist still works. ALSO required to flip GROWTH_STATUS.site_gate_up: true, which is the HARD precondition for the Growth Agent to do any pre-launch outreach."
+      how: "In Vercel env set SITE_GATE_PASSWORD=deepster (never commit it); then set GROWTH_STATUS.site_gate_up: true. At launch (every ship-critical QUALITY_SCORECARD dim A/A+ + readiness), UNSET SITE_GATE_PASSWORD to open the app. Mobile pre-launch: distribute via TestFlight / internal track only."
     - id: spend-caps
       title: "Set HARD provider spend caps + alerts (Gemini/Google AI, Vercel, Stripe) NOW"
       priority: urgent

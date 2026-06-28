@@ -44,13 +44,15 @@ def main() -> None:
     # GROWTH_STATUS
     gs = extract_block(ROOT / "docs" / "growth" / "GROWTH_STATUS.md", "GROWTH_STATUS")
     for field in ("project", "as_of", "phase", "engine_built", "engine_pct",
-                  "channels_connected", "awaiting_connect", "funnel", "acquisition",
-                  "channels", "experiments", "email", "content", "learnings",
-                  "next_actions", "owner_blockers", "links"):
+                  "channels_connected", "awaiting_connect", "site_gate_up", "funnel",
+                  "acquisition", "channels", "experiments", "email", "content",
+                  "learnings", "next_actions", "owner_blockers", "links"):
         if field not in gs:
             sys.exit(f"FAIL: GROWTH_STATUS missing `{field}`")
     if gs["phase"] not in ("pre_launch", "launching", "post_launch"):
         sys.exit(f"FAIL: GROWTH_STATUS.phase invalid: {gs['phase']}")
+    if not isinstance(gs["site_gate_up"], bool):
+        sys.exit("FAIL: GROWTH_STATUS.site_gate_up must be a boolean")
     # Pinned invariant: engine_built iff engine_pct == 100
     if bool(gs["engine_built"]) != (gs["engine_pct"] == 100):
         sys.exit("FAIL: engine_built must equal (engine_pct == 100)")
