@@ -63,17 +63,29 @@ export function Markdown({ content, className = '' }: { content: string; classNa
       flushList();
       const level = heading[1].length;
       const k = key++;
-      const cls =
-        level === 1
-          ? 'text-lg font-bold text-slate-100'
-          : level === 2
-            ? 'text-base font-semibold text-slate-100'
-            : 'text-sm font-semibold text-slate-200';
-      blocks.push(
-        <p key={`h${k}`} className={`mt-3 ${cls}`}>
-          {renderInline(heading[2], `h${k}`)}
-        </p>,
-      );
+      // Semantic heading elements (the page already owns the single <h1>, so markdown
+      // headings start at <h2>) — keeps the document outline + screen-reader nav intact.
+      const inner = renderInline(heading[2], `h${k}`);
+      const cls = 'mt-3 mb-1';
+      if (level === 1) {
+        blocks.push(
+          <h2 key={`h${k}`} className={`${cls} text-lg font-bold text-slate-100`}>
+            {inner}
+          </h2>,
+        );
+      } else if (level === 2) {
+        blocks.push(
+          <h3 key={`h${k}`} className={`${cls} text-base font-semibold text-slate-100`}>
+            {inner}
+          </h3>,
+        );
+      } else {
+        blocks.push(
+          <h4 key={`h${k}`} className={`${cls} text-sm font-semibold text-slate-200`}>
+            {inner}
+          </h4>,
+        );
+      }
       continue;
     }
 

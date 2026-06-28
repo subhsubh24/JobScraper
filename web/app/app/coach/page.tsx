@@ -91,9 +91,9 @@ export default function CoachPage() {
           <div
             className="max-w-[85%] rounded-2xl border border-slate-800 bg-slate-900/60 p-3"
             aria-live="polite"
-            aria-label="Coach is typing"
           >
-            <span className="inline-flex gap-1">
+            <span className="sr-only">Coach is typing…</span>
+            <span aria-hidden="true" className="inline-flex gap-1">
               <span className="h-2 w-2 animate-bounce rounded-full bg-slate-500 [animation-delay:-0.3s]" />
               <span className="h-2 w-2 animate-bounce rounded-full bg-slate-500 [animation-delay:-0.15s]" />
               <span className="h-2 w-2 animate-bounce rounded-full bg-slate-500" />

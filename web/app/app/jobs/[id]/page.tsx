@@ -147,6 +147,10 @@ function JobDetailSkeleton() {
           ))}
         </div>
       </div>
+      <div className="space-y-2">
+        <Skeleton className="h-5 w-32" />
+        <Skeleton className="h-10 w-44" />
+      </div>
     </div>
   );
 }
