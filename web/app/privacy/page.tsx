@@ -31,7 +31,9 @@ export default function PrivacyPage() {
           </li>
           <li>
             <strong>Profile / resume text</strong> — if you choose to provide it, so we can
-            score how well a role fits you.
+            score how well a role fits you. To do this we also generate and store a numeric
+            embedding (a vector representation) of your resume and of job descriptions; see
+            &ldquo;AI processing&rdquo; below.
           </li>
           <li>
             <strong>AI coach messages</strong> — the messages you send to the AI career coach.
@@ -55,9 +57,11 @@ export default function PrivacyPage() {
         <p>
           To generate fit scores, prep packs, and coach replies, the relevant content you
           provide (such as a job description, your resume text, or a coach message) is sent to
-          our AI provider, Google (Gemini API), to produce a response. When no AI provider is
-          configured, the product falls back to a non-AI heuristic where possible rather than
-          failing. We do not use your data to train our own models.
+          our AI provider, Google (Gemini API), to produce a response. We also send your resume
+          and job-description text to Google&rsquo;s embedding API to generate the vector
+          representations described above, which we store to power fit scoring. When no AI
+          provider is configured, the product falls back to a non-AI heuristic where possible
+          rather than failing. We do not use your data to train our own models.
         </p>
       </Section>
 
@@ -66,7 +70,7 @@ export default function PrivacyPage() {
           <li><strong>Google (Gemini API)</strong> — AI scoring, prep, and coaching.</li>
           <li><strong>Vercel</strong> — application hosting.</li>
           <li><strong>Neon</strong> — managed PostgreSQL database.</li>
-          <li><strong>Stripe</strong> — payment processing for subscriptions (card details go directly to Stripe; we never see or store your full card number).</li>
+          <li><strong>Stripe</strong> — payment processing for subscriptions. This is not active yet; once paid plans launch, card details will go directly to Stripe and we will never see or store your full card number.</li>
         </ul>
         <p>These providers process data on our behalf under their own terms and security practices.</p>
       </Section>
