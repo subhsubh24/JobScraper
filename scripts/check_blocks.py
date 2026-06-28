@@ -63,6 +63,15 @@ def main() -> None:
             sys.exit(f"FAIL: GROWTH_STATUS.pmf missing `{f}`")
     if pmf["signal"] not in ("none", "weak", "emerging", "strong"):
         sys.exit(f"FAIL: GROWTH_STATUS.pmf.signal invalid: {pmf['signal']}")
+    # Strategic outreach (DRAFT-ONLY; see OUTREACH.md)
+    outreach = gs.get("outreach")
+    if not isinstance(outreach, dict):
+        sys.exit("FAIL: GROWTH_STATUS missing `outreach` block")
+    for f in ("drafted_7d", "owner_sent_7d", "replies_7d", "signal"):
+        if f not in outreach:
+            sys.exit(f"FAIL: GROWTH_STATUS.outreach missing `{f}`")
+    if outreach["signal"] not in ("none", "weak", "emerging", "strong"):
+        sys.exit(f"FAIL: GROWTH_STATUS.outreach.signal invalid: {outreach['signal']}")
     # Pinned invariant: engine_built iff engine_pct == 100
     if bool(gs["engine_built"]) != (gs["engine_pct"] == 100):
         sys.exit("FAIL: engine_built must equal (engine_pct == 100)")

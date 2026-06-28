@@ -142,6 +142,19 @@ Left partial items (web SEO/polish, mobile device screens, auth lockout, CORS-lo
 migrations, evals, coverage, visual screenshots) and ALL DoD boxes unticked. Headline
 stays 0% until the two-gate readiness passes — correct.
 
+### 2026-06-28 — Strategic outreach (curated, DRAFT-ONLY) for the Growth Agent
+PART 1 (repo, PR pending): created docs/growth/OUTREACH.md (RAILS verbatim — DRAFT ONLY /
+agent never sends; high-confidence + strategic only; a few/run max; real published contacts
+only, never invent/scrape; honest + opt-out CAN-SPAM/GDPR; pre-launch links -> waitlist;
+maker!=checker review); target types adapted to Career Operator (careers/HR-tech/AI press,
+ATS/bootcamp/career-center partners, career creators + newsletter curators). Added a
+"Strategic outreach" pointer to ANALYSIS_PLAYBOOK and an outreach block to GROWTH_STATUS
+(drafted_7d, owner_sent_7d, replies_7d, signal; 0/none pre-launch) + preflight check_blocks
+validates it. PART 2 (routine): added OUTREACH.md to the Growth Agent ORIENT reads + a (3b)
+STRATEGIC OUTREACH draft-only step + reconciled HARD BOUNDARIES (one drafting exception:
+creates Gmail DRAFTS for the owner to send; still never auto-sends). model/cron/sources/
+tools/MCP preserved. The Gmail tool stays create_draft only — no send capability.
+
 ### 2026-06-28 — PMF as the leading indicator + FACTORY_STANDARD first-class read
 PART 1 (repo): added the PMF bullet VERBATIM to FACTORY_STANDARD §9 (canonical; revenue
 follows PMF; pre-PMF prioritize the product/retention not acquisition; metrics win over the

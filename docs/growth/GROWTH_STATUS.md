@@ -49,6 +49,11 @@ GROWTH_STATUS:
     retention_d30: null
     organic_share_rate: null # share of signups from organic/referral
     signal: none             # none | weak | emerging | strong
+  outreach:                  # strategic 1:1 outreach (DRAFT-ONLY; see OUTREACH.md)
+    drafted_7d: 0            # Gmail drafts created for the owner to review/send
+    owner_sent_7d: 0         # owner-reported sends (never fabricated)
+    replies_7d: 0            # owner-reported replies
+    signal: none             # none | weak | emerging | strong
   channels: []
   experiments: []
   email:
