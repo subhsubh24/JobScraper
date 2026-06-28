@@ -25,6 +25,38 @@ Durable lessons for the factory loop. Append dated entries. Keep it honest and s
   honestly below the $100K floor (`floor_met_year1: false`); growth is `pre_launch`,
   engine 0%. Convergence happens over scheduled runs, not by ticking boxes early.
 
+### 2026-06-28 — Maximal run: 5 feature PRs (ATS, web SEO, account/security, mobile, legal)
+Ran the full ~8-scout sweep and shipped 5 file-disjoint, value-bar-clearing PRs through
+2 Sonnet reviewers each + the gate:
+- **#34 ATS import-preview** (Track A): wired the existing-but-unused Greenhouse/Lever
+  ingestion into `POST /api/jobs/import-preview` (preview-only, no side effects). Returns
+  REAL listings or a TRUTHFUL empty/unreachable/unsupported state — clients now set
+  `last_error` so "unreachable" is never reported as "no jobs." Reviewer A caught a
+  **CRITICAL SSRF** (we fetch a user-supplied URL server-side) → added `url_guard.py`
+  (block non-http(s) + private/loopback/link-local resolved IPs) at the endpoint + detector.
+- **#35 web SEO/states** (Track A/E): metadata (title template, OG/twitter, metadataBase
+  gated on env), sitemap.ts/robots.ts (disallow /app + /api), honest status-update error.
+- **#36 account deletion + lockout + headers** (Track D/F): real `DELETE /api/auth/me`
+  (cascade), per-account login lockout, HSTS + frame-ancestors CSP. **No schema change on
+  purpose** — AUTO_CREATE_TABLES only creates missing *tables*, so adding User columns would
+  break the live Neon DB; lockout uses in-memory state like the rate limiter.
+- **#37 mobile** (Track B): prep packs render inline (was a 600-char-truncated Alert =
+  BUILDS≠WORKS dead-end); paywall emoji→Ionicons.
+- **#38 legal** (Track D/G): /privacy + /terms, code-accurate. Reviewer A caught two honesty
+  bugs: embeddings (resume_embedding/jd_embedding ARE computed via Gemini + stored) were
+  undisclosed, and Stripe was listed as active though verify-purchase is a 501 — both fixed.
+LESSONS: (1) **Process-global in-memory state leaks across tests** — the rate-limit buckets
+accumulated and tripped a spurious 429 in a later test once the suite grew; fixed with an
+autouse conftest reset (now also clears `_LOGIN_FAILURES`). Any module-level dict the app
+mutates needs a per-test reset. (2) **A server-side fetch of a user URL is an SSRF hole** —
+always guard scheme + resolved IP; residual DNS-rebinding/redirect risk needs a validating
+transport (FOLLOW-UP, code not owner). (3) **Reviewers as honesty check** — both legal
+honesty bugs and the SSRF were reviewer finds, not maker finds; maker≠checker earned its keep.
+FOLLOW-UPS for next runs (not blocking): waitlist landing + capture + email-provider
+abstraction (Track G/H — scouted, deferred as a coherent larger unit); markdown renderer for
+mobile prep content; full structured-logging/error-envelope across the API; web account-
+deletion UI (web has no Settings page yet); SSRF validating-transport for redirect/rebinding.
+
 ### 2026-06-28 — Unpinned transitive httpx silently broke the whole test suite
 A fresh container install floated the (unpinned, transitive-via-openai) `httpx` to 0.28.1.
 httpx 0.28 dropped the `Client(app=...)` shortcut that starlette 0.35.1's `TestClient`

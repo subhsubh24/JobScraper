@@ -72,6 +72,12 @@ OWNER_ACTIONS:
       status: in_progress
       why: "Neon project 'JobScraper' is provisioned and the schema is created + verified (full journey ran green against it). Remaining: set server-side env vars in Vercel and deploy."
       how: "DONE: Neon DB + 9 tables via pooled endpoint. TODO: in Vercel set DATABASE_URL (Neon pooled string), JWT_SECRET (openssl rand -hex 32), optional GEMINI_API_KEY + ALLOWED_ORIGINS; deploy; verify GET /api/health. See docs/DEPLOY_VERCEL.md. Never commit .env. ENFORCED (rule b): the API now REFUSES to start on Vercel if JWT_SECRET is unset or the dev default — set a strong JWT_SECRET BEFORE the next deploy or /api will fail loud (by design; auth tokens would be forgeable otherwise)."
+    - id: legal-review
+      title: "Have counsel review Privacy Policy + ToS; provision the contact inboxes"
+      priority: normal
+      status: open
+      why: "The /privacy + /terms pages are real and code-accurate, but auto-authored (not lawyer-reviewed); they lack a governing-law/arbitration clause, and the listed contact addresses don't exist yet. Apple/Google require a working privacy contact at submission."
+      how: "Have counsel review web/app/{privacy,terms}/page.tsx (add governing law + dispute resolution if desired). Provision privacy@careeroperator.app and support@careeroperator.app (or update the addresses on both pages to real ones) BEFORE store submission."
     - id: ci-wiring
       title: "Wire preflight + journey suite + mobile build into CI (needs workflow scope)"
       priority: normal

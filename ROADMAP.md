@@ -38,7 +38,9 @@ the guard tests, and **`FACTORY_STANDARD.md`**.
       FastAPI) confirmed on a live deploy. Un-tick if not backed.
 - [ ] Web app: real loading/empty/error states; SEO metadata; polished to the design bar
 - [ ] (legacy) Flask `app.py` — superseded by the Next.js web app; keep or retire
-- [ ] ATS ingestion (Greenhouse/Lever) returns real listings or a truthful empty state
+- [x] ATS ingestion (Greenhouse/Lever) returns real listings or a truthful empty state
+      (`POST /api/jobs/import-preview`; tests prove real listings, unreachable-vs-empty
+      honesty, unsupported ATS, and SSRF refusal — PR #34)
 - [ ] Consistent error envelope + structured logging across the API
 - [ ] DB migrations (alembic) generated and applied cleanly; seed script for dev
 - [x] External Postgres wired for serverless (no SQLite persistence on Vercel)
@@ -71,9 +73,14 @@ the guard tests, and **`FACTORY_STANDARD.md`**.
 - [ ] Receipt / signature verification server-side (no client-trusted unlocks)
 
 ### D — Store readiness & compliance (Apple App Store + Google Play)
-- [ ] Privacy policy (hosted + in-repo) and ToS
+- [x] Privacy policy (hosted + in-repo) and ToS — `/privacy` + `/terms` render real,
+      code-accurate content (embeddings + Gemini disclosed; Stripe marked not-yet-active);
+      SITE-GATE-exempt + linked from the landing footer + sitemap (PR #38). (Counsel review
+      + provisioning the contact inboxes are owner actions — PENDING_OPS.)
 - [ ] App Privacy labels / data-safety form content drafted
-- [ ] In-app account deletion (Apple + Google requirement)
+- [x] In-app account deletion (Apple + Google requirement) — `DELETE /api/auth/me` really
+      cascade-deletes the user + all owned data (test asserts ZERO rows across every
+      user-owned table); mobile Settings "Delete account" calls it for real (PR #36)
 - [ ] Permission usage strings (only for permissions actually used)
 - [ ] Rendered store assets: real icon, screenshots, feature graphic (committed image files)
 - [ ] ASO / store copy (title, subtitle, keywords, descriptions)
@@ -96,7 +103,10 @@ the guard tests, and **`FACTORY_STANDARD.md`**.
 - [x] Rate limiting on every paid/expensive/auth/scrape endpoint
 - [x] Server-side input validation on all write endpoints
 - [x] Error hygiene (no stack traces / secrets leaked to clients)
-- [ ] Auth failure cases: lockout, no email enumeration, idempotent verify
+- [x] Auth failure cases: lockout, no email enumeration, idempotent verify — per-account
+      login lockout (5 fails → 15-min 429, keyed by email so it never enumerates); register/
+      login already return generic errors; verify-purchase is idempotent (always 501). Tests
+      prove lockout blocks the correct password, no enumeration, and resets on success (PR #36)
 - [ ] CAPTCHA on public forms (signup/waitlist)
 - [ ] CORS locked to known origins + security headers
 - [x] Per-user/day spend ceiling on scrape + LLM (wallet-drain defense)
