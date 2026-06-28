@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 
@@ -30,7 +31,7 @@ export default function PaywallScreen() {
       <Card>
         {FEATURES.map((f) => (
           <View key={f} style={styles.featureRow}>
-            <Text style={styles.check}>✓</Text>
+            <Ionicons name="checkmark-circle" size={18} color={colors.success} />
             <Text style={styles.feature}>{f}</Text>
           </View>
         ))}
@@ -64,7 +65,6 @@ const styles = StyleSheet.create({
   title: { color: colors.text, fontSize: 26, fontWeight: '800', textAlign: 'center' },
   subtitle: { color: colors.textMuted, textAlign: 'center', marginBottom: spacing.sm },
   featureRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: 6 },
-  check: { color: colors.success, fontWeight: '800', fontSize: 16 },
   feature: { color: colors.text, fontSize: 15 },
   plans: { flexDirection: 'row', gap: spacing.md },
   plan: {

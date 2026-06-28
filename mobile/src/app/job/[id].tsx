@@ -25,6 +25,8 @@ export default function JobDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [prepLoading, setPrepLoading] = useState(false);
+  const [prep, setPrep] = useState<{ title: string; content: string } | null>(null);
+  const [prepMsg, setPrepMsg] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -55,16 +57,18 @@ export default function JobDetailScreen() {
   async function generatePrep() {
     if (!id) return;
     setPrepLoading(true);
+    setPrepMsg(null);
     try {
-      const pack = await api.generatePrepPack(id);
-      Alert.alert(pack.title, pack.content.slice(0, 600));
+      // Render the full pack inline (scrollable) instead of a truncated, ephemeral alert —
+      // the prep pack is the value, the user needs to read all of it and come back to it.
+      setPrep(await api.generatePrepPack(id));
     } catch (e) {
-      if (e instanceof ApiError && e.status === 503) {
-        Alert.alert('AI not configured', e.message);
-      } else if (e instanceof ApiError && e.status === 403) {
+      if (e instanceof ApiError && e.status === 403) {
         router.push('/paywall');
+      } else if (e instanceof ApiError) {
+        setPrepMsg(e.message); // 503 (AI not configured) and other API errors, honestly inline
       } else {
-        Alert.alert('Could not generate', e instanceof ApiError ? e.message : 'Try again.');
+        setPrepMsg('Could not generate a prep pack. Please try again.');
       }
     } finally {
       setPrepLoading(false);
@@ -126,10 +130,23 @@ export default function JobDetailScreen() {
 
       <Text style={styles.section}>Interview prep</Text>
       <Button
-        label={user?.tier === 'premium' ? 'Generate prep pack' : 'Generate prep pack (1 free)'}
+        label={
+          prep
+            ? 'Regenerate prep pack'
+            : user?.tier === 'premium'
+              ? 'Generate prep pack'
+              : 'Generate prep pack (1 free)'
+        }
         onPress={generatePrep}
         loading={prepLoading}
       />
+      {prepMsg ? <Text style={styles.prepMsg}>{prepMsg}</Text> : null}
+      {prep ? (
+        <Card style={styles.prepCard}>
+          <Text style={styles.prepTitle}>{prep.title}</Text>
+          <Text style={styles.prepContent}>{prep.content}</Text>
+        </Card>
+      ) : null}
     </ScrollView>
   );
 }
@@ -159,4 +176,8 @@ const styles = StyleSheet.create({
   statusChipText: { color: colors.textMuted, fontWeight: '600' },
   statusChipTextActive: { color: colors.primaryText },
   error: { color: colors.danger },
+  prepMsg: { color: colors.danger, fontSize: 13, marginTop: spacing.sm },
+  prepCard: { marginTop: spacing.md, gap: spacing.sm },
+  prepTitle: { color: colors.text, fontSize: 16, fontWeight: '700' },
+  prepContent: { color: colors.text, fontSize: 14, lineHeight: 21 },
 });
