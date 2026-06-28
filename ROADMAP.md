@@ -45,8 +45,13 @@ the guard tests, and **`FACTORY_STANDARD.md`**.
 - [x] ATS ingestion (Greenhouse/Lever) returns real listings or a truthful empty state
       (`POST /api/jobs/import-preview`; tests prove real listings, unreachable-vs-empty
       honesty, unsupported ATS, and SSRF refusal — PR #34)
-- [ ] Consistent error envelope + structured logging across the API
+- [x] Consistent error envelope + structured logging across the API — every error response
+      keeps the native `detail` AND adds a structured `error{code,message,request_id}`; a
+      request-id middleware stamps `X-Request-ID` + a log contextvar so every line during a
+      request is correlatable; stdlib JSON logging (no new dep). Tests assert the envelope +
+      request-id round-trip (PR #47, 2 Sonnet reviewers).
 - [ ] DB migrations (alembic) generated and applied cleanly; seed script for dev
+      (next run: needs the AUTO_CREATE_TABLES→alembic cutover plan — deferred this run)
 - [x] External Postgres wired for serverless (no SQLite persistence on Vercel)
 - [x] Health/readiness endpoints + **Vercel serverless deploy** verified live (see docs/DEPLOY_VERCEL.md)
 
@@ -110,8 +115,13 @@ the guard tests, and **`FACTORY_STANDARD.md`**.
 ### E — World-class quality
 - [x] Lint floor: `flake8` (backend) + ESLint (mobile) clean
 - [x] Type floor: `mypy`/type checks (backend, where adopted) + `tsc --noEmit` (mobile)
-- [ ] Test coverage floor defined and met
-- [ ] Eval suite for LLM workflows (scoring/prep/coach) with golden expectations
+- [x] Test coverage floor defined and met — branch-coverage floor `fail_under=65` in
+      `setup.cfg`, enforced by `scripts/preflight.sh ci` (`--cov-fail-under`); measured ~69%
+      this run (PR #52). Conservative ratchet; raise as legacy unused modules are covered/retired.
+- [x] Eval suite for LLM workflows (scoring/prep/coach) with golden expectations — golden
+      evals pin the deterministic heuristic scorer (`overall = 30 + 40*skills_score` → 70/30/50)
+      + context-adaptive coach suggestions; deterministic (key-free), so they guard regressions
+      in CI (`tests/evals/`, PR #52). (prep-pack golden eval = follow-up.)
 - [x] Runtime FUNCTIONAL journey suite green this run (`E2E_JOURNEYS_PASSED=1`)
 - [ ] **Visual verification (FACTORY_STANDARD §6):** journey suite CAPTURES + commits a
       screenshot of every page + key state (empty/loading/error, authed + logged-out) —
