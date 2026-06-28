@@ -27,6 +27,7 @@ LOOP_HEALTH:
     readiness_attempts: 0
     readiness_rejected: 0
     recurring_failures: []
-    harness_proposals_open: 0
+    harness_proposals_open: 1     # "gates not enforced in CI" — staged docs/ci/PROPOSED_CI.md
+  enforced_in_ci: false          # flip true once owner applies ci.yml + marks checks required
   signal: bootstrapping          # bootstrapping | improving | steady | churning | stuck
 ```

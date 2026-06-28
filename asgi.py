@@ -59,6 +59,13 @@ def _assert_required_secrets() -> None:
                 "JWT_SECRET is unset or the insecure dev default in production — set a "
                 "strong JWT_SECRET in the deploy env (auth tokens are forgeable otherwise)."
             )
+        # The TEST-ONLY rate-limit bypass must NEVER be live in production. If the deploy env
+        # somehow carries it, refuse to boot rather than run wide-open to abuse.
+        if os.getenv("E2E_DISABLE_RATE_LIMIT"):
+            raise RuntimeError(
+                "E2E_DISABLE_RATE_LIMIT is set in production — this test-only flag disables "
+                "rate limiting and must never be set on Vercel. Unset it in the deploy env."
+            )
 
 
 _assert_required_secrets()
@@ -239,9 +246,18 @@ def _clear_login_failures(email: str) -> None:
     _LOGIN_FAILURES.pop(email, None)
 
 
+# TEST-ONLY rate-limit bypass. The functional-journey CI job replays every journey from a
+# SINGLE runner IP and would trip the per-IP limiter (a false red). Gated on
+# E2E_DISABLE_RATE_LIMIT, which production NEVER sets — and _assert_required_secrets() above
+# refuses to boot if it is ever present alongside VERCEL. Evaluated once at import.
+_RATE_LIMIT_DISABLED = bool(os.getenv("E2E_DISABLE_RATE_LIMIT")) and not os.getenv("VERCEL")
+
+
 def rate_limit(bucket: str, limit: int, window_seconds: int = 60):
     """Fixed-window limiter dependency factory, keyed by client + bucket."""
     def _dep(request: Request) -> None:
+        if _RATE_LIMIT_DISABLED:
+            return
         client = request.client.host if request.client else "unknown"
         key = (client, bucket)
         now = time.time()

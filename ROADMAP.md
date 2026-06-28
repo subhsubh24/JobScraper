@@ -123,11 +123,21 @@ the guard tests, and **`FACTORY_STANDARD.md`**.
       + context-adaptive coach suggestions; deterministic (key-free), so they guard regressions
       in CI (`tests/evals/`, PR #52). (prep-pack golden eval = follow-up.)
 - [x] Runtime FUNCTIONAL journey suite green this run (`E2E_JOURNEYS_PASSED=1`)
+- [x] Browser-level functional journey (Playwright): `web/e2e/core-journey.spec.ts` boots a
+      running web build + running API + seeded throwaway DB and asserts the core-product
+      OUTPUT renders (signup → working dashboard → add job → **fit score renders** → detail,
+      no dead-end). Self-seeds; verified green locally.
+- [ ] **Gates ENFORCED as REQUIRED CI checks** (resolves loop-health proposal "gates not
+      enforced in CI"). The loop cannot push `.github/`, so the workflow + branch-protection
+      required-checks list are STAGED in `docs/ci/PROPOSED_CI.md` for the owner to apply
+      (`preflight (lint + typecheck + tests)` + `functional journeys (web E2E)`). DoD: both
+      checks required on `main` and GREEN; then flip `LOOP_HEALTH.enforced_in_ci: true` and
+      close the proposal. Until applied, the gate runs locally/in-routine only.
 - [ ] **Visual verification — DUAL-AXIS (FACTORY_STANDARD §6).** Build AFTER the functional
       journey suite (functional correctness first); the screenshots are captured BY it. DoD
       = BOTH:
   - **(1) ARTIFACTS** — a real, committed, NON-ZERO screenshot for EVERY route/state AND
-    every key journey STEP in `docs/ROUTE_INVENTORY.md`, captured by the journey suite (web:
+    every key journey STEP in `docs/ci/ROUTE_INVENTORY.md`, captured by the journey suite (web:
     Playwright `page.screenshot()` into `web/e2e/__screenshots__/` with screenshots enabled
     in the Playwright config; mobile: committed Expo component/snapshot images under
     `mobile/__screenshots__/`), at mobile + desktop widths — never placeholders/0-byte.
