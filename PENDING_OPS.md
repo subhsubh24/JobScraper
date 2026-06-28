@@ -10,7 +10,7 @@ submission. Everything else the factory builds.
 ```yaml
 OWNER_ACTIONS:
   project: jobscraper
-  as_of: 2026-06-27
+  as_of: 2026-06-28
   items:
     - id: site-gate
       title: "Pre-launch SITE GATE: set SITE_GATE_PASSWORD=deepster now; unset at launch"
@@ -79,11 +79,17 @@ OWNER_ACTIONS:
       why: "The /privacy + /terms pages are real and code-accurate, but auto-authored (not lawyer-reviewed); they lack a governing-law/arbitration clause, and the listed contact addresses don't exist yet. Apple/Google require a working privacy contact at submission."
       how: "Have counsel review web/app/{privacy,terms}/page.tsx (add governing law + dispute resolution if desired). Provision privacy@careeroperator.app and support@careeroperator.app (or update the addresses on both pages to real ones) BEFORE store submission."
     - id: ci-wiring
-      title: "Wire preflight + journey suite + mobile build into CI (needs workflow scope)"
-      priority: normal
+      title: "Apply staged CI as REQUIRED checks (workflow scope) — docs/ci/PROPOSED_CI.md"
+      priority: high
       status: open
-      why: "The loop must NOT edit .github/; CI cannot be added by the loop."
-      how: "Add a GitHub Actions workflow: pip install -r requirements-dev.txt, run scripts/preflight.sh ci (backend + cd mobile && npm ci && tsc/lint)."
+      why: "Today PRs auto-merge via `gh pr merge --admin` with NO required status check, so a BUILDS!=WORKS / lint-dirty change could slip in. The loop must NOT edit .github/ (it hangs the headless run), so the exact workflow + required-checks list are STAGED. See loop: harness improvement proposal issue #57."
+      how: "Apply docs/ci/PROPOSED_CI.md's `.github/workflows/ci.yml` (needs `workflow` scope). VERIFY both jobs go GREEN on a PR first, THEN branch-protect `main` requiring `preflight (lint + typecheck + tests)` + `functional journeys (web E2E)` — never require a red/flaky check (it blocks the loop). Then flip LOOP_HEALTH.enforced_in_ci: true and close #57."
+    - id: auto-migrate
+      title: "Enable auto-migrate-on-deploy (alembic upgrade head on main) — one-time setup"
+      priority: high
+      status: open
+      why: "Real Alembic migrations now ship (initial schema committed; a gate test fails the build if models change without a migration). Auto-applying them on deploy ends the manual `python scripts/init_db.py` after every schema change. Auto-apply replaces the manual human schema checkpoint, so it needs a recoverability net + a one-time baseline; the loop cannot set GitHub secrets, enable backups, or push .github/."
+      how: "1) Enable Neon PITR / daily backups FIRST (recoverability net). 2) Baseline the existing DB ONCE (it was created via create_all): `DATABASE_URL='<neon pooled>' alembic stamp head`. 3) Add a GitHub Actions secret DATABASE_URL = the Neon pooled string (never inline/commit it). 4) Set AUTO_CREATE_TABLES=0 in Vercel so Alembic is the single schema source. 5) Apply the `migrate` job from docs/ci/PROPOSED_CI.md (default-branch + post-gate + forward-only; NOT a required PR check). TRADEOFF: a destructive migration that passes review will auto-apply — PITR is how you undo it."
     - id: email-verification-deferred
       title: "DECISION: signup is NOT gated on email verification (no email pipeline wired)"
       priority: normal

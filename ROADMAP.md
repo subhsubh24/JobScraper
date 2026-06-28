@@ -50,8 +50,14 @@ the guard tests, and **`FACTORY_STANDARD.md`**.
       request-id middleware stamps `X-Request-ID` + a log contextvar so every line during a
       request is correlatable; stdlib JSON logging (no new dep). Tests assert the envelope +
       request-id round-trip (PR #47, 2 Sonnet reviewers).
-- [ ] DB migrations (alembic) generated and applied cleanly; seed script for dev
-      (next run: needs the AUTO_CREATE_TABLES→alembic cutover plan — deferred this run)
+- [x] DB migrations (alembic) generated and applied cleanly — `alembic.ini` + `migrations/`
+      (env.py reads `DATABASE_URL`, no committed creds) + initial-schema migration (all 10
+      tables). `tests/test_migrations.py` proves `upgrade head` rebuilds the full schema with
+      ZERO drift vs the models AND fails the gate if a model changes without a migration.
+- [ ] **Auto-migrate on deploy** (`alembic upgrade head` on `main`, post-gate, forward-only):
+      job STAGED in `docs/ci/PROPOSED_CI.md`; owner one-time = enable Neon PITR, `alembic stamp
+      head` the existing DB, add the `DATABASE_URL` Actions secret, set `AUTO_CREATE_TABLES=0`,
+      apply (OWNER_ACTION `auto-migrate`). Removes the manual `init_db.py` schema push.
 - [x] External Postgres wired for serverless (no SQLite persistence on Vercel)
 - [x] Health/readiness endpoints + **Vercel serverless deploy** verified live (see docs/DEPLOY_VERCEL.md)
 
