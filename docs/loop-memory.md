@@ -4,6 +4,21 @@ Durable lessons for the factory loop. Append dated entries. Keep it honest and s
 
 ---
 
+### 2026-06-28 — LOOP HEALTH made measurable (self-improving ≠ busy) + META self-check
+Added FACTORY_STANDARD §10b (byte-identical): the deep audit grades the PRODUCT; LOOP_HEALTH
+grades the LOOP. Seeded `docs/autonomous-loop/LOOP_HEALTH.md` (signal: bootstrapping) — update
+EVERY bookkeeping run with REAL counts; CLASSIFY every abandoned change
+(gate_tsc/gate_pytest/gate_flake8/gate_lint/gate_build/review_value/review_correctness/
+circuit_breaker/conflict/dead_end/blocked_owner) so the loop never re-attempts the same
+dead-end; `churning`/`stuck` → open ONE "loop: harness improvement proposal" issue (the only
+channel to improve the loop's own rules — it can't edit its routine/.claude/.github). Added the
+file to ROADMAP's shared-ledger (bookkeeping-PR-only) list + a LOOP HEALTH bullet. META
+SELF-CHECK done now over the last ~14 loop-memory entries: NO wall recurred ≥2 runs unaddressed
+— httpx-unpinned and gitignored-source were each ONE-TIME walls (fixed + a permanent preflight
+guard each); the only "again" pattern is reviewers catching must-fixes (a feature, not a wall).
+So opening a proposal would manufacture a fake signal — did NOT. Honest counts only;
+observability, NOT a ship gate. Going forward a churning/stuck reading MUST raise a proposal.
+
 ### 2026-06-28 — Maximal run: 4 feature PRs (API hardening, web Settings, coach safety, evals)
 Ran the full ~8-scout sweep, selected a file-disjoint set, shipped 4 PRs through 2 Sonnet
 reviewers each + the gate, then this bookkeeping PR. asgi.py was the single contended file →
