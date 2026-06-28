@@ -292,8 +292,13 @@ downgrade reviewers below Sonnet or auditors below Opus.
 ### The value bar is the only limiter on volume
 Ship ALL changes that genuinely clear the value bar, ZERO that don't; no padding, no
 artificial scarcity. **The disjoint rule:** every change file-disjoint → parallel
-auto-merge; shared ledger files (ROADMAP, loop-memory, PENDING_OPS, business case) only
-in ONE bookkeeping PR. **Brakes:** subagent cap (~8 scouts + 2 reviewers/change + ≥ 3
+auto-merge; shared ledger files (ROADMAP, loop-memory, PENDING_OPS, business case,
+docs/autonomous-loop/LOOP_HEALTH.md) only in ONE bookkeeping PR. **LOOP HEALTH
+(FACTORY_STANDARD §10b):** every bookkeeping run, update `docs/autonomous-loop/LOOP_HEALTH.md`
+with REAL counts; CLASSIFY every abandoned change (gate_tsc/gate_pytest/review_value/
+circuit_breaker/dead_end/blocked_owner/…) so the loop never re-attempts the same dead-end; a
+`churning`/`stuck` signal → open ONE "loop: harness improvement proposal" issue (the only
+channel to improve the loop's own rules). **Brakes:** subagent cap (~8 scouts + 2 reviewers/change + ≥ 3
 auditors at the gate, hard ceiling ~50/run), ≤ 2 verify + ≤ 2 review cycles, circuit
 breakers, spend discipline (a capless loop once burned $47k). **Marketing autonomy
 boundary:** build + stage everything, but NEVER publish/email/ad-spend without the
