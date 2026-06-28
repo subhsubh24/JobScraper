@@ -42,6 +42,13 @@ GROWTH_STATUS:
     ltv_usd: null
     ltv_cac_ratio: null
     top_channel: null
+  pmf:                       # leading indicator (FACTORY_STANDARD §9); 0/null pre-launch
+    activation_rate: null    # new users who add a job + get a fit score in session 1
+    retention_d1: null
+    retention_d7: null
+    retention_d30: null
+    organic_share_rate: null # share of signups from organic/referral
+    signal: none             # none | weak | emerging | strong
   channels: []
   experiments: []
   email:

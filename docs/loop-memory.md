@@ -142,6 +142,20 @@ Left partial items (web SEO/polish, mobile device screens, auth lockout, CORS-lo
 migrations, evals, coverage, visual screenshots) and ALL DoD boxes unticked. Headline
 stays 0% until the two-gate readiness passes — correct.
 
+### 2026-06-28 — PMF as the leading indicator + FACTORY_STANDARD first-class read
+PART 1 (repo): added the PMF bullet VERBATIM to FACTORY_STANDARD §9 (canonical; revenue
+follows PMF; pre-PMF prioritize the product/retention not acquisition; metrics win over the
+model). Product-specific: ANALYSIS_PLAYBOOK "Product-market fit — the leading indicator"
+section (Career Operator activation = add a job + get a fit score in session 1; retention =
+returns to work the pipeline; organic = shared prep packs; signal ladder governs the rec,
+pre-PMF = product fixes). ROADMAP growth note: "PMF FIRST" bullet. GROWTH_STATUS: pmf block
+(activation_rate, retention_d1/d7/d30, organic_share_rate, signal none|weak|emerging|strong;
+0/null pre-launch) + preflight check_blocks validates it. PART 2: FACTORY_STANDARD.md added
+as the FIRST orient-read in the product-factory + growth routines (digest untouched).
+DEEP_DIAGNOSIS in practice: gate went red on tests/test_billing.py -> diagnosed CONFIG not
+code (stripe not installed locally; factory shipped real Stripe Track C in PRs #40-44, moved
+stripe to runtime requirements.txt). Installed stripe -> green.
+
 ### 2026-06-28 — DECISION COROLLARY: never gate on an unbuilt loop
 A sibling outage: signup required email verification + showed "check your email" but no
 email pipeline was wired -> every new user dead-ended. The bug under the bug was a DECISION
