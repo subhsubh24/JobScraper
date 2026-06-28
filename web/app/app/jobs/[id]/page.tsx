@@ -2,7 +2,8 @@
 
 import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
-import { Button, Card } from '@/components/ui';
+import { Button, Card, Skeleton } from '@/components/ui';
+import { Markdown } from '@/components/markdown';
 import { api, ApiError } from '@/lib/api';
 import { STATUS_LABELS, STATUS_ORDER, scoreColor, type ApplicationStatus, type Job } from '@/lib/types';
 
@@ -57,7 +58,7 @@ export default function JobDetailPage() {
     }
   }
 
-  if (loading) return <p className="text-slate-400">Loading…</p>;
+  if (loading) return <JobDetailSkeleton />;
   if (error || !job)
     return (
       <div className="space-y-4">
@@ -108,12 +109,47 @@ export default function JobDetailPage() {
           {prepLoading ? 'Generating…' : 'Generate prep pack'}
         </Button>
         {prepMsg && <p className="mt-2 text-sm text-amber-400">{prepMsg}</p>}
+        {prepLoading && !prep && (
+          <Card className="mt-4 space-y-3" aria-busy="true" aria-label="Generating prep pack">
+            <Skeleton className="h-5 w-48" />
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-4 w-11/12" />
+            <Skeleton className="h-4 w-4/5" />
+          </Card>
+        )}
         {prep && (
           <Card className="mt-4">
             <h3 className="mb-2 font-semibold">{prep.title}</h3>
-            <pre className="whitespace-pre-wrap text-sm text-slate-300">{prep.content}</pre>
+            <Markdown content={prep.content} />
           </Card>
         )}
+      </div>
+    </div>
+  );
+}
+
+function JobDetailSkeleton() {
+  return (
+    <div className="space-y-6" aria-busy="true" aria-label="Loading job">
+      <div className="space-y-2">
+        <Skeleton className="h-8 w-2/3" />
+        <Skeleton className="h-4 w-40" />
+      </div>
+      <Card className="flex flex-col items-center gap-2">
+        <Skeleton className="h-12 w-24" />
+        <Skeleton className="h-4 w-20" />
+      </Card>
+      <div className="space-y-2">
+        <Skeleton className="h-5 w-32" />
+        <div className="flex flex-wrap gap-2">
+          {[0, 1, 2, 3, 4].map((i) => (
+            <Skeleton key={i} className="h-8 w-24" />
+          ))}
+        </div>
+      </div>
+      <div className="space-y-2">
+        <Skeleton className="h-5 w-32" />
+        <Skeleton className="h-10 w-44" />
       </div>
     </div>
   );

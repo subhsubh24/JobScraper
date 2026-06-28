@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
-import { Button, Card, ErrorText, Field } from '@/components/ui';
+import { Button, Card, ErrorText, Field, Skeleton } from '@/components/ui';
 import { api, ApiError } from '@/lib/api';
 import { STATUS_LABELS, scoreColor, type Job, type PipelineStats } from '@/lib/types';
 
@@ -32,7 +32,7 @@ export default function PipelinePage() {
     load();
   }, [load]);
 
-  if (loading) return <p className="text-slate-400">Loading your pipeline…</p>;
+  if (loading) return <PipelineSkeleton />;
 
   return (
     <div className="space-y-6">
@@ -82,6 +82,27 @@ export default function PipelinePage() {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+function PipelineSkeleton() {
+  return (
+    <div className="space-y-6" aria-busy="true" aria-label="Loading your pipeline">
+      <div className="flex items-center justify-between">
+        <Skeleton className="h-8 w-44" />
+        <Skeleton className="h-10 w-28" />
+      </div>
+      <div className="grid grid-cols-3 gap-4">
+        {[0, 1, 2].map((i) => (
+          <Skeleton key={i} className="h-20" />
+        ))}
+      </div>
+      <div className="space-y-3">
+        {[0, 1, 2, 3].map((i) => (
+          <Skeleton key={i} className="h-[88px]" />
+        ))}
+      </div>
     </div>
   );
 }

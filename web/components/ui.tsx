@@ -75,3 +75,9 @@ export function Card({ children, className = '' }: { children: React.ReactNode; 
 export function ErrorText({ children }: { children: React.ReactNode }) {
   return children ? <p className="text-sm text-red-400">{children}</p> : null;
 }
+
+// A shimmer placeholder for content that is still loading. Decorative, so hidden from
+// assistive tech — the surrounding region carries an aria-busy/label where it matters.
+export function Skeleton({ className = '' }: { className?: string }) {
+  return <div aria-hidden="true" className={`animate-pulse rounded-lg bg-slate-800/70 ${className}`} />;
+}
