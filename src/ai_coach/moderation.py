@@ -49,20 +49,32 @@ _SELF_HARM = re.compile(
     r"take (my|my own) life|"
     r"want(ing)? to die|"
     r"wanna die|"
-    r"i('?m| am)? .{0,15}suicidal|"
-    r"suicidal( thoughts| ideation)|"
+    r"wish (i|I) (was|were|wasn'?t alive|could be dead)|"
+    r"suicidal|"
     r"commit(ting)? suicide|"
     r"(hurt|harm|cut|cutting) (myself|my self)|"
+    r"(hang|shoot|drown|stab)(ing)? (myself|my self)|"
+    r"overdos(e|ing)( on)? (pills|meds|medication)?|"
+    r"(slit|cut)(ting)? my (wrist|wrists|throat)|"
+    r"(jump|step)(ing)? (in front of|off) (a |the )?(train|bridge|building|car)|"
+    r"(kill|end) (it|myself) all|end(ing)? it all|"
+    r"kms|"
     r"don'?t want to (live|be alive|exist) (any ?more|anymore)?"
     r")\b",
     re.IGNORECASE,
 )
-# Hyperbole that should NEVER trigger the crisis path (career venting, idioms).
+# Suppressors that should NEVER trigger the crisis path: career-venting hyperbole/idioms AND
+# explicit NEGATIONS of self-harm intent ("I'm not suicidal", "I don't want to die"), which
+# would otherwise match the positive patterns above and deliver a jarring, wrong crisis reply.
 _SELF_HARM_FALSE_POSITIVE = re.compile(
     r"\b("
     r"killing it|kill(ing)? for|dying to|dead tired|"
     r"this (job|commute|interview|process) is killing me|"
-    r"killing my (vibe|mood)"
+    r"killing my (vibe|mood)|"
+    r"want(ing)? to die (of|for|from|laughing)|"
+    r"(not|never|n'?t)( really| at all)? (feeling )?suicidal|"
+    r"don'?t want to die|"
+    r"(don'?t|not|never) (want to |going to |gonna )?(kill|hurt|harm) (myself|my self)"
     r")\b",
     re.IGNORECASE,
 )
@@ -71,9 +83,9 @@ _SELF_HARM_FALSE_POSITIVE = re.compile(
 _VIOLENCE = re.compile(
     r"\b("
     r"how (do|can|to) .{0,30}(make|build|create) .{0,15}(bomb|explosive|weapon)|"
-    r"(kill|murder|stab|shoot|poison|attack) (my |the )?"
-    r"(boss|manager|coworker|co-worker|colleague|him|her|them|someone)|"
-    r"(hurt|harm) .{0,15}(physically)|"
+    r"(kill|murder|stab|shoot|poison|attack|hurt|harm|beat up) (my |the )?"
+    r"(boss|manager|supervisor|coworker|co-worker|colleague|recruiter|interviewer|"
+    r"hr|ceo|director|him|her|them|someone)|"
     r"get (violent )?revenge on"
     r")\b",
     re.IGNORECASE,
@@ -81,7 +93,7 @@ _VIOLENCE = re.compile(
 
 # --- Requests to GENERATE hateful/sexual content (NOT discussing harassment as a topic). ---
 _HATE_GEN = re.compile(
-    r"\b(write|generate|give me|make|create|compose)\b.{0,40}\b"
+    r"\b(write|generate|give me|tell me|make|create|compose)\b.{0,40}\b"
     r"(racist|sexist|homophobic|transphobic|antisemitic|hateful|bigoted)\b.{0,20}\b"
     r"(joke|jokes|rant|message|insult|content|slur|slurs)\b",
     re.IGNORECASE,
@@ -95,9 +107,9 @@ _SEXUAL_GEN = re.compile(
 # --- Output safety net: catch the model emitting actionable harmful instructions. ---
 _OUTPUT_UNSAFE = re.compile(
     r"\b("
-    r"here('?s| is) how to (make|build) a (bomb|weapon|explosive)|"
-    r"step-by-step .{0,20}(suicide|kill yourself)|"
-    r"you should (kill|hurt|harm) (yourself|them|him|her)"
+    r"here('?s| is) how to (make|build|create) (a |an )?(bomb|weapon|explosive)|"
+    r"step[- ]by[- ]step .{0,20}(suicide|kill(ing)? yourself)|"
+    r"you (should|ought to|need to) (kill|hurt|harm) (yourself|them|him|her)"
     r")\b",
     re.IGNORECASE,
 )

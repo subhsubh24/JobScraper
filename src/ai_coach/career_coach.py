@@ -106,20 +106,21 @@ burnout) supportively is in scope; generating harmful content is not."""
         job_context: Optional[JobPosting] = None
     ) -> str:
         """Send a message and get a response from the coach."""
-        if self.client is None:
-            raise RuntimeError("GEMINI_API_KEY not configured")
-
         # Create session if needed
         if not session_id:
             session_id = str(uuid.uuid4())
 
-        # SAFETY (input): catch harmful/out-of-scope input BEFORE spending an LLM call. A
-        # self-harm message gets compassionate crisis resources; other disallowed categories
-        # get a polite redirect. We still persist the exchange so the thread stays coherent.
+        # SAFETY (input) runs FIRST — before the LLM-key check — so crisis resources are
+        # always reachable even on a deploy with no Gemini key. A self-harm message gets
+        # compassionate crisis resources; other disallowed categories get a polite redirect.
+        # We still persist the exchange so the thread stays coherent.
         pre = self.moderator.check_input(message)
         if not pre.allowed:
             self._persist_exchange(user, session_id, message, pre.safe_response, job_context)
             return pre.safe_response
+
+        if self.client is None:
+            raise RuntimeError("GEMINI_API_KEY not configured")
 
         # Build system prompt with context
         user_context = self._get_user_context(user)
@@ -260,4 +261,8 @@ burnout) supportively is in scope; generating harmful content is not."""
             max_tokens=300,
         )
 
-        return response.choices[0].message.content
+        summary = response.choices[0].message.content
+        # Defense in depth: this summarizes stored history (which could contain a harmful
+        # thread), so run the same output safety net before surfacing it.
+        post = self.moderator.check_output(summary)
+        return summary if post.allowed else post.safe_response
