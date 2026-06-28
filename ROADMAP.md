@@ -36,7 +36,11 @@ the guard tests, and **`FACTORY_STANDARD.md`**.
       "deploy-ready" box):** build command + env contract (`NEXT_PUBLIC_API_URL`) + output
       documented and verified; the single-project Vercel Services routing (`/` web, `/api`
       FastAPI) confirmed on a live deploy. Un-tick if not backed.
-- [ ] Web app: real loading/empty/error states; SEO metadata; polished to the design bar
+- [x] Web app: real loading/empty/error states; SEO metadata; polished to the design bar —
+      SEO/metadata + sitemap/robots (PR #35); skeleton loading states (pipeline, job detail,
+      prep), empty + honest error states, and prep content rendered as markdown not raw
+      `<pre>` (PR #41, 2 Sonnet reviewers incl. design). (Visual screenshot verification is
+      separate — Track E.)
 - [ ] (legacy) Flask `app.py` — superseded by the Next.js web app; keep or retire
 - [x] ATS ingestion (Greenhouse/Lever) returns real listings or a truthful empty state
       (`POST /api/jobs/import-preview`; tests prove real listings, unreachable-vs-empty
@@ -50,7 +54,9 @@ the guard tests, and **`FACTORY_STANDARD.md`**.
 - [x] Expo app scaffolded, `tsc --noEmit` clean, lint clean
 - [ ] Navigation + auth (login/register) wired to the Python API
 - [ ] Jobs list + job detail screens render real API data (no placeholders)
-- [ ] Prep pack + AI coach screens at parity with web
+- [x] Prep pack + AI coach screens at parity with web — prep packs render structured
+      markdown (headings/bold/lists) via a dependency-free native renderer, not a flat text
+      block (PR #42, 2 Sonnet reviewers); AI coach screen present + Premium-gated on both.
 - [ ] Pipeline / dashboard screen
 - [ ] Paywall screen wired to entitlement state
 - [ ] Polished design-bar UI; real empty/loading/error states; not a thin wrapper
@@ -65,9 +71,16 @@ the guard tests, and **`FACTORY_STANDARD.md`**.
 
 ### C — Monetization (subscription)
 - [x] Pricing tiers defined (good-better-best + annual) — see BUSINESS_CASE
-- [ ] Web: Stripe Checkout session creation (REAL call, not stub)
-- [ ] Web: Stripe webhook → server-side entitlement persistence
-- [ ] Web: server-side entitlement gating on paid endpoints
+- [x] Web: Stripe Checkout session creation (REAL call, not stub) — `POST /api/billing/checkout`
+      makes a real `stripe.checkout.Session.create`; refuses honestly (503, no charge) when
+      Stripe isn't configured. Test asserts the real call fires with the right price + user
+      mapping (PR #40). Live keys/price IDs are owner-only (PENDING_OPS).
+- [x] Web: Stripe webhook → server-side entitlement persistence — `POST /api/billing/webhook`
+      verifies the Stripe signature (`construct_event`) and persists a `subscriptions` row +
+      flips `users.tier`; a forged/unsigned/unpaid event grants NOTHING. Round-trip tested
+      (PR #40, F4.1).
+- [x] Web: server-side entitlement gating on paid endpoints — `users.tier` gates coach + job/
+      prep limits server-side; the webhook is now the real source that grants/revokes it (PR #40).
 - [ ] Mobile: RevenueCat/StoreKit + Play Billing integration code
 - [ ] Mobile: entitlement gate reads verified subscription state
 - [ ] Receipt / signature verification server-side (no client-trusted unlocks)
@@ -77,13 +90,21 @@ the guard tests, and **`FACTORY_STANDARD.md`**.
       code-accurate content (embeddings + Gemini disclosed; Stripe marked not-yet-active);
       SITE-GATE-exempt + linked from the landing footer + sitemap (PR #38). (Counsel review
       + provisioning the contact inboxes are owner actions — PENDING_OPS.)
-- [ ] App Privacy labels / data-safety form content drafted
+- [x] App Privacy labels / data-safety form content drafted — `docs/store/APP_PRIVACY_LABELS.md`
+      maps Apple App Privacy + Google Data Safety to the ACTUAL data model + LLM call sites
+      (code-accurate); reviewed for honesty + correct store categories (PR #43). Owner enters
+      them in the consoles + counsel review (PENDING_OPS).
 - [x] In-app account deletion (Apple + Google requirement) — `DELETE /api/auth/me` really
       cascade-deletes the user + all owned data (test asserts ZERO rows across every
       user-owned table); mobile Settings "Delete account" calls it for real (PR #36)
-- [ ] Permission usage strings (only for permissions actually used)
+- [x] Permission usage strings (only for permissions actually used) — `docs/store/PERMISSIONS_AUDIT.md`
+      verifies ZERO sensitive permissions are requested (network-only client; `expo-secure-store`
+      needs no runtime prompt), so there are no `NS*UsageDescription`/dangerous Android perms to
+      justify; standing rule for future additions (PR #43).
 - [ ] Rendered store assets: real icon, screenshots, feature graphic (committed image files)
-- [ ] ASO / store copy (title, subtitle, keywords, descriptions)
+- [x] ASO / store copy (title, subtitle, keywords, descriptions) — `docs/store/ASO_COPY.md`
+      (title/subtitle/keywords within char limits, descriptions honest to shipped features,
+      auto-renew + restore-purchases disclosure) (PR #43).
 - [ ] `docs/store/ACCEPTANCE_AUDIT.md` vs CURRENT Apple/Google guidelines, **ZERO open FAILs**
 
 ### E — World-class quality
@@ -119,8 +140,12 @@ the guard tests, and **`FACTORY_STANDARD.md`**.
       WHEN email/2FA/reset/magic-link is added: stand up an email capture (Mailpit/Mailhog or
       provider sandbox + fetch API) and assert a real round-trip (signup → receive the real
       email → follow link → confirmed → logged-in) + that the provider client was invoked with
-      the right recipient/payload. WHEN Stripe/RevenueCat lands (Track C): assert the sandbox
-      charge/entitlement call actually fires before any success state.
+      the right recipient/payload. Stripe (Track C, PR #40) NOW satisfies the Stripe half: a
+      signature-VERIFIED webhook event is the only thing that grants Premium; `tests/test_billing.py`
+      asserts the real signed round-trip grants entitlement while a forged/unsigned/unpaid event
+      grants NOTHING, and that checkout makes the real Stripe call (never a fake success). The
+      email/2FA round-trip remains for when those land; RevenueCat/Play receipt verification
+      remains for mobile billing.
 
 ### G — Marketing engine + brand
 - [ ] **Pre-launch SITE GATE** — env-driven middleware (`SITE_GATE_PASSWORD`; gate ON

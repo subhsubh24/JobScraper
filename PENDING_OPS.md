@@ -25,11 +25,11 @@ OWNER_ACTIONS:
       why: "LLM + scrape + hosting are wallet-drain targets; a capless loop once burned $47k."
       how: "Google AI Studio / Gemini API usage limits; Vercel usage/spend alerts; Stripe Radar/limits. Set monthly hard caps before any live traffic."
     - id: stripe-account
-      title: "Create Stripe account + products/prices (Pro/Career+ monthly+annual)"
+      title: "Create Stripe account + products/prices + wire the webhook (web billing CODE is built)"
       priority: high
       status: open
-      why: "Web subscription billing needs live keys + price IDs the loop must not hold."
-      how: "Create products in Stripe; copy price IDs into deploy env (STRIPE_*). Never commit them."
+      why: "Web subscription billing CODE now ships (PR #40): POST /api/billing/checkout makes a real Stripe Checkout session; POST /api/billing/webhook verifies the signature and grants entitlement. It refuses honestly (503, no charge) until these owner-only secrets exist. Live keys + price IDs + the webhook signing secret must NOT be held by the loop."
+      how: "1) Create the Stripe products/prices (Pro monthly $12 + annual $96; optionally Career+). 2) In the deploy env set STRIPE_SECRET_KEY, STRIPE_PRICE_PRO_MONTHLY, STRIPE_PRICE_PRO_ANNUAL (and STRIPE_PRICE_CAREERPLUS_* if used). 3) In the Stripe Dashboard add a webhook endpoint -> https://<deploy>/api/billing/webhook for events checkout.session.completed, customer.subscription.updated, customer.subscription.deleted; copy its signing secret into STRIPE_WEBHOOK_SECRET. 4) Optionally set WEB_APP_URL if the API origin differs from the site. Test with Stripe test-mode keys first; never commit any STRIPE_* value. Until set, the paywall stays honestly disabled (no fake charge)."
     - id: apple-developer
       title: "Enroll Apple Developer Program ($99/yr) + App Store Connect app record"
       priority: high

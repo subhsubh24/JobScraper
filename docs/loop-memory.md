@@ -4,6 +4,50 @@ Durable lessons for the factory loop. Append dated entries. Keep it honest and s
 
 ---
 
+### 2026-06-28 — Maximal run: 4 feature PRs (web billing, web polish, mobile markdown, store docs)
+Ran the ~8-scout sweep, selected a file-disjoint set, and shipped 4 PRs through 2 Sonnet
+reviewers each + the gate, then this bookkeeping PR:
+- **#40 web Stripe billing** (Track C, the business-case lever #1): `src/billing.py` +
+  `/api/billing/checkout` (real `stripe.checkout.Session.create`) + `/api/billing/webhook`
+  (signature-verified) + a NEW `subscriptions` table (not a new `users` column) + `User.subscription`
+  cascade. SIDE-EFFECT INTEGRITY: entitlement flips ONLY from a verified webhook; checkout
+  refuses honestly (503) when unconfigured. Reviewer A caught a real gap — `checkout.session.completed`
+  fires `payment_status="unpaid"` for async methods (bank/ACH) and would grant free Premium →
+  guarded on `payment_status` + regression test. Reviewer B caught a broken `?next` upgrade
+  funnel (register ignored it) → fixed with an open-redirect guard.
+- **#41 web polish** (Track A/E): Skeleton primitive + composed pipeline/job/prep skeletons,
+  and a dependency-free **Markdown renderer** (`web/components/markdown.tsx`) so prep packs
+  render structured (was raw `<pre>`). Reviewer B → semantic `<h2/h3/h4>` (was `<p>`) + a11y.
+- **#42 mobile prep markdown** (Track B): a zero-dependency native `Markdown` (Text/View) —
+  conservative, no new native dep. Reviewer B → full-contrast body for paid content + wider
+  numbered-list marker. Reviewer A verified RN nesting valid (no `<View>`-in-`<Text>`).
+- **#43 store docs** (Track D): code-accurate App Privacy labels + Google Data Safety + ASO
+  copy + permissions audit; corrected ACCEPTANCE_AUDIT to shipped state (kept honest FAILs:
+  mobile billing + rendered screenshots → readiness still NO). Reviewer A caught an over-claim
+  ("10 prep packs/mo" but Premium is unlimited in code) → matched to code. Reviewer B caught
+  console-rejection issues (keyword >100 chars, short desc >80, mis-categorized Data-Safety
+  User ID) → all fixed.
+LESSONS: (1) **STALE `origin/*` ref silently resets your worktree.** A fresh container's
+`origin/main` ref was 6 commits behind the real remote (PRs #34–#39 unfetched). `git checkout
+-B branch origin/main` reset the working tree to that OLD commit, so edits got anchored to
+stale file text that would have REVERTED #34–#39. Caught it because asgi.py/conftest looked
+different than the first reads. **FIX/RULE: always `git fetch origin main` BEFORE branching,
+and branch from the freshly-fetched ref** — never trust a clone's `origin/*` ref age. (2)
+**A leftover remote branch can block a push** — an old `feat/web-polish-states` (PR #35's head)
+existed remotely; reused-name push was rejected (non-fast-forward). Use a unique branch name
+per run or delete stale ones. (3) **Bash cwd persists between calls** — a `cd mobile` made a
+later `find docs` fail from the wrong dir; cd back to the repo root (or use absolute paths).
+(4) Reviewers earned their keep again: every must-fix this run (unpaid-grant, `?next` funnel,
+semantic headings, the unlimited-vs-10 over-claim, the char-limit/category store defects) was
+a reviewer find, not a maker find. maker≠checker holds.
+FOLLOW-UPS (scouted, deferred — collide with asgi.py which billing owned this run, so next
+run when asgi.py is free): CAPTCHA on public forms (new `src/security/captcha.py` + register/
+login edits); cross-instance rate-limit + spend-ceiling (Upstash/Postgres); consistent error
+envelope + structured logging; web account-deletion UI (web has no Settings page); waitlist
+landing + email-provider abstraction (Track G/H); mobile StoreKit/Play Billing (Track C).
+
+---
+
 ### 2026-06-27 — Bootstrap lesson
 - **The repo wins over assumptions.** The bootstrap charter assumed "Python SaaS, NO
   mobile app." Reality: a **Flutter** prototype existed in `/mobile`. Owner chose to
