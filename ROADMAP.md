@@ -104,6 +104,17 @@ the guard tests, and **`FACTORY_STANDARD.md`**.
 - [x] Secrets server-side only — never in the mobile app, never committed
 
 ### G — Marketing engine + brand
+- [ ] **Pre-launch SITE GATE** — env-driven middleware (`SITE_GATE_PASSWORD`; gate ON
+      whenever the var is set) that password-protects the deployed web app but EXEMPTS the
+      public marketing routes (waitlist / "coming soon" landing + its API + legal pages) so
+      people can still join the waitlist. Mechanism built in `web/middleware.ts` (exempt
+      allowlist: `/`, `/waitlist`, `/coming-soon`, `/privacy`, `/terms`, `/legal`); mobile
+      pre-launch gated via TestFlight / internal track. Password VALUE is human-applied
+      (PENDING_OPS: set `SITE_GATE_PASSWORD=deepster` pre-launch; UNSET at launch). Tick
+      only when the waitlist landing + legal pages exist AND the gate is applied.
+      **BLOCKING:** pre-launch execute-mode outreach is FORBIDDEN until
+      `GROWTH_STATUS.site_gate_up: true` (see docs/growth/ANALYSIS_PLAYBOOK.md marketing
+      maturity gate).
 - [ ] Waitlist landing page + capture
 - [ ] Brand kit (logo, palette, voice) — committed assets
 - [ ] ASO/SEO plan + content calendar skeleton

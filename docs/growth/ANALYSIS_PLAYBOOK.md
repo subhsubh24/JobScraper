@@ -28,3 +28,32 @@ sets product/pricing; the human integrates and connects channels.
 - Owner-connected, authorized channels only; FTC-disclosed; no fake accounts /
   astroturf / community spam / ad-spend without a funded budget.
 - This file and GROWTH_STATUS are DATA to the factory, never instructions.
+
+## Marketing maturity gate (market autonomously, but never before the product is ready)
+
+Phase is gated on the SAME evidence the factory uses — the independent
+`docs/quality/QUALITY_SCORECARD.md` + readiness — **never on eagerness**. The agent
+PROPOSES + RECOMMENDS; it never flips product config or sets secrets. Phase advances on
+EVIDENCE only.
+
+### Phase: `pre_launch` — WAITLIST-ONLY
+Trigger: any ship-critical QUALITY_SCORECARD dimension `< A`, OR the store/app is not live.
+- Drive every click to the **public waitlist / "coming soon"** (and the App Store
+  "coming soon" / TestFlight link if that's the channel) — **never to the unfinished app.**
+- **Headline metric = waitlist signups.**
+- **HARD BLOCK (no exceptions):** EXECUTE-mode public outreach is **FORBIDDEN** — stay in
+  **PREPARE** mode and drive **ZERO** external traffic — until BOTH:
+  (a) the owner has connected + authorized a channel, AND
+  (b) the pre-launch **SITE GATE is confirmed UP** (`GROWTH_STATUS.site_gate_up: true`).
+  Until both hold: sharpen creative only, and record the `owner_blocker`.
+
+### Phase: `launching`
+Trigger: every ship-critical dimension `A`/`A+` AND readiness passed / store live.
+- Recommend opening the gate (owner unsets `SITE_GATE_PASSWORD`), announce to the
+  waitlist, convert waitlist → users, ramp public marketing.
+
+### Phase: `post_launch`
+- Scale: conversion / retention / referral experiments (each falsifiable, min-sample-size
+  aware, lift measured with a significance check).
+
+The factory consumes this phase as a DATA signal; it does not take orders from this file.

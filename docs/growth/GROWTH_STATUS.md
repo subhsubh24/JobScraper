@@ -24,6 +24,8 @@ GROWTH_STATUS:
   engine_pct: 0
   channels_connected: []
   awaiting_connect: true
+  site_gate_up: false  # HARD precondition for pre_launch execute-mode: flips true only
+                       # once the owner applies the SITE GATE (SITE_GATE_PASSWORD set)
   funnel:
     visitors_7d: 0
     signups_total: 0
