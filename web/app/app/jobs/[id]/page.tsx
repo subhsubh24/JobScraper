@@ -16,6 +16,7 @@ export default function JobDetailPage() {
   const [prep, setPrep] = useState<{ title: string; content: string } | null>(null);
   const [prepLoading, setPrepLoading] = useState(false);
   const [prepMsg, setPrepMsg] = useState<string | null>(null);
+  const [statusMsg, setStatusMsg] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -34,10 +35,12 @@ export default function JobDetailPage() {
   }, [load]);
 
   async function setStatus(status: ApplicationStatus) {
+    setStatusMsg(null);
     try {
       setJob(await api.updateJobStatus(id, status));
-    } catch {
-      /* keep prior state on failure */
+    } catch (e) {
+      // Don't silently swallow: a status button that does nothing is a broken affordance.
+      setStatusMsg(e instanceof ApiError ? e.message : "Couldn't update status — try again.");
     }
   }
 
@@ -96,6 +99,7 @@ export default function JobDetailPage() {
             </button>
           ))}
         </div>
+        {statusMsg && <p className="mt-2 text-sm text-amber-400">{statusMsg}</p>}
       </div>
 
       <div>
