@@ -4,6 +4,18 @@ Durable lessons for the factory loop. Append dated entries. Keep it honest and s
 
 ---
 
+### 2026-06-28 — Applied .github/workflows/ci.yml (owner-authorized, interactive — a deliberate exception)
+STANDING RULE is the loop NEVER edits .github/ (hangs the headless run; it's the tamper-proof
+enforcement rail). The OWNER explicitly asked, in an interactive session, to create the workflow
+file — so I did (the rule's hazard is headless hangs + self-weakening enforcement; neither
+applies when the human directs it live). Committed `ci.yml` with the 3 jobs from PROPOSED_CI.md;
+added a guard so the `migrate` job SKIPS cleanly when the DATABASE_URL secret is unset (so the
+first push to main doesn't redden over a missing secret). What the loop STILL can't do (truly
+owner-only): set the DATABASE_URL Actions secret (never paste a secret to the loop), enable Neon
+PITR, run `alembic stamp head` against prod, set Vercel AUTO_CREATE_TABLES=0, and mark the two
+checks REQUIRED in branch protection (do that only AFTER they're green on a PR). enforced_in_ci
+stays false until the checks are required — a committed workflow ≠ an enforced gate.
+
 ### 2026-06-28 — Auto-migrate-on-deploy: real Alembic migrations + a drift gate (Part B)
 Part A (gates as required CI checks) already shipped (PR #56, #57) — skipped per directive.
 Part B = end the manual `init_db.py` schema push. The DB was being created by

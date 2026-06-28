@@ -1,9 +1,10 @@
 # PROPOSED CI — make the loop's quality gates REQUIRED checks
 
-**Status:** STAGED. The autonomous loop authored everything here but **cannot push
-`.github/`** (a workflow-scope, sensitive-file action that hangs the headless run). An owner
-or an interactive workflow-scope session must apply the workflow file and mark the checks
-required. Until then, the gates run locally / in the routine but do **not** block auto-merge.
+**Status:** APPLIED (workflow file). `.github/workflows/ci.yml` was created on 2026-06-28 in an
+interactive session at the owner's explicit request. **Still owner-only to finish:** (1) mark
+the two gate checks REQUIRED in branch protection (after confirming they're green on a PR), and
+(2) the Part B secrets/PITR/stamp/Vercel steps below. Until the checks are *required*, the
+workflow runs but does not yet *block* auto-merge.
 
 **Why:** today a PR auto-merges on `gh pr merge --admin` without CI enforcing the gate, so a
 BUILDS≠WORKS / lint-failing change *could* slip in. This resolves loop-health harness
@@ -140,7 +141,12 @@ jobs:
         env:
           # Neon pooled connection string — set as a GitHub Actions SECRET, never inline.
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
-        run: alembic upgrade head
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "DATABASE_URL secret not set — skipping auto-migrate (see OWNER_ACTION auto-migrate)."
+            exit 0
+          fi
+          alembic upgrade head
 ```
 
 ## Required-checks list (for branch protection)
