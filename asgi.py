@@ -25,6 +25,7 @@ from src.db import get_db
 from src.db.models import (
     Application,
     ApplicationStatus,
+    ATSType,
     JobPosting,
     PrepArtifact,
     User,
@@ -186,6 +187,14 @@ class AppPurchase(BaseModel):
     platform: str = "ios"
 
 
+class ImportPreviewRequest(BaseModel):
+    careers_url: str = Field(min_length=4, max_length=500)
+
+
+# Cap the preview so one request can't fan out into a huge payload / long fetch.
+ATS_PREVIEW_LIMIT = 50
+
+
 # ---------------------------------------------------------------------------
 # Serialization helpers
 # ---------------------------------------------------------------------------
@@ -216,6 +225,24 @@ def job_public(job: JobPosting) -> dict:
         "status": status.value if hasattr(status, "value") else status,
         "url": job.url,
         "created_at": job.created_at.isoformat() if job.created_at else None,
+    }
+
+
+def ats_listing_public(listing, company_slug: Optional[str]) -> dict:
+    """Serialize a normalized ATS JobListing for the import-preview response.
+
+    `company_slug` is the ATS board token (e.g. Greenhouse "acme"), NOT a display name —
+    named accordingly so a UI doesn't render the slug where a company name belongs.
+    """
+    return {
+        "external_id": listing.external_id,
+        "title": listing.title,
+        "company_slug": company_slug,
+        "location": listing.location,
+        "url": listing.url,
+        "department": listing.department,
+        "remote_type": listing.remote_type,
+        "posted_at": listing.posted_at,
     }
 
 
@@ -396,6 +423,88 @@ def update_job_status(
     db.commit()
     db.refresh(job)
     return {"success": True, "job": job_public(job)}
+
+
+# ---------------------------------------------------------------------------
+# ATS ingestion — import open roles from a company's Greenhouse/Lever board.
+# Preview-only (no side effects): we return REAL listings or a TRUTHFUL empty/
+# unreachable state, and the user adds the ones they want via POST /api/jobs.
+# We never fabricate jobs and never claim "no jobs" when the board was unreachable.
+# ---------------------------------------------------------------------------
+@app.post("/api/jobs/import-preview", dependencies=[Depends(rate_limit("ingest", 6))])
+def import_jobs_preview(
+    data: ImportPreviewRequest,
+    user: User = Depends(get_current_user),
+):
+    from src.ingestion.detector import ATSDetector
+    from src.ingestion.url_guard import assert_public_http_url, UnsafeURLError
+
+    # SSRF defense: refuse to fetch internal/non-public targets before any network call.
+    try:
+        assert_public_http_url(data.careers_url)
+    except UnsafeURLError:
+        raise HTTPException(
+            status_code=400,
+            detail="Enter a public http(s) careers URL (internal/private addresses are not allowed).",
+        )
+
+    detector = ATSDetector()
+    try:
+        ats_type, identifier = detector.detect_from_careers_page(data.careers_url)
+    except Exception:
+        logger.exception("ATS detection raised for %s", data.careers_url)
+        ats_type, identifier = ATSType.UNKNOWN, None
+
+    supported = {ATSType.GREENHOUSE, ATSType.LEVER}
+    if ats_type not in supported or not identifier:
+        # Honest: no SUPPORTED board to fetch. Distinguish "found an unsupported board"
+        # (Ashby/Workday) from "found nothing", and never imply an empty board.
+        if ats_type in (ATSType.ASHBY, ATSType.WORKDAY):
+            message = (
+                f"We detected a {ats_type.value.title()} job board, but only Greenhouse and "
+                "Lever are supported right now. Add the role manually for now."
+            )
+        else:
+            message = (
+                "We couldn't find a supported job board (Greenhouse or Lever) at that link. "
+                "Paste the company's Greenhouse or Lever careers URL, or add the role manually."
+            )
+        return {
+            "success": True,
+            "ats": ats_type.value,
+            "supported": False,
+            "jobs": [],
+            "truncated": False,
+            "message": message,
+        }
+
+    # ats_type is GREENHOUSE/LEVER here, so get_client_for_company never raises.
+    client = detector.get_client_for_company(ats_type, identifier)
+    try:
+        listings = client.fetch_jobs()
+    except Exception:
+        logger.exception("ATS fetch raised for %s/%s", ats_type.value, identifier)
+        listings, client.last_error = [], "fetch raised"
+
+    # fetch_jobs() swallows network errors and returns []; last_error tells us whether the
+    # empty result is "unreachable" (a real failure) vs "genuinely no open roles" (truthful).
+    if not listings and client.last_error:
+        return {
+            "success": True, "ats": ats_type.value, "supported": True, "reachable": False,
+            "jobs": [], "truncated": False,
+            "message": "That job board was temporarily unreachable. Please try again shortly.",
+        }
+
+    capped = listings[:ATS_PREVIEW_LIMIT]
+    return {
+        "success": True,
+        "ats": ats_type.value,
+        "supported": True,
+        "reachable": True,
+        "jobs": [ats_listing_public(j, identifier) for j in capped],
+        "truncated": len(listings) > ATS_PREVIEW_LIMIT,
+        "message": None if capped else "No open roles are posted on that board right now.",
+    }
 
 
 # ---------------------------------------------------------------------------

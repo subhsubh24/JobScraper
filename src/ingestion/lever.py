@@ -1,7 +1,15 @@
 """Lever ATS client."""
+import logging
+
 import requests
 from typing import List, Optional
 from .base import BaseATSClient, JobListing
+
+logger = logging.getLogger("career_operator.ingestion.lever")
+
+# Shorter than the serverless function budget so a slow board fails inside our handler
+# rather than being killed mid-request (DEEP_DIAGNOSIS rule a).
+HTTP_TIMEOUT = 20
 
 
 class LeverClient(BaseATSClient):
@@ -13,12 +21,14 @@ class LeverClient(BaseATSClient):
         """Fetch all open jobs from Lever."""
         url = f"{self.BASE_URL}/{self.company_identifier}"
 
+        self.last_error = None
         try:
-            response = requests.get(url, params={"mode": "json"}, timeout=30)
+            response = requests.get(url, params={"mode": "json"}, timeout=HTTP_TIMEOUT)
             response.raise_for_status()
             data = response.json()
         except requests.RequestException as e:
-            print(f"Error fetching Lever jobs: {e}")
+            self.last_error = str(e)
+            logger.warning("Lever fetch failed for board %s: %s", self.company_identifier, e)
             return []
 
         jobs = []

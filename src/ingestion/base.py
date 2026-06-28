@@ -30,6 +30,10 @@ class BaseATSClient(ABC):
                               (e.g., board token for Greenhouse)
         """
         self.company_identifier = company_identifier
+        # Set to the error string when the last fetch failed (network/HTTP), so callers
+        # can tell "the board was unreachable" apart from "the board has no open jobs"
+        # — the difference between an honest empty state and a silent lie.
+        self.last_error: Optional[str] = None
 
     @abstractmethod
     def fetch_jobs(self) -> List[JobListing]:

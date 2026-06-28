@@ -1,7 +1,15 @@
 """Greenhouse ATS client."""
+import logging
+
 import requests
 from typing import List, Optional
 from .base import BaseATSClient, JobListing
+
+logger = logging.getLogger("career_operator.ingestion.greenhouse")
+
+# Shorter than any serverless function budget (Vercel maxDuration 60s) so a slow board
+# fails inside our handler instead of being killed mid-request (DEEP_DIAGNOSIS rule a).
+HTTP_TIMEOUT = 20
 
 
 class GreenhouseClient(BaseATSClient):
@@ -13,12 +21,14 @@ class GreenhouseClient(BaseATSClient):
         """Fetch all open jobs from Greenhouse."""
         url = f"{self.BASE_URL}/{self.company_identifier}/jobs"
 
+        self.last_error = None
         try:
-            response = requests.get(url, timeout=30)
+            response = requests.get(url, timeout=HTTP_TIMEOUT)
             response.raise_for_status()
             data = response.json()
         except requests.RequestException as e:
-            print(f"Error fetching Greenhouse jobs: {e}")
+            self.last_error = str(e)
+            logger.warning("Greenhouse fetch failed for board %s: %s", self.company_identifier, e)
             return []
 
         jobs = []
@@ -44,12 +54,14 @@ class GreenhouseClient(BaseATSClient):
         """Fetch full details for a specific job."""
         url = f"{self.BASE_URL}/{self.company_identifier}/jobs/{job_id}"
 
+        self.last_error = None
         try:
-            response = requests.get(url, timeout=30)
+            response = requests.get(url, timeout=HTTP_TIMEOUT)
             response.raise_for_status()
             job_data = response.json()
         except requests.RequestException as e:
-            print(f"Error fetching job details: {e}")
+            self.last_error = str(e)
+            logger.warning("Greenhouse detail fetch failed for job %s: %s", job_id, e)
             return None
 
         location = job_data.get("location", {}).get("name", "")

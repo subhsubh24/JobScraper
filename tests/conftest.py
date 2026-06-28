@@ -21,6 +21,17 @@ from src.db import get_db  # noqa: E402
 from src.db.models import Base  # noqa: E402
 
 
+@pytest.fixture(autouse=True)
+def _reset_rate_limit_state():
+    """The rate-limit + LLM-ceiling buckets are process-global, in-memory dicts. Without
+    a reset they accumulate across every test in the run, so a later test trips the limit
+    and gets a spurious 429 (flaky, order-dependent). Clear them before each test so the
+    journey suite stays deterministic as more tests are added."""
+    asgi._RATE_BUCKET.clear()
+    asgi._LLM_DAY_COUNT.clear()
+    yield
+
+
 @pytest.fixture()
 def client():
     engine = create_engine(
