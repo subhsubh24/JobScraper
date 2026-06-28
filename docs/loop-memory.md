@@ -142,6 +142,14 @@ Left partial items (web SEO/polish, mobile device screens, auth lockout, CORS-lo
 migrations, evals, coverage, visual screenshots) and ALL DoD boxes unticked. Headline
 stays 0% until the two-gate readiness passes — correct.
 
+### 2026-06-28 — Outreach drafts surface on the dashboard via OWNER_ACTIONS
+Added a "Surfacing on the factory dashboard" note to docs/growth/OUTREACH.md: when outreach
+drafts await the owner, file/refresh ONE PENDING_OPS OWNER_ACTIONS item (id:
+review-outreach-drafts, "Review + send N strategic outreach drafts (Gmail)"), decrement N
+as the owner sends and close it at zero — honest counts, never stale. The dashboard already
+renders OWNER_ACTIONS, so this makes the review surface there; keep GROWTH_STATUS.outreach
+current for the tile. Doc-only; CI green.
+
 ### 2026-06-28 — Strategic outreach (curated, DRAFT-ONLY) for the Growth Agent
 PART 1 (repo, PR pending): created docs/growth/OUTREACH.md (RAILS verbatim — DRAFT ONLY /
 agent never sends; high-confidence + strategic only; a few/run max; real published contacts
