@@ -171,6 +171,30 @@ def test_paywall_and_ai_degrade_gracefully(client):
     assert "GEMINI_API_KEY" in prep.json()["detail"]
 
 
+def test_no_fake_success_on_unverified_purchase(client):
+    # SIDE-EFFECT INTEGRITY (FACTORY_STANDARD §6): the billing side-effect (receipt
+    # verification) is not implemented, so verify-purchase must NOT report success or
+    # grant premium — a "purchase processed" the user can't trust is a LIE.
+    reg = client.post(
+        "/api/auth/register",
+        json={"email": "buyer@example.com", "password": "supersecret123", "full_name": "B"},
+    )
+    h = _auth_headers(reg.json()["token"])
+    assert reg.json()["user"]["tier"] == "free"
+    r = client.post(
+        "/api/auth/verify-purchase",
+        headers=h,
+        json={"receipt_data": "forged-or-unverifiable", "platform": "ios"},
+    )
+    # Honest refusal, not a fake-success.
+    assert r.status_code == 501, r.text
+    assert r.json().get("success") is not True
+    # The entitlement side-effect did NOT happen: user is still free.
+    me = client.get("/api/auth/me", headers=h)
+    assert me.json()["user"]["tier"] == "free"
+    assert me.json()["user"]["ai_coach"] is False
+
+
 def test_auth_failures_are_safe(client):
     # No token -> 401
     assert client.get("/api/jobs").status_code == 401
