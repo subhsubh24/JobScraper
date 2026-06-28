@@ -67,6 +67,39 @@ class User(Base):
     jobs = relationship("JobPosting", back_populates="user", cascade="all, delete-orphan")
     applications = relationship("Application", back_populates="user", cascade="all, delete-orphan")
     chat_messages = relationship("ChatMessage", back_populates="user", cascade="all, delete-orphan")
+    subscription = relationship(
+        "Subscription", back_populates="user", uselist=False, cascade="all, delete-orphan"
+    )
+
+
+# ============ BILLING / SUBSCRIPTIONS ============
+
+class Subscription(Base):
+    """Durable Stripe subscription record for a user (Track C).
+
+    One row per user. ``users.tier`` remains the single source of truth for entitlement
+    gating; this table is the audit/renewal bookkeeping a Stripe webhook keeps in sync.
+    A NEW table (not new columns on ``users``) so AUTO_CREATE_TABLES can create it safely.
+    """
+    __tablename__ = "subscriptions"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    user_id = Column(
+        String(36), ForeignKey("users.id"), nullable=False, unique=True, index=True
+    )
+
+    stripe_customer_id = Column(String(255), index=True)
+    stripe_subscription_id = Column(String(255), index=True)
+
+    plan = Column(String(50))    # pro_monthly | pro_annual | careerplus_* (our plan id)
+    status = Column(String(50))  # Stripe status: active, trialing, past_due, canceled, ...
+    current_period_end = Column(DateTime)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    user = relationship("User", back_populates="subscription")
 
 
 # ============ COMPANIES ============

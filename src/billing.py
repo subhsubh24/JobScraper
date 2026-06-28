@@ -1,0 +1,233 @@
+"""Stripe subscription billing for the web product (Track C).
+
+Design rules (FACTORY_STANDARD §6 — SIDE-EFFECT INTEGRITY):
+- NO fake success. The checkout endpoint makes a REAL ``stripe.checkout.Session.create``
+  call; when Stripe is not configured (no live keys) it refuses HONESTLY rather than
+  pretending a charge happened. Live keys + price IDs are owner-only (PENDING_OPS).
+- Entitlement is granted ONLY downstream of a Stripe-signed webhook event whose signature
+  we verify with ``stripe.Webhook.construct_event``. The user's ``tier`` is the single
+  source of truth for gating; the ``subscriptions`` table is the durable Stripe bookkeeping.
+
+Persistence is a NEW ``subscriptions`` table + an UPDATE of the existing ``users.tier``
+column — never an added column on ``users`` (AUTO_CREATE_TABLES only creates missing
+*tables*, so a new User column would silently not exist on the live DB).
+"""
+import os
+from datetime import datetime
+from typing import Optional
+
+from sqlalchemy.orm import Session
+
+from src.db.models import Subscription, User, UserTier
+
+# Stripe subscription statuses that should grant the Premium entitlement.
+_ACTIVE_STATUSES = {"active", "trialing"}
+
+# Public plan id -> the env var holding that plan's Stripe Price ID. The owner creates the
+# products/prices in Stripe and sets these in the deploy env; they are never committed.
+_PLAN_PRICE_ENV = {
+    "pro_monthly": "STRIPE_PRICE_PRO_MONTHLY",
+    "pro_annual": "STRIPE_PRICE_PRO_ANNUAL",
+    "careerplus_monthly": "STRIPE_PRICE_CAREERPLUS_MONTHLY",
+    "careerplus_annual": "STRIPE_PRICE_CAREERPLUS_ANNUAL",
+}
+
+
+class BillingNotConfigured(Exception):
+    """Raised when a billing operation is attempted without the required Stripe config."""
+
+
+class UnknownPlan(Exception):
+    """Raised when an unrecognized plan id is requested."""
+
+
+def billing_enabled() -> bool:
+    """True only when a Stripe secret key is configured (owner-provided, server-side)."""
+    return bool(os.getenv("STRIPE_SECRET_KEY"))
+
+
+def price_id_for_plan(plan: str) -> str:
+    env_var = _PLAN_PRICE_ENV.get(plan)
+    if not env_var:
+        raise UnknownPlan(plan)
+    price_id = os.getenv(env_var)
+    if not price_id:
+        raise BillingNotConfigured(f"No price configured for plan '{plan}' ({env_var}).")
+    return price_id
+
+
+def create_checkout_session(
+    user: User,
+    plan: str,
+    success_url: str,
+    cancel_url: str,
+) -> str:
+    """Create a REAL Stripe Checkout session for a subscription and return its hosted URL.
+
+    Raises UnknownPlan / BillingNotConfigured (never a fake URL) so the caller can surface
+    an honest error. We tag the session with the user id in BOTH client_reference_id and
+    metadata, and propagate it to subscription_data.metadata, so every later webhook event
+    (subscription.updated/deleted) can be mapped back to the user.
+    """
+    if not billing_enabled():
+        raise BillingNotConfigured("STRIPE_SECRET_KEY is not set.")
+    price_id = price_id_for_plan(plan)  # raises before any network call if misconfigured
+
+    import stripe
+
+    stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
+    session = stripe.checkout.Session.create(
+        mode="subscription",
+        line_items=[{"price": price_id, "quantity": 1}],
+        success_url=success_url,
+        cancel_url=cancel_url,
+        client_reference_id=user.id,
+        customer_email=user.email,
+        metadata={"user_id": user.id, "plan": plan},
+        subscription_data={"metadata": {"user_id": user.id, "plan": plan}},
+        allow_promotion_codes=True,
+    )
+    return session.url
+
+
+def construct_event(payload: bytes, sig_header: str):
+    """Verify a webhook payload's Stripe signature and return the parsed event.
+
+    Raises BillingNotConfigured if no signing secret is set; lets stripe raise on a bad
+    signature so the caller can return 400 and grant NOTHING.
+    """
+    secret = os.getenv("STRIPE_WEBHOOK_SECRET")
+    if not secret:
+        raise BillingNotConfigured("STRIPE_WEBHOOK_SECRET is not set.")
+
+    import stripe
+
+    return stripe.Webhook.construct_event(payload, sig_header, secret)
+
+
+def _period_end(obj) -> Optional[datetime]:
+    ts = obj.get("current_period_end")
+    if not ts:
+        return None
+    try:
+        return datetime.utcfromtimestamp(int(ts))
+    except (TypeError, ValueError, OverflowError):
+        return None
+
+
+def _user_for_subscription(db: Session, obj) -> Optional[User]:
+    """Map a Stripe subscription object back to our User.
+
+    Prefer the user id we stamped into metadata; fall back to the customer/subscription id
+    recorded on a prior Subscription row.
+    """
+    meta = obj.get("metadata") or {}
+    user_id = meta.get("user_id")
+    if user_id:
+        user = db.query(User).filter(User.id == user_id).first()
+        if user:
+            return user
+    customer_id = obj.get("customer")
+    if customer_id:
+        sub = db.query(Subscription).filter(Subscription.stripe_customer_id == customer_id).first()
+        if sub:
+            return db.query(User).filter(User.id == sub.user_id).first()
+    sub_id = obj.get("id")
+    if sub_id:
+        sub = db.query(Subscription).filter(Subscription.stripe_subscription_id == sub_id).first()
+        if sub:
+            return db.query(User).filter(User.id == sub.user_id).first()
+    return None
+
+
+def _upsert_subscription(
+    db: Session,
+    user: User,
+    *,
+    stripe_customer_id: Optional[str] = None,
+    stripe_subscription_id: Optional[str] = None,
+    plan: Optional[str] = None,
+    status: Optional[str] = None,
+    current_period_end: Optional[datetime] = None,
+) -> Subscription:
+    """Create or update the single Subscription row for a user (one row per user)."""
+    sub = db.query(Subscription).filter(Subscription.user_id == user.id).first()
+    if sub is None:
+        sub = Subscription(user_id=user.id)
+        db.add(sub)
+    if stripe_customer_id:
+        sub.stripe_customer_id = stripe_customer_id
+    if stripe_subscription_id:
+        sub.stripe_subscription_id = stripe_subscription_id
+    if plan:
+        sub.plan = plan
+    if status:
+        sub.status = status
+    if current_period_end:
+        sub.current_period_end = current_period_end
+    sub.updated_at = datetime.utcnow()
+    db.flush()
+    return sub
+
+
+def apply_event(event, db: Session) -> Optional[str]:
+    """Apply a verified Stripe event to entitlement state. Returns the affected user id.
+
+    Only these events change anything; everything else is acknowledged and ignored. The
+    user.tier flip is the entitlement; the Subscription row is the audit/renewal record.
+    """
+    etype = event["type"]
+    obj = event["data"]["object"]
+
+    if etype == "checkout.session.completed":
+        meta = obj.get("metadata") or {}
+        user_id = obj.get("client_reference_id") or meta.get("user_id")
+        if not user_id:
+            return None
+        # Async payment methods (bank transfer, ACH, SEPA) complete the session with
+        # payment_status="unpaid" — money has NOT cleared. Granting Premium here would hand
+        # out ~a billing cycle of free access until the payment fails. Wait for the
+        # subscription to go active (customer.subscription.created/updated) instead.
+        if obj.get("payment_status") not in (None, "paid", "no_payment_required"):
+            return None
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            return None
+        _upsert_subscription(
+            db,
+            user,
+            stripe_customer_id=obj.get("customer"),
+            stripe_subscription_id=obj.get("subscription"),
+            plan=meta.get("plan"),
+            status="active",
+        )
+        user.tier = UserTier.PREMIUM
+        return user.id
+
+    if etype in ("customer.subscription.created", "customer.subscription.updated"):
+        user = _user_for_subscription(db, obj)
+        if not user:
+            return None
+        status = obj.get("status")
+        meta = obj.get("metadata") or {}
+        _upsert_subscription(
+            db,
+            user,
+            stripe_customer_id=obj.get("customer"),
+            stripe_subscription_id=obj.get("id"),
+            plan=meta.get("plan"),
+            status=status,
+            current_period_end=_period_end(obj),
+        )
+        user.tier = UserTier.PREMIUM if status in _ACTIVE_STATUSES else UserTier.FREE
+        return user.id
+
+    if etype == "customer.subscription.deleted":
+        user = _user_for_subscription(db, obj)
+        if not user:
+            return None
+        _upsert_subscription(db, user, stripe_subscription_id=obj.get("id"), status="canceled")
+        user.tier = UserTier.FREE
+        return user.id
+
+    return None

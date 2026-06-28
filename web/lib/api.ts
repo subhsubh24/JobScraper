@@ -145,4 +145,12 @@ export const api = {
       })
     ).prep_pack;
   },
+
+  // Start a Stripe Checkout session for a subscription plan and return its hosted URL.
+  // Throws ApiError(503) when billing isn't configured yet — the caller surfaces it
+  // honestly rather than pretending a charge happened.
+  async startCheckout(plan: string): Promise<string> {
+    return (await request<{ url: string }>('/api/billing/checkout', { method: 'POST', body: { plan } }))
+      .url;
+  },
 };
