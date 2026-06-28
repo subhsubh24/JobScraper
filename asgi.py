@@ -37,6 +37,23 @@ from src.ranking.scorer import JobScorer
 load_dotenv()
 logger = logging.getLogger("career_operator")
 
+
+def _assert_required_secrets() -> None:
+    """DEEP_DIAGNOSIS rule (b): a critical-path secret must FAIL LOUD in production, never
+    silently default. On Vercel, refuse to run with an unset / dev-default JWT_SECRET —
+    otherwise auth tokens are forgeable (a silent security hole worse than an outage).
+    """
+    if os.getenv("VERCEL"):
+        secret = os.getenv("JWT_SECRET", "")
+        if not secret or secret == "dev-secret-change-in-production":
+            raise RuntimeError(
+                "JWT_SECRET is unset or the insecure dev default in production — set a "
+                "strong JWT_SECRET in the deploy env (auth tokens are forgeable otherwise)."
+            )
+
+
+_assert_required_secrets()
+
 app = FastAPI(
     title="Career Operator API",
     description="AI-powered job search platform (web + mobile)",
