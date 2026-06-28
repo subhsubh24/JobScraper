@@ -34,6 +34,7 @@ from src.db.models import (
 from src.enrichment.llm_workflows import LLMWorkflows
 from src.llm import llm_available
 from src.ranking.scorer import JobScorer
+from src import billing
 
 load_dotenv()
 logger = logging.getLogger("career_operator")
@@ -243,6 +244,10 @@ class AppPurchase(BaseModel):
     platform: str = "ios"
 
 
+class CheckoutRequest(BaseModel):
+    plan: str = Field(min_length=2, max_length=50)
+
+
 class ImportPreviewRequest(BaseModel):
     careers_url: str = Field(min_length=4, max_length=500)
 
@@ -397,6 +402,72 @@ def verify_purchase(
         detail="Purchase verification is not available yet. No charge was applied and "
         "your plan is unchanged.",
     )
+
+
+# ---------------------------------------------------------------------------
+# Billing (web subscriptions via Stripe Checkout) — Track C.
+# ---------------------------------------------------------------------------
+def _web_base_url(request: Request) -> str:
+    """Origin to send the user back to after Checkout. On the unified Vercel deployment the
+    web app and API share an origin, so the request origin is correct; WEB_APP_URL overrides
+    it (e.g. when the API runs on a separate origin from the site)."""
+    explicit = os.getenv("WEB_APP_URL")
+    if explicit:
+        return explicit.rstrip("/")
+    return str(request.base_url).rstrip("/")
+
+
+@app.post("/api/billing/checkout", dependencies=[Depends(rate_limit("billing", 10))])
+def billing_checkout(
+    data: CheckoutRequest,
+    request: Request,
+    user: User = Depends(get_current_user),
+):
+    """Create a real Stripe Checkout session and return its hosted URL.
+
+    SIDE-EFFECT INTEGRITY: this makes a REAL stripe.checkout.Session.create call. When
+    Stripe isn't configured (no owner keys) it returns an HONEST 503 and applies no charge —
+    never a fake success. Entitlement is granted only later, by the signed webhook.
+    """
+    if user.tier == UserTier.PREMIUM:
+        raise HTTPException(status_code=400, detail="You're already on a Premium plan.")
+    base = _web_base_url(request)
+    try:
+        url = billing.create_checkout_session(
+            user,
+            data.plan,
+            success_url=f"{base}/billing/success?session_id={{CHECKOUT_SESSION_ID}}",
+            cancel_url=f"{base}/billing/cancel",
+        )
+    except billing.UnknownPlan:
+        raise HTTPException(status_code=400, detail="Unknown plan.")
+    except billing.BillingNotConfigured:
+        raise HTTPException(
+            status_code=503,
+            detail="Subscriptions aren't available yet. No charge was made.",
+        )
+    return {"url": url}
+
+
+@app.post("/api/billing/webhook")
+async def billing_webhook(request: Request, db: Session = Depends(get_db)):
+    """Receive Stripe webhook events, VERIFY the signature, and persist entitlement.
+
+    The raw request body is required for signature verification. We grant/revoke Premium
+    only from a signature-verified event — an unsigned or forged payload changes nothing.
+    """
+    payload = await request.body()
+    sig = request.headers.get("stripe-signature", "")
+    try:
+        event = billing.construct_event(payload, sig)
+    except billing.BillingNotConfigured:
+        raise HTTPException(status_code=503, detail="Billing webhook is not configured.")
+    except Exception:
+        # Invalid signature / malformed payload — grant NOTHING.
+        raise HTTPException(status_code=400, detail="Invalid signature.")
+    billing.apply_event(event, db)
+    db.commit()
+    return {"received": True}
 
 
 # ---------------------------------------------------------------------------
