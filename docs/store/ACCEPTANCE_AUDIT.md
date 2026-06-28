@@ -15,7 +15,7 @@
 
 | # | Guideline area | Requirement | Status | Notes |
 |---|---|---|---|---|
-| A1 | 1.x Safety | No objectionable content; UGC/AI output moderated | OPEN | AI coach output still needs an explicit safety guardrail (roadmap) |
+| A1 | 1.x Safety | No objectionable content; UGC/AI output moderated | PARTIAL | AI coach now has a content-safety guardrail on input + output (self-harm→crisis resources, violence/hate/sexual-gen blocked; conservative so legit career topics pass) + hardened system prompt — `src/ai_coach/moderation.py`, 35 tests (PR #51). REMAINING (follow-ups, not blocking build): a user-facing "report this response" affordance, and the same output filter on the prep-pack generators (`src/enrichment/llm_workflows.py`). |
 | A2 | 2.1 App Completeness | No crashes, no placeholder content, all features work | OPEN | Backend journeys pass at runtime; full native completeness pending a signed device build (CI/Human) |
 | A3 | 2.3 Accurate Metadata | Screenshots/description match real app | FAIL | ASO copy drafted (`ASO_COPY.md`); rendered screenshots/feature graphic need a running build — not yet produced |
 | A4 | 3.1.1 In-App Purchase | Digital subscriptions via StoreKit, not external payment | FAIL | Web Stripe billing built (PR #40); **mobile** StoreKit/RevenueCat NOT integrated — required before iOS submission |
@@ -47,7 +47,8 @@
 - [ ] Mobile subscription purchase flow w/ restore (A4–A5, G4) — StoreKit/Play Billing not built
 - [ ] All core flows verified at runtime on a real build (A2, G6) — needs signed build (CI/Human)
 - [ ] Rendered, accurate store assets committed (A3, G7) — needs a running build
-- [ ] AI-output safety guardrail (A1)
+- [x] AI-output safety guardrail (A1) — coach input+output moderation shipped (PR #51);
+      follow-ups: user-facing report affordance + prep-pack generator output filter
 - [ ] Owner enters App Privacy / Data Safety answers in the consoles + counsel review (PENDING_OPS)
 
 **Open FAILs remain (mobile billing, rendered assets). Submission readiness: NO.**

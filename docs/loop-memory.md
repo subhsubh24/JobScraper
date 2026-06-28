@@ -4,6 +4,47 @@ Durable lessons for the factory loop. Append dated entries. Keep it honest and s
 
 ---
 
+### 2026-06-28 — Maximal run: 4 feature PRs (API hardening, web Settings, coach safety, evals)
+Ran the full ~8-scout sweep, selected a file-disjoint set, shipped 4 PRs through 2 Sonnet
+reviewers each + the gate, then this bookkeeping PR. asgi.py was the single contended file →
+exactly ONE PR owned it; mobile-billing + waitlist (both want asgi.py) were deferred as a
+coherent next unit.
+- **#47 API hardening** (Track A/F): consistent error envelope (additive — keeps `detail`,
+  adds `error{code,message,request_id}`), request-id middleware (`X-Request-ID` + log
+  contextvar), stdlib JSON logging (no new dep), CORS prod-warning. Both reviewers caught a
+  real JsonFormatter reserved-key collision (extra= merged after fixed fields → could drop
+  the traceback) → fixed (merge extra first, fixed fields win) + regression test.
+- **#49 web Settings/account deletion** (Track D): the page the Privacy Policy already
+  promised; deletes via the real DELETE /api/auth/me (verified round-trip: account+data gone,
+  token 401s, login fails). Reviewer B: reuse the design system (added Button danger variants)
+  + the billing copy over-claimed a portal that doesn't exist → honest support-email copy.
+- **#51 coach safety guardrail** (Track D/Apple §1.2, A1): conservative ContentModerator on
+  input+output (self-harm→crisis resources; violence/hate/sexual-gen blocked; legit career
+  topics pass). Reviewers found real gaps: method phrasings bypassed (hang/od/etc.), negation
+  FPs ("I'm not suicidal"), and a CRITICAL ordering bug — the client-None check ran BEFORE
+  moderation, so crisis resources were unreachable with no key → moderation now runs first.
+- **#52 eval suite + coverage floor** (Track E): golden-expectation evals for the
+  deterministic heuristic scorer (30+40*skills_score → 70/30/50) + coach suggestions;
+  coverage floor fail_under=65 wired into preflight ci (branch coverage ~69%).
+LESSONS: (1) **CONCURRENT GIT IN ONE WORKING TREE CORRUPTS BRANCHES.** Background reviewers
+launched WITHOUT isolation ran `cd web && tsc` / `git checkout`, which switched the MAIN
+tree's HEAD out from under the maker mid-edit — a commit landed on the wrong branch and a
+branch got reset to a stale ref (no-diff PR-create error). FIX/RULE: any reviewer/agent that
+must check out a branch or run build/test commands MUST use Agent `isolation: "worktree"`
+(separate working dir + HEAD). Reviewers that only need the diff should use remote refs
+(`git diff origin/main...origin/<branch>`) and NEVER `git checkout`. After switching to
+worktree-isolated reviewers, zero further corruption. (2) **A desynced working tree can read
+clean** — `git status` showed clean while files differed from HEAD (stat-cache race from the
+concurrent checkout); recover with `git checkout -B <branch> origin/<branch> --force`. (3)
+Reviewers earned their keep again: every must-fix this run (the formatter collision, the
+billing over-claim, the coach ordering bug + self-harm bypasses) was a reviewer find. (4)
+DEFERRED (next run, asgi.py now free): alembic migrations + AUTO_CREATE_TABLES cutover; CAPTCHA
++ cross-instance rate-limit + waitlist capture (all want asgi.py); mobile RevenueCat/StoreKit
++ server-side receipt verification (coherent monetization unit); prep-pack generator output
+moderation; web Stripe billing-portal endpoint.
+
+---
+
 ### 2026-06-28 — Maximal run: 4 feature PRs (web billing, web polish, mobile markdown, store docs)
 Ran the ~8-scout sweep, selected a file-disjoint set, and shipped 4 PRs through 2 Sonnet
 reviewers each + the gate, then this bookkeeping PR:
