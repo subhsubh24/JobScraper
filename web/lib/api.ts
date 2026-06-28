@@ -101,6 +101,15 @@ export const api = {
     setToken(null);
   },
 
+  // Permanently delete the signed-in account and ALL its data (store + GDPR requirement).
+  // Awaits the real DELETE /api/auth/me and only clears the local token after the server
+  // confirms the deletion — never an optimistic success. Throws ApiError on failure so the
+  // caller can surface it honestly instead of pretending the account is gone.
+  async deleteAccount(): Promise<void> {
+    await request<{ success: boolean; deleted: boolean }>('/api/auth/me', { method: 'DELETE' });
+    setToken(null);
+  },
+
   async listJobs(): Promise<Job[]> {
     return (await request<{ jobs: Job[] }>('/api/jobs')).jobs;
   },

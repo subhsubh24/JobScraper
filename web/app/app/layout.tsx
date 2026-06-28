@@ -27,6 +27,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               <Link href="/app" className="hover:text-slate-100">Pipeline</Link>
               <Link href="/app/coach" className="hover:text-slate-100">Coach</Link>
               <Link href="/pricing" className="hover:text-slate-100">Upgrade</Link>
+              <Link href="/app/settings" className="hover:text-slate-100">Settings</Link>
             </nav>
           </div>
           <div className="flex items-center gap-3 text-sm">
