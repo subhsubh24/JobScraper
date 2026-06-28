@@ -37,6 +37,19 @@ JobScraper is registered in subhsubh24/AutoFactoryDashboard `config/projects.ts`
 https://claude.ai/code/routines. Owner-only (Human-Core) steps remain in PENDING_OPS —
 spend caps are 🔴 urgent before any live traffic.
 
+### 2026-06-27 — Synced FACTORY_STANDARD.md to canonical (visual verification)
+Canonical sync (kept byte-identical across factories): added visual-verification to the
+shared standard — §6 "SEE WHAT THE USER SEES" (journey suite captures + commits a
+screenshot of every page/state; design-audit + readiness gate VISUALLY review them on a
+vision model; blank/broken/unstyled/off-brand/"vibe-coded" = release-blocking FAIL even if
+DOM assertions pass; bounded to deep-audit + readiness, not every micro-change), §7 Gate-2
+functional-reality lens now includes visually reviewing the screenshots, §10 design/taste
+lens now visually reviews the screenshots. This is a deliberate canonical sync, NOT loop
+work — FACTORY_STANDARD.md remains a stable anchor. FOLLOW-UP for the factory (ROADMAP/
+product work, not this file): make the journey suite actually capture + commit page
+screenshots (web: Playwright/screenshot; mobile: component snapshots) so the new lenses
+have artifacts to judge.
+
 ### 2026-06-27 — Adopted the shared FACTORY_STANDARD.md (stable anchor)
 Created `FACTORY_STANDARD.md` at the repo root with the canonical, product-agnostic
 operating standard — copied BYTE-IDENTICAL (no paraphrase/trim/reorder/adaptation) so it
