@@ -4,6 +4,27 @@ Durable lessons for the factory loop. Append dated entries. Keep it honest and s
 
 ---
 
+### 2026-06-28 — Quality gates staged as REQUIRED CI checks (resolves the "not enforced in CI" wall)
+The gate runs locally + in the routine but does NOT block `gh pr merge --admin` — a BUILDS≠WORKS
+/ lint-failing change could slip in. Mirrored GroceryManager's OUTCOME, adapted to this stack.
+SHIPPED (product side, through the gate): (1) browser-level functional journey
+`web/e2e/core-journey.spec.ts` + `web/playwright.config.ts` — boots a running web build + running
+FastAPI + seeded throwaway sqlite, asserts the core-product OUTPUT renders (signup → working
+dashboard, no dead-end → add job → **fit SCORE renders as a real number** → detail); self-seeds;
+verified GREEN locally (2 passed). (2) lint at zero warnings (`eslint --max-warnings=0`).
+(3) `docs/ci/ROUTE_INVENTORY.md`. (4) TEST-ONLY rate-limit bypass `E2E_DISABLE_RATE_LIMIT` in
+asgi.py, HARD-REFUSED on Vercel (`_assert_required_secrets` raises; regression-tested).
+STAGED (can't push `.github/` — it trips a sensitive-file prompt that hangs the headless run):
+`docs/ci/PROPOSED_CI.md` = exact `ci.yml` + the branch-protection required-checks list. Carried
+GroceryManager's two gotchas: (a) `NEXT_PUBLIC_API_URL` is baked at BUILD time → CI builds with
+it set (no next-auth here, so no trusted-host callback — pointing the build at the local API is
+the equivalent); (b) one runner IP trips the per-IP limiter → the test-only bypass on the E2E
+API server. RAISED the META proposal (LOOP_HEALTH.harness_proposals_open: 1,
+`enforced_in_ci: false`). LESSON: a green LOCAL gate ≠ an enforced gate — "merged" without
+required CI is an honor-system gate; the only durable fix is required status checks, and the
+loop can stage everything but the `.github/` push + the branch-protection toggle (owner-only).
+NEVER mark a red/flaky check required (would block the loop) — verify green in CI first.
+
 ### 2026-06-28 — LOOP HEALTH made measurable (self-improving ≠ busy) + META self-check
 Added FACTORY_STANDARD §10b (byte-identical): the deep audit grades the PRODUCT; LOOP_HEALTH
 grades the LOOP. Seeded `docs/autonomous-loop/LOOP_HEALTH.md` (signal: bootstrapping) — update
