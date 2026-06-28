@@ -1,9 +1,8 @@
 'use client';
 
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { Button, Card, ErrorText } from '@/components/ui';
+import { Button, Card, ErrorText, LinkButton } from '@/components/ui';
 import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 
@@ -46,7 +45,7 @@ export default function SettingsPage() {
     <div className="mx-auto max-w-2xl space-y-6">
       <div>
         <h1 className="text-2xl font-bold">Settings</h1>
-        <p className="mt-1 text-sm text-slate-400">Manage your account and subscription.</p>
+        <p className="mt-1 text-sm text-slate-400">Manage your account and plan.</p>
       </div>
 
       <Card>
@@ -79,18 +78,16 @@ export default function SettingsPage() {
               Active
             </span>
           ) : (
-            <Link
-              href="/pricing"
-              className="inline-flex items-center justify-center rounded-lg bg-indigo-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-400"
-            >
-              Upgrade
-            </Link>
+            <LinkButton href="/pricing">Upgrade</LinkButton>
           )}
         </div>
         {user.tier === 'premium' && (
           <p className="mt-3 text-sm text-slate-400">
-            Manage or cancel your subscription anytime from the receipt email&rsquo;s billing
-            portal link.
+            To change or cancel your plan, email{' '}
+            <a href="mailto:support@careeroperator.app" className="text-indigo-400 hover:underline">
+              support@careeroperator.app
+            </a>{' '}
+            and we&rsquo;ll take care of it.
           </p>
         )}
       </Card>
@@ -103,12 +100,11 @@ export default function SettingsPage() {
         </p>
 
         {!showConfirm ? (
-          <button
-            onClick={() => setShowConfirm(true)}
-            className="mt-4 inline-flex items-center justify-center rounded-lg border border-red-700 px-4 py-2.5 text-sm font-semibold text-red-300 transition hover:bg-red-950/50"
-          >
-            Delete account
-          </button>
+          <div className="mt-4">
+            <Button variant="dangerOutline" onClick={() => setShowConfirm(true)}>
+              Delete account
+            </Button>
+          </div>
         ) : (
           <div className="mt-4 space-y-3">
             <label className="block">
@@ -126,13 +122,9 @@ export default function SettingsPage() {
             </label>
             <ErrorText>{error}</ErrorText>
             <div className="flex gap-3">
-              <button
-                onClick={handleDelete}
-                disabled={!canDelete}
-                className="inline-flex items-center justify-center rounded-lg bg-red-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-red-500 disabled:opacity-50"
-              >
+              <Button variant="danger" onClick={handleDelete} disabled={!canDelete}>
                 {deleting ? 'Deleting…' : 'Permanently delete account'}
-              </button>
+              </Button>
               <Button
                 variant="secondary"
                 onClick={() => {
