@@ -25,6 +25,22 @@ Durable lessons for the factory loop. Append dated entries. Keep it honest and s
   honestly below the $100K floor (`floor_met_year1: false`); growth is `pre_launch`,
   engine 0%. Convergence happens over scheduled runs, not by ticking boxes early.
 
+### 2026-06-28 — Unpinned transitive httpx silently broke the whole test suite
+A fresh container install floated the (unpinned, transitive-via-openai) `httpx` to 0.28.1.
+httpx 0.28 dropped the `Client(app=...)` shortcut that starlette 0.35.1's `TestClient`
+still passes, so `TestClient(app=...)` raised `TypeError` at construction — EVERY test in
+`tests/journeys` errored before running. The preflight CI gate and the Track E journey suite
+(`E2E_JOURNEYS_PASSED`) could not run at all, while a production deploy looked fine because
+`TestClient` is test-only. Same local-green/repo-or-prod-broken family as the
+gitignored-source foot-gun. Fix: pin `httpx==0.27.2` in `requirements.txt` (prod==dev, zero
+drift; `requirements-dev.txt` inherits via `-r`). openai 1.59.6 supports httpx >=0.23,<1, so
+the old `proxies` crash stays fixed. LESSONS: (1) on a fresh clone the gate runs against
+LATEST floating transitives — pin anything whose major/minor API your tooling depends on,
+even transitive ones; (2) a green local checkout with stale wheels hides this — the bug only
+appears on a clean install, so treat "fresh-container CI red" as signal, not noise. Upgrade
+path: lift the pin once fastapi/starlette are bumped to a TestClient that uses ASGITransport
+(bumping fastapi from 0.109.0 risks asgi.py route-mirroring internals — deferred).
+
 ### 2026-06-27 — Cloud routines + dashboard wired (handoff)
 The three scheduled cloud routines that drive this repo (source = this GitHub repo,
 env FactoryDashboard) are LIVE. Future runs: do not recreate them; update via the
