@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button, Card } from '@/components/ui';
@@ -17,20 +17,36 @@ export default function SettingsScreen() {
     ]);
   }
 
+  async function deleteAccount() {
+    // Required by Apple (5.1.1v) & Google. A REAL deletion: the server removes the user
+    // and all their data, then we clear the local session (signOut sets user -> null, so
+    // the root layout routes back to the auth screen).
+    try {
+      await api.deleteAccount();
+    } catch (e) {
+      // Only the deletion request itself failing should surface as a failure.
+      Alert.alert(
+        'Could not delete account',
+        e instanceof Error ? e.message : 'Something went wrong. Please try again.',
+      );
+      return;
+    }
+    // Account is gone server-side. Clear the session; if signOut hiccups, force the user
+    // back to auth rather than wrongly reporting a delete failure.
+    try {
+      await signOut();
+    } catch {
+      router.replace('/(auth)/login');
+    }
+  }
+
   function confirmDelete() {
-    // Account deletion is required by Apple (5.1.1v) & Google. Server endpoint is
-    // tracked in ROADMAP Track D; we surface the entry point honestly.
     Alert.alert(
       'Delete account',
-      'This permanently deletes your account and data. This cannot be undone.',
+      'This permanently deletes your account and all your data. This cannot be undone.',
       [
         { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () =>
-            Alert.alert('Not yet available', 'Account deletion ships before store submission.'),
-        },
+        { text: 'Delete', style: 'destructive', onPress: deleteAccount },
       ],
     );
   }
@@ -63,7 +79,11 @@ export default function SettingsScreen() {
         </View>
 
         <Button label="Log out" variant="secondary" onPress={confirmSignOut} />
-        <Button label="Delete account" variant="secondary" onPress={confirmDelete} />
+        {/* Destructive action set apart from preferences and visually marked as danger,
+            so deleting an account never reads like just another button. */}
+        <Pressable accessibilityRole="button" onPress={confirmDelete} style={styles.deleteBtn}>
+          <Text style={styles.deleteText}>Delete account</Text>
+        </Pressable>
       </ScrollView>
     </SafeAreaView>
   );
@@ -81,4 +101,6 @@ const styles = StyleSheet.create({
   usage: { color: colors.textMuted, marginTop: spacing.sm, fontSize: 13 },
   meta: { alignItems: 'center' },
   metaText: { color: colors.textMuted, fontSize: 12 },
+  deleteBtn: { paddingVertical: 14, alignItems: 'center', marginTop: spacing.sm },
+  deleteText: { color: colors.danger, fontWeight: '600', fontSize: 15 },
 });
