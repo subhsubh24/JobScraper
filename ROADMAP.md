@@ -85,6 +85,12 @@ the guard tests, and **`FACTORY_STANDARD.md`**.
 - [ ] Test coverage floor defined and met
 - [ ] Eval suite for LLM workflows (scoring/prep/coach) with golden expectations
 - [ ] Runtime FUNCTIONAL journey suite green this run (`E2E_JOURNEYS_PASSED=1`)
+- [ ] **Visual verification (FACTORY_STANDARD §6):** journey suite CAPTURES + commits a
+      screenshot of every page + key state (empty/loading/error, authed + logged-out) —
+      web via Playwright, mobile via component snapshots — as artifacts; the deep-audit
+      design lens + readiness gate VISUALLY review them vs the VISION design bar (a
+      blank/broken/unstyled/off-brand/"vibe-coded" page is a release-blocking FAIL even if
+      DOM assertions pass)
 
 ### F — Security & abuse hardening
 - [ ] Rate limiting on every paid/expensive/auth/scrape endpoint
