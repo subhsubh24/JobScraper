@@ -53,6 +53,19 @@ JobScraper is registered in subhsubh24/AutoFactoryDashboard `config/projects.ts`
 https://claude.ai/code/routines. Owner-only (Human-Core) steps remain in PENDING_OPS —
 spend caps are 🔴 urgent before any live traffic.
 
+### 2026-06-27 — Reconciled ROADMAP track ticks to real verified state (dashboard 0%)
+AutoFactoryDashboard showed JobScraper at 0%. Diagnosis: the dashboard's headline % =
+percentToSubmission = the Definition-of-Done checkboxes (submission readiness). DoD is
+0/9 ticked — ACCURATE: the product is built + deployed + live-E2E-verified, but NOT
+submission-ready (no monetization, no store assets, business case below $100K floor,
+no independent A/A+ quality grade). Separately, build progress also read 0 because the
+bootstrap left ALL Track boxes unticked — that understated reality. Fixed: ticked 19
+Track boxes that are genuinely done WITH on-branch artifacts + this-session live
+verification (backend e2e, Next.js web live, Neon, Gemini scoring+prep, gates green).
+Left partial items (web SEO/polish, mobile device screens, auth lockout, CORS-locked,
+migrations, evals, coverage, visual screenshots) and ALL DoD boxes unticked. Headline
+stays 0% until the two-gate readiness passes — correct.
+
 ### 2026-06-27 — Synced FACTORY_STANDARD.md to canonical (visual verification)
 Canonical sync (kept byte-identical across factories): added visual-verification to the
 shared standard — §6 "SEE WHAT THE USER SEES" (journey suite captures + commits a

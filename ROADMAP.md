@@ -28,11 +28,11 @@ the guard tests, and **`FACTORY_STANDARD.md`**.
 ## Tracks
 
 ### A — Web / API product quality + reliability (FastAPI backend + Next.js web app)
-- [ ] `asgi.py` endpoints actually work end-to-end against `src/` (no method/sig mismatches)
-- [ ] Core flow works with **no Gemini key** via graceful heuristic degradation
-- [ ] **Next.js web app (`/web`)**: auth + pipeline + job detail + coach + pricing wired to the API
-- [ ] Web app: typecheck + lint + `next build` green; deployed live on Vercel
-- [ ] **Web production deploy config is REAL + backed by an artifact (not just a ticked
+- [x] `asgi.py` endpoints actually work end-to-end against `src/` (no method/sig mismatches)
+- [x] Core flow works with **no Gemini key** via graceful heuristic degradation
+- [x] **Next.js web app (`/web`)**: auth + pipeline + job detail + coach + pricing wired to the API
+- [x] Web app: typecheck + lint + `next build` green; deployed live on Vercel
+- [x] **Web production deploy config is REAL + backed by an artifact (not just a ticked
       "deploy-ready" box):** build command + env contract (`NEXT_PUBLIC_API_URL`) + output
       documented and verified; the single-project Vercel Services routing (`/` web, `/api`
       FastAPI) confirmed on a live deploy. Un-tick if not backed.
@@ -41,11 +41,11 @@ the guard tests, and **`FACTORY_STANDARD.md`**.
 - [ ] ATS ingestion (Greenhouse/Lever) returns real listings or a truthful empty state
 - [ ] Consistent error envelope + structured logging across the API
 - [ ] DB migrations (alembic) generated and applied cleanly; seed script for dev
-- [ ] External Postgres wired for serverless (no SQLite persistence on Vercel)
-- [ ] Health/readiness endpoints + **Vercel serverless deploy** verified live (see docs/DEPLOY_VERCEL.md)
+- [x] External Postgres wired for serverless (no SQLite persistence on Vercel)
+- [x] Health/readiness endpoints + **Vercel serverless deploy** verified live (see docs/DEPLOY_VERCEL.md)
 
 ### B — Native mobile app (NEW Expo / React Native, iOS + Android, TypeScript, `/mobile`)
-- [ ] Expo app scaffolded, `tsc --noEmit` clean, lint clean
+- [x] Expo app scaffolded, `tsc --noEmit` clean, lint clean
 - [ ] Navigation + auth (login/register) wired to the Python API
 - [ ] Jobs list + job detail screens render real API data (no placeholders)
 - [ ] Prep pack + AI coach screens at parity with web
@@ -53,7 +53,7 @@ the guard tests, and **`FACTORY_STANDARD.md`**.
 - [ ] Paywall screen wired to entitlement state
 - [ ] Polished design-bar UI; real empty/loading/error states; not a thin wrapper
 - [ ] Component/integration tests green; typecheck-clean release build (native device run = human/CI)
-- [ ] **Distribution/release config is REAL (don't trust a ticked "build-ready" box):**
+- [x] **Distribution/release config is REAL (don't trust a ticked "build-ready" box):**
       `mobile/eas.json` build+submit profiles + `app.json`/`app.config.ts` with bundle id,
       version + `buildNumber`/`versionCode`, icon/splash, permission strings (only for
       permissions actually used), EAS `projectId` from env — and the production build
@@ -62,7 +62,7 @@ the guard tests, and **`FACTORY_STANDARD.md`**.
       submit are Human-Core → PENDING_OPS.)
 
 ### C — Monetization (subscription)
-- [ ] Pricing tiers defined (good-better-best + annual) — see BUSINESS_CASE
+- [x] Pricing tiers defined (good-better-best + annual) — see BUSINESS_CASE
 - [ ] Web: Stripe Checkout session creation (REAL call, not stub)
 - [ ] Web: Stripe webhook → server-side entitlement persistence
 - [ ] Web: server-side entitlement gating on paid endpoints
@@ -80,11 +80,11 @@ the guard tests, and **`FACTORY_STANDARD.md`**.
 - [ ] `docs/store/ACCEPTANCE_AUDIT.md` vs CURRENT Apple/Google guidelines, **ZERO open FAILs**
 
 ### E — World-class quality
-- [ ] Lint floor: `flake8` (backend) + ESLint (mobile) clean
-- [ ] Type floor: `mypy`/type checks (backend, where adopted) + `tsc --noEmit` (mobile)
+- [x] Lint floor: `flake8` (backend) + ESLint (mobile) clean
+- [x] Type floor: `mypy`/type checks (backend, where adopted) + `tsc --noEmit` (mobile)
 - [ ] Test coverage floor defined and met
 - [ ] Eval suite for LLM workflows (scoring/prep/coach) with golden expectations
-- [ ] Runtime FUNCTIONAL journey suite green this run (`E2E_JOURNEYS_PASSED=1`)
+- [x] Runtime FUNCTIONAL journey suite green this run (`E2E_JOURNEYS_PASSED=1`)
 - [ ] **Visual verification (FACTORY_STANDARD §6):** journey suite CAPTURES + commits a
       screenshot of every page + key state (empty/loading/error, authed + logged-out) —
       web via Playwright, mobile via component snapshots — as artifacts; the deep-audit
@@ -93,15 +93,15 @@ the guard tests, and **`FACTORY_STANDARD.md`**.
       DOM assertions pass)
 
 ### F — Security & abuse hardening
-- [ ] Rate limiting on every paid/expensive/auth/scrape endpoint
-- [ ] Server-side input validation on all write endpoints
-- [ ] Error hygiene (no stack traces / secrets leaked to clients)
+- [x] Rate limiting on every paid/expensive/auth/scrape endpoint
+- [x] Server-side input validation on all write endpoints
+- [x] Error hygiene (no stack traces / secrets leaked to clients)
 - [ ] Auth failure cases: lockout, no email enumeration, idempotent verify
 - [ ] CAPTCHA on public forms (signup/waitlist)
 - [ ] CORS locked to known origins + security headers
-- [ ] Per-user/day spend ceiling on scrape + LLM (wallet-drain defense)
+- [x] Per-user/day spend ceiling on scrape + LLM (wallet-drain defense)
 - [ ] Make rate-limit + spend-ceiling **cross-instance** (Upstash Redis/Postgres) — current in-memory state is per-instance on Vercel serverless
-- [ ] Secrets server-side only — never in the mobile app, never committed
+- [x] Secrets server-side only — never in the mobile app, never committed
 
 ### G — Marketing engine + brand
 - [ ] Waitlist landing page + capture
@@ -116,7 +116,7 @@ the guard tests, and **`FACTORY_STANDARD.md`**.
 - [ ] Publishing queue (dry-run until connected)
 - [ ] Privacy-safe analytics read-API
 - [ ] Experiment engine (falsifiable, min-sample-size aware)
-- [ ] Owner CONNECT runbook ([docs/growth/CONNECT.md](./docs/growth/CONNECT.md)) — exists; channels awaiting owner
+- [x] Owner CONNECT runbook ([docs/growth/CONNECT.md](./docs/growth/CONNECT.md)) — exists; channels awaiting owner
 
 ---
 
