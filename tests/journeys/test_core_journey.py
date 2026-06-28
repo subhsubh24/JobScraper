@@ -171,6 +171,28 @@ def test_paywall_and_ai_degrade_gracefully(client):
     assert "GEMINI_API_KEY" in prep.json()["detail"]
 
 
+def test_signup_reaches_working_app_no_verification_deadend(client):
+    # DECISION COROLLARY (FACTORY_STANDARD §6): signup must NOT gate on an unbuilt loop
+    # (e.g. email verification with no email pipeline). A brand-new signup reaches the
+    # working app immediately — usable session, no "check your email" dead-end.
+    r = client.post(
+        "/api/auth/register",
+        json={"email": "fresh@example.com", "password": "supersecret123", "full_name": "Fresh"},
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    # A usable session right away — NOT a pending-verification state.
+    assert body.get("token"), "signup must return a usable token, not a pending-verification state"
+    h = _auth_headers(body["token"])
+    me = client.get("/api/auth/me", headers=h)
+    assert me.status_code == 200 and me.json()["user"]["email"] == "fresh@example.com"
+    # ...and can immediately use the core loop (truly in the working app).
+    job = client.post(
+        "/api/jobs", headers=h, json={"title": "E", "company_name": "C", "description": "python"}
+    )
+    assert job.status_code == 200, job.text
+
+
 def test_no_fake_success_on_unverified_purchase(client):
     # SIDE-EFFECT INTEGRITY (FACTORY_STANDARD §6): the billing side-effect (receipt
     # verification) is not implemented, so verify-purchase must NOT report success or

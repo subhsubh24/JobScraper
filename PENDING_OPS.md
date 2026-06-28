@@ -78,4 +78,10 @@ OWNER_ACTIONS:
       status: open
       why: "The loop must NOT edit .github/; CI cannot be added by the loop."
       how: "Add a GitHub Actions workflow: pip install -r requirements-dev.txt, run scripts/preflight.sh ci (backend + cd mobile && npm ci && tsc/lint)."
+    - id: email-verification-deferred
+      title: "DECISION: signup is NOT gated on email verification (no email pipeline wired)"
+      priority: normal
+      status: done
+      why: "DECISION COROLLARY (FACTORY_STANDARD §6): never gate on an unbuilt loop. Signup returns a usable session and lands the user in the working app — no 'check your email' dead-end. Audited 2026-06-28: no verification/confirmation gate exists in auth."
+      how: "Re-enable email verification / password-reset / 2FA ONLY together with a real provider (or sandbox) + a round-trip journey test (F4.1) that receives the email, follows the link, and completes the flow. Until then, do not introduce the gate."
 ```

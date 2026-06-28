@@ -66,6 +66,19 @@ Left partial items (web SEO/polish, mobile device screens, auth lockout, CORS-lo
 migrations, evals, coverage, visual screenshots) and ALL DoD boxes unticked. Headline
 stays 0% until the two-gate readiness passes — correct.
 
+### 2026-06-28 — DECISION COROLLARY: never gate on an unbuilt loop
+A sibling outage: signup required email verification + showed "check your email" but no
+email pipeline was wired -> every new user dead-ended. The bug under the bug was a DECISION
+(a hard gate on a loop never built). Added the DECISION COROLLARY to FACTORY_STANDARD §6
+(canonical, verbatim). Audited JobScraper auth (2026-06-28): NO gate-on-unbuilt-loop —
+signup returns a JWT and lands the user in the working app (web /app, mobile /(tabs)); no
+"check your email" screen; no password-reset flow (absent, not a dead-end); verify-purchase
+already refuses honestly (501). Nothing to un-gate. Codified the invariant with
+test_signup_reaches_working_app_no_verification_deadend (fresh signup -> usable token ->
+/me + create job work, no pending-verification state). Recorded the decision in PENDING_OPS
+(email-verification-deferred: re-enable ONLY with the round-trip test, F4.1). Generalizes:
+any gate-on-unbuilt-loop (notify-me w/o sender, share w/o backend, paywall stub) is barred.
+
 ### 2026-06-28 — Deep-diagnosis discipline + the two hard rules applied
 Added docs/autonomous-loop/DEEP_DIAGNOSIS.md (observe the real env first via Vercel logs +
 Neon psql/SQLAlchemy or reproduce the journey; separate code/data/config with evidence;
