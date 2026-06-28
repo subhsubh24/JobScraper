@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Button, Card } from '@/components/ui';
+import { Markdown } from '@/components/markdown';
 import { useAuth } from '@/contexts/auth';
 import { api, ApiError } from '@/services/api';
 import { colors, radius, scoreColor, spacing } from '@/theme';
@@ -144,7 +145,7 @@ export default function JobDetailScreen() {
       {prep ? (
         <Card style={styles.prepCard}>
           <Text style={styles.prepTitle}>{prep.title}</Text>
-          <Text style={styles.prepContent}>{prep.content}</Text>
+          <Markdown content={prep.content} />
         </Card>
       ) : null}
     </ScrollView>
@@ -179,5 +180,4 @@ const styles = StyleSheet.create({
   prepMsg: { color: colors.danger, fontSize: 13, marginTop: spacing.sm },
   prepCard: { marginTop: spacing.md, gap: spacing.sm },
   prepTitle: { color: colors.text, fontSize: 16, fontWeight: '700' },
-  prepContent: { color: colors.text, fontSize: 14, lineHeight: 21 },
 });
