@@ -66,6 +66,16 @@ Left partial items (web SEO/polish, mobile device screens, auth lockout, CORS-lo
 migrations, evals, coverage, visual screenshots) and ALL DoD boxes unticked. Headline
 stays 0% until the two-gate readiness passes — correct.
 
+### 2026-06-27 — Canonical sync: FACTORY_STANDARD §6b design-taste standard
+Sanctioned canonical sync (the only way the stable anchor changes). Inserted §6b "Design
+taste — ELIMINATE generic-AI frontend" VERBATIM between §6 and §7, byte-identical across
+all factories (THE DESIGNER QUESTION kill-switch on every UI change; AVOID-BY-DEFAULT slop
+list; GENERATE-BETTER targets; audit lenses; "simplicity without blandness…"; ENFORCED via
+Reviewer B + §10 deep-audit design lens + §7 readiness visual review; optional Taste Skill
+but the in-repo standard + gates are the guarantee). Product brand/voice/tokens stay in
+VISION.md. JobScraper HAS user-facing surfaces (Next.js web + Expo mobile) so it fully
+applies (not N/A). Treat FACTORY_STANDARD.md as a stable anchor again.
+
 ### 2026-06-27 — Marketing maturity gate + pre-launch SITE GATE
 Growth markets autonomously but never before the product is ready, and never exposes a
 half-baked app. Added: (1) ANALYSIS_PLAYBOOK marketing maturity gate (pre_launch
