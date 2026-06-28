@@ -1,5 +1,15 @@
 import Link from 'next/link';
 
+const VARIANT_STYLES = {
+  primary: 'bg-indigo-500 text-white hover:bg-indigo-400',
+  secondary: 'border border-slate-700 text-slate-200 hover:bg-slate-800',
+  danger: 'bg-red-600 text-white hover:bg-red-500',
+  // Outlined destructive — for a low-emphasis "reveal the danger zone" action.
+  dangerOutline: 'border border-red-700 text-red-300 hover:bg-red-950/50',
+} as const;
+
+export type ButtonVariant = keyof typeof VARIANT_STYLES;
+
 export function Button({
   children,
   onClick,
@@ -11,18 +21,19 @@ export function Button({
   children: React.ReactNode;
   onClick?: () => void;
   type?: 'button' | 'submit';
-  variant?: 'primary' | 'secondary';
+  variant?: ButtonVariant;
   disabled?: boolean;
   className?: string;
 }) {
   const base =
     'inline-flex items-center justify-center rounded-lg px-4 py-2.5 text-sm font-semibold transition disabled:opacity-50';
-  const styles =
-    variant === 'primary'
-      ? 'bg-indigo-500 text-white hover:bg-indigo-400'
-      : 'border border-slate-700 text-slate-200 hover:bg-slate-800';
   return (
-    <button type={type} onClick={onClick} disabled={disabled} className={`${base} ${styles} ${className}`}>
+    <button
+      type={type}
+      onClick={onClick}
+      disabled={disabled}
+      className={`${base} ${VARIANT_STYLES[variant]} ${className}`}
+    >
       {children}
     </button>
   );

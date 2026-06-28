@@ -26,7 +26,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <nav className="flex gap-4 text-sm text-slate-400">
               <Link href="/app" className="hover:text-slate-100">Pipeline</Link>
               <Link href="/app/coach" className="hover:text-slate-100">Coach</Link>
-              <Link href="/pricing" className="hover:text-slate-100">Upgrade</Link>
+              {user.tier !== 'premium' && (
+                <Link href="/pricing" className="hover:text-slate-100">Upgrade</Link>
+              )}
+              <Link href="/app/settings" className="hover:text-slate-100">Settings</Link>
             </nav>
           </div>
           <div className="flex items-center gap-3 text-sm">
