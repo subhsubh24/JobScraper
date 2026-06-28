@@ -184,6 +184,12 @@ def apply_event(event, db: Session) -> Optional[str]:
         user_id = obj.get("client_reference_id") or meta.get("user_id")
         if not user_id:
             return None
+        # Async payment methods (bank transfer, ACH, SEPA) complete the session with
+        # payment_status="unpaid" — money has NOT cleared. Granting Premium here would hand
+        # out ~a billing cycle of free access until the payment fails. Wait for the
+        # subscription to go active (customer.subscription.created/updated) instead.
+        if obj.get("payment_status") not in (None, "paid", "no_payment_required"):
+            return None
         user = db.query(User).filter(User.id == user_id).first()
         if not user:
             return None

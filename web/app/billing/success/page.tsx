@@ -40,7 +40,10 @@ export default function BillingSuccessPage() {
   }, []);
 
   return (
-    <main className="mx-auto flex w-full max-w-lg flex-col items-center px-6 py-24 text-center">
+    <main
+      aria-live="polite"
+      className="mx-auto flex w-full max-w-lg flex-col items-center px-6 py-24 text-center"
+    >
       {status === 'active' ? (
         <>
           <h1 className="text-3xl font-extrabold">You’re Premium 🎉</h1>

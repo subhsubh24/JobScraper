@@ -96,7 +96,11 @@ export default function PricingPage() {
         ))}
       </ul>
 
-      {notice && <p className="mt-6 text-center text-sm text-amber-400">{notice}</p>}
+      {notice && (
+        <p role="alert" className="mt-6 text-center text-sm text-amber-400">
+          {notice}
+        </p>
+      )}
 
       <p className="mt-6 text-center text-xs text-slate-500">
         Secure checkout by Stripe. Subscriptions renew automatically until cancelled.

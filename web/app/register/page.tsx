@@ -7,6 +7,16 @@ import { Button, Card, ErrorText, Field } from '@/components/ui';
 import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 
+// Where to send the user after signup. Honors a ?next=/path param (e.g. coming from the
+// pricing upgrade flow) but ONLY for internal paths — an open-redirect guard rejects
+// absolute URLs and protocol-relative ("//evil.com") targets.
+function postSignupPath(): string {
+  if (typeof window === 'undefined') return '/app';
+  const next = new URLSearchParams(window.location.search).get('next');
+  if (next && next.startsWith('/') && !next.startsWith('//')) return next;
+  return '/app';
+}
+
 export default function RegisterPage() {
   const router = useRouter();
   const { setUser } = useAuth();
@@ -34,7 +44,7 @@ export default function RegisterPage() {
           resume_text: resume.trim() || undefined,
         }),
       );
-      router.push('/app');
+      router.push(postSignupPath());
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Something went wrong.');
     } finally {

@@ -110,6 +110,7 @@ def test_webhook_grants_premium_on_signed_checkout_completed(client, monkeypatch
             "client_reference_id": user_id,
             "customer": "cus_123",
             "subscription": "sub_123",
+            "payment_status": "paid",
             "metadata": {"user_id": user_id, "plan": "pro_annual"},
         },
     )
@@ -125,6 +126,30 @@ def test_webhook_grants_premium_on_signed_checkout_completed(client, monkeypatch
     assert sub.stripe_subscription_id == "sub_123"
     assert sub.plan == "pro_annual"
     assert sub.status == "active"
+
+
+def test_webhook_unpaid_async_checkout_grants_nothing(client, monkeypatch, db_session):
+    """An async-payment checkout that completes UNPAID must not grant Premium — money
+    hasn't cleared. Entitlement waits for the subscription to go active."""
+    monkeypatch.setenv("STRIPE_WEBHOOK_SECRET", WHSEC)
+    user_id, _ = _register(client)
+    payload = _event(
+        "checkout.session.completed",
+        {
+            "id": "cs_unpaid",
+            "client_reference_id": user_id,
+            "customer": "cus_u",
+            "subscription": "sub_u",
+            "payment_status": "unpaid",
+            "metadata": {"user_id": user_id, "plan": "pro_annual"},
+        },
+    )
+    r = client.post(
+        "/api/billing/webhook", content=payload, headers={"stripe-signature": _sign(payload)}
+    )
+    assert r.status_code == 200
+    db_session.expire_all()
+    assert db_session.query(User).filter(User.id == user_id).first().tier == UserTier.FREE
 
 
 def test_webhook_rejects_forged_signature_and_grants_nothing(client, monkeypatch, db_session):
