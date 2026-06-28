@@ -66,6 +66,23 @@ Left partial items (web SEO/polish, mobile device screens, auth lockout, CORS-lo
 migrations, evals, coverage, visual screenshots) and ALL DoD boxes unticked. Headline
 stays 0% until the two-gate readiness passes — correct.
 
+### 2026-06-28 — Deep-diagnosis discipline + the two hard rules applied
+Added docs/autonomous-loop/DEEP_DIAGNOSIS.md (observe the real env first via Vercel logs +
+Neon psql/SQLAlchemy or reproduce the journey; separate code/data/config with evidence;
+one hypothesis proven against the live system; find the UNCAUGHT throw; verify the fix in
+the real system not the build; root-cause + regression test + fail loud; peel the layers;
+stay honest). Adapted to Neon (no Supabase MCP). Applied both hard rules to real latent
+traps found in JobScraper:
+- (a) LLM timeout: the Gemini client had NO timeout (openai default ~600s) vs Vercel
+  maxDuration 60s — a hung call would be killed before the graceful except ran. Added
+  timeout=LLM_TIMEOUT_SECONDS (default 45s) + max_retries=1 in src/llm.py.
+- (b) JWT_SECRET silently defaulted to "dev-secret-change-in-production" → forgeable tokens
+  in prod. asgi.py now RAISES on Vercel if JWT_SECRET is unset/dev-default (fail loud).
+  OWNER must set a strong JWT_SECRET in Vercel before the next deploy or /api fails loud.
+Regression tests in tests/test_hardening.py (timeout+retries set; fail-loud raises in prod,
+no-op locally). 11 tests green. Each future "builds but errors" incident -> follow
+DEEP_DIAGNOSIS.md + record here.
+
 ### 2026-06-28 — SIDE-EFFECT INTEGRITY: a "success" the user can't verify is a LIE
 A sibling product shipped "confirmation email sent" while no email was delivered (provider
 in dry-run) — BUILDS≠WORKS missed it because the guard asserts SCREEN outcomes, not

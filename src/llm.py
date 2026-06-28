@@ -20,6 +20,11 @@ GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
 _DEFAULT_CHAT_MODEL = "gemini-2.5-flash"
 _DEFAULT_EMBEDDING_MODEL = "gemini-embedding-001"
 
+# DEEP_DIAGNOSIS rule (a): every external/LLM call MUST time out SHORTER than the
+# serverless function budget (vercel.json maxDuration=60s) — a graceful try/except is
+# useless if Vercel kills the function first. Keep this < maxDuration with headroom.
+_LLM_TIMEOUT_SECONDS = float(os.getenv("LLM_TIMEOUT_SECONDS", "45"))
+
 
 def llm_available() -> bool:
     """True only when a Gemini API key is configured."""
@@ -46,7 +51,12 @@ def get_llm_client() -> Optional["object"]:
         return None
     try:
         from openai import OpenAI
-        return OpenAI(api_key=os.getenv("GEMINI_API_KEY"), base_url=GEMINI_BASE_URL)
+        return OpenAI(
+            api_key=os.getenv("GEMINI_API_KEY"),
+            base_url=GEMINI_BASE_URL,
+            timeout=_LLM_TIMEOUT_SECONDS,  # rule (a): sub-budget timeout
+            max_retries=1,                 # bounded: retries must not blow the budget
+        )
     except Exception:  # noqa: BLE001 - construction failure must degrade, not crash
         import logging
         logging.getLogger("career_operator").exception("LLM client construction failed")
