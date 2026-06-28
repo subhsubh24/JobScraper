@@ -87,6 +87,19 @@ export default function CoachPage() {
             <p className="whitespace-pre-wrap">{m.content}</p>
           </div>
         ))}
+        {sending && (
+          <div
+            className="max-w-[85%] rounded-2xl border border-slate-800 bg-slate-900/60 p-3"
+            aria-live="polite"
+            aria-label="Coach is typing"
+          >
+            <span className="inline-flex gap-1">
+              <span className="h-2 w-2 animate-bounce rounded-full bg-slate-500 [animation-delay:-0.3s]" />
+              <span className="h-2 w-2 animate-bounce rounded-full bg-slate-500 [animation-delay:-0.15s]" />
+              <span className="h-2 w-2 animate-bounce rounded-full bg-slate-500" />
+            </span>
+          </div>
+        )}
       </div>
       {error && <p className="text-sm text-red-400">{error}</p>}
       <form
@@ -96,8 +109,9 @@ export default function CoachPage() {
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
+          disabled={sending}
           placeholder="Type a message…"
-          className="flex-1 rounded-lg border border-slate-700 bg-slate-800/60 px-3 py-2.5 outline-none focus:border-indigo-500"
+          className="flex-1 rounded-lg border border-slate-700 bg-slate-800/60 px-3 py-2.5 outline-none focus:border-indigo-500 disabled:opacity-50"
         />
         <Button type="submit" disabled={sending}>{sending ? '…' : 'Send'}</Button>
       </form>
