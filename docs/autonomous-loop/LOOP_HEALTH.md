@@ -27,7 +27,8 @@ LOOP_HEALTH:
     readiness_attempts: 0
     readiness_rejected: 0
     recurring_failures: []
-    harness_proposals_open: 1     # "gates not enforced in CI" — staged docs/ci/PROPOSED_CI.md
+    harness_proposals_open: 1     # "gates not enforced in CI" — staged docs/ci/PROPOSED_CI.md (#57)
   enforced_in_ci: false          # flip true once owner applies ci.yml + marks checks required
+  auto_migrate_on_deploy: staged # alembic migrations + drift-gate shipped; migrate job staged (OWNER_ACTION auto-migrate)
   signal: bootstrapping          # bootstrapping | improving | steady | churning | stuck
 ```
