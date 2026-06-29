@@ -1,25 +1,74 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import { useEffect } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Button, Card } from '@/components/ui';
+import { useAuth } from '@/contexts/auth';
 import { colors, radius, spacing } from '@/theme';
 
 const FEATURES = [
   'Unlimited tracked jobs',
   'AI interview prep packs',
   'AI Career Coach',
-  'Salary negotiation scripts',
+  'Salary negotiation coaching',
   'Priority fit scoring',
 ];
 
-// Real paywall UI. The actual purchase flow (StoreKit / Play Billing via RevenueCat)
-// is Track C and requires the owner's store accounts + product IDs (Human-Core).
+// Paywall wired to REAL entitlement state (Track B). It reads the user's tier from the auth
+// context and refreshes it on open, so a user who upgraded elsewhere (e.g. web Stripe
+// checkout) sees their Premium status instead of a stale upgrade prompt. The actual in-app
+// purchase (StoreKit / Play Billing via RevenueCat) is Track C and owner-gated; until it's
+// live we are HONEST about it (no fake "purchase complete"), never granting access here —
+// entitlement only ever flips server-side from a verified RevenueCat webhook.
 export default function PaywallScreen() {
+  const { user, refresh } = useAuth();
+  const isPremium = user?.tier === 'premium';
+
+  // Re-check entitlement when the paywall opens. A user may have subscribed on another
+  // surface; this keeps the screen from showing an upgrade CTA to someone already Premium.
+  useEffect(() => {
+    refresh().catch(() => {
+      // Offline / transient — keep showing whatever tier we already have, no crash.
+    });
+  }, [refresh]);
+
+  if (isPremium) {
+    return (
+      <ScrollView style={styles.flex} contentContainerStyle={styles.container}>
+        <View style={styles.badge}>
+          <Ionicons name="checkmark-circle" size={48} color={colors.success} />
+        </View>
+        <Text style={styles.title}>You&apos;re on Premium</Text>
+        <Text style={styles.subtitle}>
+          Every Career Operator feature is unlocked on this account.
+        </Text>
+
+        <Card>
+          {FEATURES.map((f) => (
+            <View key={f} style={styles.featureRow}>
+              <Ionicons name="checkmark-circle" size={18} color={colors.success} />
+              <Text style={styles.feature}>{f}</Text>
+            </View>
+          ))}
+        </Card>
+
+        <Button label="Back to app" onPress={() => router.back()} />
+        <Text style={styles.legal}>
+          Manage or cancel your subscription anytime in your app store account.
+        </Text>
+      </ScrollView>
+    );
+  }
+
   function purchase() {
+    // HONEST, not a fake success: no charge is made and the plan is unchanged. In-app
+    // purchases unlock once the owner connects the store accounts (Track C); entitlement is
+    // then granted server-side by a verified RevenueCat webhook, never from this screen.
     Alert.alert(
-      'Checkout not yet connected',
-      'In-app purchase (RevenueCat / StoreKit / Play Billing) ships in Track C and needs the store accounts + product IDs configured by the owner.',
+      'In-app purchase coming soon',
+      'Subscriptions are being finalized for the App Store and Play Store. No charge was made '
+        + 'and your plan is unchanged — check back shortly.',
     );
   }
 
@@ -62,6 +111,7 @@ export default function PaywallScreen() {
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.bg },
   container: { padding: spacing.lg, gap: spacing.md },
+  badge: { alignItems: 'center', marginTop: spacing.sm },
   title: { color: colors.text, fontSize: 26, fontWeight: '800', textAlign: 'center' },
   subtitle: { color: colors.textMuted, textAlign: 'center', marginBottom: spacing.sm },
   featureRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: 6 },
