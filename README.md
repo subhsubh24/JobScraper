@@ -31,8 +31,7 @@ Career Operator is a mobile app (iOS + Android) that helps tech professionals la
 
 ```
 JobScraper/
-├── api.py                      # FastAPI backend for mobile app
-├── app.py                      # Flask web app (original prototype)
+├── asgi.py                     # FastAPI backend (web + mobile) — Vercel entrypoint
 ├── src/
 │   ├── auth/                   # Authentication & JWT
 │   ├── payments/               # Stripe integration (unused in app model)

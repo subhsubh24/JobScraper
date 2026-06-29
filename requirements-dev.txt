@@ -1,17 +1,10 @@
 # Career Operator — full dev/CI deps. Installs the lean runtime set plus everything
-# the API does NOT need at runtime: the Flask web app, the CLI, migrations, tests,
-# and lint. CI installs THIS file; Vercel installs only requirements.txt.
+# the API does NOT need at runtime: the CLI, migrations, tests, and lint. CI installs
+# THIS file; Vercel installs only requirements.txt.
 -r requirements.txt
 
 # Migrations
 alembic==1.13.1
-
-# Flask web app (app.py)
-flask==3.0.0
-flask-cors==4.0.0
-flask-login==0.6.3
-flask-session==0.6.0
-werkzeug==3.1.0
 
 # CLI (cli.py)
 click==8.1.7
