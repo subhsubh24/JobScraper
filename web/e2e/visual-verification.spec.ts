@@ -80,9 +80,12 @@ for (const { label, size } of WIDTHS) {
     expect(Number(scoreText)).toBeGreaterThan(0);
     await page.screenshot({ path: `${SHOTS}/app-job-scored-${label}.png`, fullPage: true });
 
-    // job detail
+    // job detail — assert the CONTENT painted (heading), not just the URL, before the shot
     await page.getByText('Senior Backend Engineer').click();
     await expect(page).toHaveURL(/\/app\/jobs\//, { timeout: 20_000 });
+    await expect(
+      page.getByRole('heading', { name: /Senior Backend Engineer/i }).first(),
+    ).toBeVisible({ timeout: 20_000 });
     await page.screenshot({ path: `${SHOTS}/app-job-detail-${label}.png`, fullPage: true });
 
     // coach (free tier sees the honest upgrade-gated state — a real state worth judging)

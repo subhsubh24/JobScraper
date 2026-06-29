@@ -44,6 +44,9 @@ next-env.d.ts
 /test-results/
 /playwright-report/
 /.last-run.json
-# NOTE: /e2e/__screenshots__/ is intentionally COMMITTED — the dual-axis visual
-# verification baseline (ROADMAP Track E) is judged on a vision model and gated by
-# scripts/preflight.sh, so the captured page screenshots must live in the repo.
+# The dual-axis visual-verification baseline (ROADMAP Track E) is intentionally COMMITTED
+# (judged on a vision model + gated by scripts/preflight.sh). Scope the un-ignore to the
+# PNGs ONLY so a failing local run can never leak stray artifacts (traces, error-context.md,
+# partial junk) into a commit — only the named page screenshots are trackable.
+/e2e/__screenshots__/*
+!/e2e/__screenshots__/*.png
