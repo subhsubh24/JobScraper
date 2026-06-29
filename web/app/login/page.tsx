@@ -45,7 +45,7 @@ export default function LoginPage() {
       </Card>
       <p className="mt-5 text-center text-sm text-slate-400">
         New here?{' '}
-        <Link href="/register" className="font-semibold text-indigo-400">Create an account</Link>
+        <Link href="/register" className="rounded font-semibold text-indigo-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400">Create an account</Link>
       </p>
     </main>
   );

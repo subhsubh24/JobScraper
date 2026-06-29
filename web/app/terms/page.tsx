@@ -66,7 +66,7 @@ export default function TermsPage() {
           You grant us a limited license to process that content solely to operate the service
           for you — including sending the relevant parts to our AI provider to generate results,
           as described in our{' '}
-          <a className="text-indigo-400 hover:text-indigo-300" href="/privacy">
+          <a className="rounded text-indigo-400 hover:text-indigo-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400" href="/privacy">
             Privacy Policy
           </a>
           .
@@ -101,7 +101,7 @@ export default function TermsPage() {
       <Section heading="Contact">
         <p>
           Questions about these Terms? Email{' '}
-          <a className="text-indigo-400 hover:text-indigo-300" href="mailto:support@careeroperator.app">
+          <a className="rounded text-indigo-400 hover:text-indigo-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400" href="mailto:support@careeroperator.app">
             support@careeroperator.app
           </a>
           .
