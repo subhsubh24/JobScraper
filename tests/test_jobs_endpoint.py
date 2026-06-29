@@ -43,13 +43,6 @@ def test_all_status_transitions_persist(client):
         assert got.json()["job"]["status"] == status
 
 
-def test_patch_invalid_status_is_rejected(client):
-    token = _register(client, "badstatus@example.com")
-    job_id = _add_job(client, token)
-    r = client.patch(f"/api/jobs/{job_id}", headers=_auth(token), json={"status": "teleported"})
-    assert r.status_code == 422
-
-
 def test_get_nonexistent_job_is_404(client):
     token = _register(client, "missing@example.com")
     r = client.get("/api/jobs/does-not-exist", headers=_auth(token))

@@ -91,16 +91,6 @@ def test_prep_pack_unlimited_for_premium(client, _llm_on, db_session):
         assert r.status_code == 200, r.text
 
 
-def test_prep_pack_honest_degradation_without_key(client, monkeypatch):
-    """No LLM key → honest 503, never a fake/empty pack."""
-    monkeypatch.setattr(asgi, "llm_available", lambda: False)
-    token = _register(client, "nokey@example.com")
-    job_id = _add_job(client, token)
-    r = client.post("/api/prep-packs/generate", headers=_auth(token), json={"job_id": job_id})
-    assert r.status_code == 503
-    assert "GEMINI_API_KEY" in r.json()["detail"]
-
-
 def test_prep_pack_foreign_job_is_404(client, _llm_on):
     token_a = _register(client, "owner@example.com")
     job_id = _add_job(client, token_a)

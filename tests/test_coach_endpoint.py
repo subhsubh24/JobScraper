@@ -1,16 +1,14 @@
-"""Track C/E/F4.1: outcome contract + side-effect round-trip for the AI coach.
+"""Track C/E/F: outcome contract for the AI coach endpoint.
 
-Asserts: the Premium gate refuses Free users (403); an absent key degrades honestly
-(503, no fake reply); the success response carries the model reply; the per-user/day
-LLM ceiling actually blocks (429). Plus a deterministic, KEY-FREE side-effect
-round-trip on the moderation path: a self-harm message returns crisis resources AND
-persists the exchange (user + assistant ChatMessage rows) — proving the effect, not
-just the screen.
+Asserts the paths NOT already covered by the journey suite / coach-safety tests: a
+Premium user with no key degrades honestly (503, no fake reply); the success response
+carries the model reply; and the per-user/day LLM ceiling actually blocks (429) — the
+wallet-drain defense. (The Free-user 403 gate and the key-free crisis-moderation
+round-trip are already covered in tests/journeys + tests/test_coach_safety.py.)
 """
 
 import asgi
-from src.ai_coach.career_coach import CareerCoach
-from src.db.models import ChatMessage, User, UserTier
+from src.db.models import User, UserTier
 
 
 def _register(client, email="coach@example.com", password="hunter2pw"):
@@ -26,14 +24,6 @@ def _auth(token):
 def _make_premium(db_session):
     db_session.query(User).update({User.tier: UserTier.PREMIUM})
     db_session.commit()
-
-
-def test_coach_is_premium_gated(client):
-    """A Free user is honestly refused (403), never silently served."""
-    token = _register(client, "free@example.com")
-    r = client.post("/api/coach/chat", headers=_auth(token), json={"message": "Hi"})
-    assert r.status_code == 403
-    assert "premium" in r.json()["detail"].lower()
 
 
 def test_coach_honest_degradation_without_key(client, db_session):
@@ -93,23 +83,3 @@ def test_coach_daily_ceiling_blocks(client, db_session, monkeypatch):
     blocked = client.post("/api/coach/chat", headers=_auth(token), json={"message": "hi"})
     assert blocked.status_code == 429
     assert "daily" in blocked.json()["detail"].lower()
-
-
-def test_moderation_path_persists_exchange_keyfree(db_session):
-    """KEY-FREE side-effect round-trip: a self-harm message returns crisis resources AND
-    persists both sides of the exchange, with NO LLM client involved (the moderation
-    branch runs before the key check). Proves the persisted effect, not just the reply."""
-    from src.auth.auth_service import AuthService
-
-    user, _token = AuthService(db_session).register(email="hurt@example.com", password="hunter2pw")
-    coach = CareerCoach(db_session)
-    assert coach.client is None  # no key in the test env
-
-    reply = coach.chat(user=user, message="I want to kill myself", session_id="s1")
-    assert reply  # a real, non-empty crisis response was returned
-    assert "988" in reply or "crisis" in reply.lower() or "lifeline" in reply.lower()
-
-    rows = db_session.query(ChatMessage).filter(ChatMessage.user_id == user.id).all()
-    roles = {m.role for m in rows}
-    assert "user" in roles and "assistant" in roles
-    assert any("kill myself" in m.content for m in rows if m.role == "user")
