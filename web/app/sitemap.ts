@@ -4,7 +4,7 @@ const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") || "https:
 
 // Public, indexable routes only — never the per-user /app product or /api.
 export default function sitemap(): MetadataRoute.Sitemap {
-  const routes = ["", "/login", "/register", "/pricing", "/privacy", "/terms"];
+  const routes = ["", "/waitlist", "/login", "/register", "/pricing", "/privacy", "/terms"];
   return routes.map((path) => ({
     url: `${SITE_URL}${path || "/"}`,
     changeFrequency: "weekly",
