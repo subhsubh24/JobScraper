@@ -96,5 +96,17 @@ describe('api client', () => {
     const err = await api.listJobs().catch((e) => e);
     expect(err).toBeInstanceOf(ApiError);
     expect(err.status).toBe(0);
+    // The message is what screens surface to the user on connection loss — pin it.
+    expect(err.message).toMatch(/network/i);
+  });
+
+  it('generatePrepPack posts the job_id and unwraps prep_pack (happy path)', async () => {
+    const fetchMock = mockFetch(200, { prep_pack: { title: 'Interview Prep: Eng', content: '## X' } });
+    const pack = await api.generatePrepPack('j1');
+    expect(pack).toEqual({ title: 'Interview Prep: Eng', content: '## X' });
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toContain('/api/prep-packs/generate');
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(init.body)).toEqual({ job_id: 'j1' });
   });
 });

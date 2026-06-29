@@ -67,6 +67,7 @@ describe('PipelineScreen', () => {
     expect(screen.getByText('87')).toBeTruthy(); // j1 fit score, not a placeholder
     // Aggregate stat row reflects the API payload (avg fit = 84, tracked = 2).
     expect(screen.getByText('Tracked')).toBeTruthy();
+    expect(screen.getByText('Avg fit')).toBeTruthy();
     expect(screen.getByText('84')).toBeTruthy();
     // Personalized greeting uses the real user.
     expect(screen.getByText(/Ada/)).toBeTruthy();

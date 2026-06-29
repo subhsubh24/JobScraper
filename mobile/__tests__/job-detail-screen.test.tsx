@@ -41,6 +41,14 @@ jest.mock('@/services/api', () => {
   };
 });
 
+// Markdown rendering correctness is owned by markdown.test.tsx — mock it to a passthrough
+// here so this suite asserts the SCREEN's integration (it hands the real prep content to the
+// renderer + shows the title), not the renderer's hash-stripping again.
+jest.mock('@/components/markdown', () => {
+  const { Text } = require('react-native');
+  return { Markdown: ({ content }: { content: string }) => <Text testID="prep-content">{content}</Text> };
+});
+
 import JobDetailScreen from '@/app/job/[id]';
 
 const JOB = {
@@ -89,8 +97,11 @@ describe('JobDetailScreen', () => {
     await screen.findByText('Senior Backend Engineer');
 
     fireEvent.press(screen.getByText('Generate prep pack (1 free)'));
+    // Screen-level integration: the prep card renders with the title and hands the REAL
+    // generated content to the (mocked) Markdown renderer. Rendering correctness of the
+    // markdown itself is covered by markdown.test.tsx.
     expect(await screen.findByText('Interview Prep: Senior Backend Engineer')).toBeTruthy();
-    expect(screen.getByText('Company Research')).toBeTruthy(); // markdown rendered, hashes stripped
+    expect(screen.getByTestId('prep-content').props.children).toContain('Acme builds rockets.');
   });
 
   it('shows an honest error state when the job fails to load', async () => {
