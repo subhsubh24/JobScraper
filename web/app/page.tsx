@@ -49,8 +49,7 @@ export default function Landing() {
         <div className="mt-8 grid gap-x-12 gap-y-10 sm:grid-cols-2">
           {FEATURES.map(([title, body]) => (
             <div key={title}>
-              <div className="h-0.5 w-8 rounded-full bg-indigo-500" aria-hidden="true" />
-              <h3 className="mt-4 text-lg font-semibold">{title}</h3>
+              <h3 className="text-lg font-semibold">{title}</h3>
               <p className="mt-2 leading-relaxed text-slate-400">{body}</p>
             </div>
           ))}
