@@ -4,6 +4,72 @@ Durable lessons for the factory loop. Append dated entries. Keep it honest and s
 
 ---
 
+### 2026-06-29 (run 5) — Maximal run: 4 PRs (CORS-lock, Track E visual verification, mobile-nav fix, test coverage) + 8-scout sweep, consuming the first QUALITY_SCORECARD
+First run after the independent Quality Auditor bootstrapped docs/quality/QUALITY_SCORECARD.md
+(Overall C, ship gate NOT met; 4 ship-critical dims below A: business-case-strength C, store-
+readiness C, security B, design-taste B) + opened issues #92–#95. Consumed it as DATA, ran the
+full 8-scout sweep (Career+ / referral / security / store-assets / Track-E / accent /
+functional-reality / tests-perf) doubling as the ~daily DEEP AUDIT. Functional-reality found
+NO critical bugs (core web+mobile loops + side-effects sound). Shipped 4 file-disjoint PRs
+through 2 Sonnet reviewers each + the CI gate (all merged), then this bookkeeping PR:
+- **#96 CORS-lock** (Track F → TICKED line 206): `asgi.py` no longer defaults to
+  `allow_origins=["*"]`; new testable `resolve_cors_origins()` → explicit when set, `[]` on
+  Vercel (same-origin web + native mobile unaffected), localhost otherwise; never `*`.
+  `tests/test_cors.py` pins it. Clean first pass both reviewers. (Security B→ one of 3 gaps closed.)
+- **#97 Track E visual verification** (design-taste #1 lever): `web/e2e/visual-verification.spec.ts`
+  captures + commits 24 non-zero screenshots (10 routes/states × desktop+mobile + the 4 legacy
+  core-journey shots) incl. the fit-score OUTPUT; un-ignored `web/e2e/__screenshots__` (scoped
+  to *.png). Reviewer A REQUEST_CHANGES (1 cycle): scope the un-ignore to PNGs only + assert the
+  job-detail heading rendered before the shot. I VISUALLY reviewed the images (vision model) and
+  recorded the dual-axis verdict (below).
+- **#98 authed-nav mobile fix** (design, SURFACED BY #97's visual review): the authed app header
+  crammed brand+nav+email+logout into one non-wrapping row → overlapped at 390px. Made it
+  flex-wrap + tighter mobile gaps + hide the email on phones (truncate on larger). Rebuilt +
+  re-captured at 390px to PROVE the overlap is gone. Clean first pass both reviewers.
+- **#99 test coverage**: greenhouse detail-parse + partial-failure resilience + llm_workflows
+  parse_job_description + key-absent guard. Reviewer B REQUEST_CHANGES (1 cycle): CUT a
+  tautological prep-pack "golden content" eval (faked LLM returns the golden string verbatim →
+  asserts input==output; content quality can't be evaluated key-free) and CUT two
+  output-moderation tests that DUPLICATED the existing tests/test_prep_moderation.py.
+DUAL-AXIS VISION VERDICT (run 5, web; reviewed a representative set on the vision model):
+landing (desktop+mobile), pricing, login/register, dashboard-empty, **job-scored (fit=70 amber)**,
+**job-detail (70/100 + "Good match | Matching skills: sql, docker, aws, python, fastapi")**,
+coach-gated (honest "Upgrade to unlock"), settings — ALL **FUNCTIONAL PASS** (intended output
+visible, real artifact, no dead-end/placeholder) and **DESIGN PASS** (strong type hierarchy,
+intentional dark theme, on-brand, not slop) EXCEPT the authed nav overlapped at 390px (DESIGN
+FAIL) → FIXED in #98. The web product genuinely clears the VISION design bar — strongly addresses
+the design-taste "no visual proof" cap.
+DEFERRED (named, buildable — NOT abandoned; recorded so the next run executes cleanly):
+- **business-case-strength (#1 ship-critical gap) — Career+ tier as a real entitlement**:
+  deferred to a DEDICATED next run, NOT rushed alongside 3 PRs. WHY: the `tier` column is a
+  native PG Enum (FREE/PREMIUM), so adding CAREERPLUS needs a live `ALTER TYPE` migration AND a
+  real value-differentiation (PREMIUM is already unlimited-everything, so a $24 tier sprawls into
+  metering Pro down + a Career+-exclusive feature). NEXT-RUN DESIGN (no enum migration): keep tier
+  binary, identify Career+ via the verified `Subscription.plan` prefix (`careerplus_*`, already in
+  billing config + written only by a verified webhook), add ONE genuine Career+-exclusive gate +
+  the pricing card + checkout. Even then it adds ~$3.6K — the floor-flip ($100K) needs the
+  TEAM/B2B2C tier (biggest build). Business-case-strength → A is multi-run convergence work.
+- **store assets / brand icon (#93/#95)**: OWNER-BLOCKED per the repo's own standard — BRAND_KIT
+  + ACCEPTANCE_AUDIT explicitly say the loop must NOT auto-generate a brand mark ("would read as
+  generic-AI slop, fails the DESIGNER QUESTION"); also NO image tooling installed. Did NOT fabricate slop.
+- **accent convergence (#95)**: dropped this run — 13-file web find-replace + stale-screenshot
+  coherence friction vs the Track E capture; low value vs the screenshots. Clean standalone follow-up.
+- **CAPTCHA + cross-instance rate-limit (#94)**: CAPTCHA wants asgi.py (CORS owned it) + owner keys;
+  cross-instance needs owner Upstash. Defer.
+- **N+1 pagination**: wants asgi.py (CORS owned it); non-critical. Defer.
+LESSONS: (1) **Playwright runs headlessly here** despite the version skew — local PW 1.61 wants
+chromium build 1228 but only 1194 is pre-installed; launch with `executablePath:'/opt/pw-browsers/chromium'`
+(temporary, reverted before commit so CI uses its own download). Also use the LOCAL `./node_modules/.bin/playwright`,
+not `npx` (which grabbed a broken global). (2) **maker≠checker earned its keep**: every must-fix
+was a reviewer find — the gitignore junk-commit trap + the missing render-assert (#97 Rev A), the
+TAUTOLOGICAL golden eval + DUPLICATE moderation tests (#99 Rev B). A faked-LLM "golden content"
+test is input==output — content quality needs a real LLM eval (owner key). (3) **Dual-axis visual
+review caught a real bug DOM tests missed** — the authed nav overlap at 390px passed every DOM
+assertion; only LOOKING at the pixels revealed it. This is exactly what §6 visual verification is for.
+(4) **A scout can over-scope** — the store-assets scout proposed installing cairosvg to render a
+brand icon; the repo standard explicitly forbids loop-generated brand marks, so I did NOT (respecting
+the anchor over the scout).
+
 ### 2026-06-29 (run 4) — Maximal run: 5 PRs (mobile monetization server-side, paywall entitlement, prep moderation, scorer bug, web hierarchy) + 8-scout sweep
 Ran the full 8-scout sweep (mobile-paywall / mobile-monetization / web-security / store / marketing /
 web-design / backend-tests / functional-reality) which doubled as the ~daily DEEP AUDIT.
