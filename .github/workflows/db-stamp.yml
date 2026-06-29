@@ -27,3 +27,5 @@ jobs:
             echo "DATABASE_URL secret not set — cannot stamp."; exit 1
           fi
           python -m alembic stamp head
+          echo "=== verify Neon actual schema matches head ==="
+          python scripts/db_inspect.py
