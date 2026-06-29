@@ -59,8 +59,8 @@ export default function Landing() {
       <footer className="mt-20 flex flex-col items-center gap-2 border-t border-slate-800 pt-8 text-sm text-slate-500 sm:flex-row sm:justify-between">
         <span>© 2026 Career Operator</span>
         <nav className="flex gap-4">
-          <Link href="/privacy" className="hover:text-slate-300">Privacy</Link>
-          <Link href="/terms" className="hover:text-slate-300">Terms</Link>
+          <Link href="/privacy" className="rounded hover:text-slate-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400">Privacy</Link>
+          <Link href="/terms" className="rounded hover:text-slate-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400">Terms</Link>
         </nav>
       </footer>
     </main>

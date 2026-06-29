@@ -22,19 +22,19 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <header className="border-b border-slate-800">
         <div className="mx-auto flex w-full max-w-5xl items-center justify-between px-6 py-4">
           <div className="flex items-center gap-6">
-            <Link href="/app" className="font-bold">Career Operator</Link>
+            <Link href="/app" className="rounded font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400">Career Operator</Link>
             <nav className="flex gap-4 text-sm text-slate-400">
-              <Link href="/app" className="hover:text-slate-100">Pipeline</Link>
-              <Link href="/app/coach" className="hover:text-slate-100">Coach</Link>
+              <Link href="/app" className="rounded hover:text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400">Pipeline</Link>
+              <Link href="/app/coach" className="rounded hover:text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400">Coach</Link>
               {user.tier !== 'premium' && (
-                <Link href="/pricing" className="hover:text-slate-100">Upgrade</Link>
+                <Link href="/pricing" className="rounded hover:text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400">Upgrade</Link>
               )}
-              <Link href="/app/settings" className="hover:text-slate-100">Settings</Link>
+              <Link href="/app/settings" className="rounded hover:text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400">Settings</Link>
             </nav>
           </div>
           <div className="flex items-center gap-3 text-sm">
             <span className="text-slate-400">{user.email}</span>
-            <button onClick={signOut} className="rounded-lg border border-slate-700 px-3 py-1.5 hover:bg-slate-800">
+            <button onClick={signOut} className="rounded-lg border border-slate-700 px-3 py-1.5 hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950">
               Log out
             </button>
           </div>
