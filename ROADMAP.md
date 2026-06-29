@@ -193,6 +193,14 @@ the guard tests, and **`FACTORY_STANDARD.md`**.
     `docs/loop-memory.md` for the deep audit and in the readiness-issue evidence for the
     gate. A FAIL on EITHER axis is release-blocking even if DOM assertions pass.
     Capture-and-forget (screenshots with no recorded verdict) does NOT satisfy this item.
+  - **PROGRESS (run 5, PR #97):** `web/e2e/visual-verification.spec.ts` now CAPTURES + commits
+    24 non-zero web screenshots — every key route/state at desktop (1280) + mobile (390)
+    widths incl. the core-product **fit-score OUTPUT** (70/100 + skills breakdown). The maker
+    recorded a dual-axis VISION verdict this run (loop-memory 2026-06-29 run 5): public + authed
+    surfaces PASS functional + design; the review SURFACED a real DESIGN defect (authed nav
+    overlapped at 390px) → fixed in PR #98. STILL OPEN before this box ticks: the generated
+    **prep-pack content** rendered (needs an LLM key — keyless E2E can't generate it) and the
+    **mobile component snapshots** (`mobile/__screenshots__/`). Box stays `[ ]`.
 
 ### F — Security & abuse hardening
 - [x] Rate limiting on every paid/expensive/auth/scrape endpoint
@@ -203,7 +211,12 @@ the guard tests, and **`FACTORY_STANDARD.md`**.
       login already return generic errors; verify-purchase is idempotent (always 501). Tests
       prove lockout blocks the correct password, no enumeration, and resets on success (PR #36)
 - [ ] CAPTCHA on public forms (signup/waitlist)
-- [ ] CORS locked to known origins + security headers
+- [x] CORS locked to known origins + security headers — `asgi.py` no longer falls back to
+      `allow_origins=["*"]`; `resolve_cors_origins()` returns explicit `ALLOWED_ORIGINS`
+      when set, `[]` in production (same-origin web + native mobile both still work), and the
+      localhost dev/E2E origins otherwise (never `*`). Security headers (HSTS, X-Frame-Options,
+      nosniff, Referrer-Policy, frame-ancestors CSP, Permissions-Policy) already ship on every
+      response. `tests/test_cors.py` pins all modes never return `*` (PR #96, 2 Sonnet reviewers).
 - [x] Per-user/day spend ceiling on scrape + LLM (wallet-drain defense)
 - [ ] Make rate-limit + spend-ceiling **cross-instance** (Upstash Redis/Postgres) — current in-memory state is per-instance on Vercel serverless
 - [x] Secrets server-side only — never in the mobile app, never committed
