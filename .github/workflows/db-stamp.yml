@@ -1,0 +1,27 @@
+name: DB stamp (one-time baseline)
+# Manual-only. Stamps an EXISTING database (created via create_all, no alembic_version yet)
+# at the current migration head, so the auto-migrate `migrate` job's `alembic upgrade head`
+# becomes a clean no-op instead of trying to re-create existing tables. Uses the
+# DATABASE_URL Actions secret — no credential is ever pasted locally. Re-runnable safely
+# (stamping head when already at head is a no-op).
+on:
+  workflow_dispatch:
+
+jobs:
+  stamp:
+    name: alembic stamp head (baseline existing DB)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -r requirements-dev.txt
+      - name: Stamp the existing DB at the current head
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "DATABASE_URL secret not set — cannot stamp."; exit 1
+          fi
+          python -m alembic stamp head
