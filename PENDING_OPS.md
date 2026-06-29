@@ -79,17 +79,23 @@ OWNER_ACTIONS:
       why: "The /privacy + /terms pages are real and code-accurate, but auto-authored (not lawyer-reviewed); they lack a governing-law/arbitration clause, and the listed contact addresses don't exist yet. Apple/Google require a working privacy contact at submission."
       how: "Have counsel review web/app/{privacy,terms}/page.tsx (add governing law + dispute resolution if desired). Provision privacy@careeroperator.app and support@careeroperator.app (or update the addresses on both pages to real ones) BEFORE store submission."
     - id: ci-wiring
-      title: "Apply staged CI as REQUIRED checks (workflow scope) — docs/ci/PROPOSED_CI.md"
-      priority: high
-      status: open
-      why: "Today PRs auto-merge via `gh pr merge --admin` with NO required status check, so a BUILDS!=WORKS / lint-dirty change could slip in. The loop must NOT edit .github/ (it hangs the headless run), so the exact workflow + required-checks list are STAGED. See loop: harness improvement proposal issue #57."
-      how: "Apply docs/ci/PROPOSED_CI.md's `.github/workflows/ci.yml` (needs `workflow` scope). VERIFY both jobs go GREEN on a PR first, THEN branch-protect `main` requiring `preflight (lint + typecheck + tests)` + `functional journeys (web E2E)` — never require a red/flaky check (it blocks the loop). Then flip LOOP_HEALTH.enforced_in_ci: true and close #57."
+      title: "CI as REQUIRED checks — DONE + enforced (2026-06-29)"
+      priority: normal
+      status: done
+      why: "`.github/workflows/ci.yml` is live; branch protection on main requires `preflight (lint + typecheck + tests)` + `functional journeys (web E2E)` with enforce_admins=ON; auto-merge enabled; loop merges via `gh pr merge --squash --auto`. Validated end-to-end (PR #61 blocked until green, then auto-merged). Proposal #57 closed; LOOP_HEALTH.enforced_in_ci=true."
+      how: "Done. NOTE (residual fragility): if the CI workflow itself breaks (action deprecation/flake), required checks block ALL merges and the loop can't fix .github/ — that needs the owner. The Node-20→24 deprecation warning is benign for now; bump action versions when convenient."
     - id: auto-migrate
-      title: "Enable auto-migrate-on-deploy (alembic upgrade head on main) — one-time setup"
-      priority: high
+      title: "Auto-migrate-on-deploy — ENABLED + verified (2026-06-29)"
+      priority: normal
+      status: done
+      why: "Real Alembic migrations ship + a gate test fails the build on model/migration drift. The migrate job (.github/workflows/ci.yml) applies `alembic upgrade head` on push to main, post-gate, forward-only. DONE: Neon PITR enabled (owner); DATABASE_URL GitHub Actions secret set; existing DB stamped at head via the manual db-stamp workflow and VERIFIED against the models (LIVE TABLES == MODEL TABLES, MISSING/EXTRA empty, alembic_version=head). Future migrations now self-apply on merge."
+      how: "Optional cleanup (not required for correctness): set AUTO_CREATE_TABLES=0 in Vercel so Alembic is the single schema source (create_all still only ADDS missing tables, and the CI drift gate catches a missing migration, so leaving it on is safe). Re-baseline anytime via the manual `DB stamp (one-time baseline)` workflow. TRADEOFF (accepted): a destructive migration that passes review auto-applies — Neon PITR is the undo."
+    - id: rotate-db-credential
+      title: "SECURITY: rotate the Neon DB password (it appeared in a chat transcript)"
+      priority: urgent
       status: open
-      why: "Real Alembic migrations now ship (initial schema committed; a gate test fails the build if models change without a migration). Auto-applying them on deploy ends the manual `python scripts/init_db.py` after every schema change. Auto-apply replaces the manual human schema checkpoint, so it needs a recoverability net + a one-time baseline; the loop cannot set GitHub secrets, enable backups, or push .github/."
-      how: "1) Enable Neon PITR / daily backups FIRST (recoverability net). 2) Baseline the existing DB ONCE (it was created via create_all): `DATABASE_URL='<neon pooled>' alembic stamp head`. 3) Add a GitHub Actions secret DATABASE_URL = the Neon pooled string (never inline/commit it). 4) Set AUTO_CREATE_TABLES=0 in Vercel so Alembic is the single schema source. 5) Apply the `migrate` job from docs/ci/PROPOSED_CI.md (default-branch + post-gate + forward-only; NOT a required PR check). TRADEOFF: a destructive migration that passes review will auto-apply — PITR is how you undo it."
+      why: "During auto-migrate setup the Neon connection string (incl. password) was pasted into an assistant chat several times, so it must be treated as compromised. The DB is SSL-gated by this password; anyone with the string could connect."
+      how: "Neon Console -> Roles -> reset neondb_owner password. Then update the NEW pooled string in BOTH places via UI (no terminal/transcript): GitHub repo Settings -> Secrets -> Actions -> DATABASE_URL, and Vercel env DATABASE_URL -> redeploy. The DB stays stamped (the marker lives in the DB, survives password change); no re-stamp needed."
     - id: email-verification-deferred
       title: "DECISION: signup is NOT gated on email verification (no email pipeline wired)"
       priority: normal
