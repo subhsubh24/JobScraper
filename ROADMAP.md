@@ -85,7 +85,12 @@ the guard tests, and **`FACTORY_STANDARD.md`**.
       (tracked / avg fit / active) with loading, empty, and error states; a jest-expo test
       proves it renders the real API payload and that the loading spinner is replaced — no
       stuck spinner (PR #71).
-- [ ] Paywall screen wired to entitlement state
+- [x] Paywall screen wired to entitlement state — `mobile/src/app/paywall.tsx` reads the
+      user's tier from the auth context and refreshes entitlement on open: PREMIUM shows a
+      confirmation state (no buy CTA), FREE shows the offer with an HONEST purchase action
+      (no fake "purchase complete" — no charge, plan unchanged; entitlement only flips
+      server-side from a verified RevenueCat webhook). jest-expo test asserts both states +
+      refresh-on-open + honest purchase (PR #88, 2 Sonnet reviewers).
 - [ ] Polished design-bar UI; real empty/loading/error states; not a thin wrapper
 - [x] Component/integration tests green; typecheck-clean (native device run = human/CI) —
       jest-expo suite now covers the API client + Pipeline + Job-detail screens + the prep
@@ -111,9 +116,21 @@ the guard tests, and **`FACTORY_STANDARD.md`**.
       (PR #40, F4.1).
 - [x] Web: server-side entitlement gating on paid endpoints — `users.tier` gates coach + job/
       prep limits server-side; the webhook is now the real source that grants/revokes it (PR #40).
-- [ ] Mobile: RevenueCat/StoreKit + Play Billing integration code
-- [ ] Mobile: entitlement gate reads verified subscription state
-- [ ] Receipt / signature verification server-side (no client-trusted unlocks)
+- [ ] Mobile: RevenueCat/StoreKit + Play Billing integration code — SERVER half done (see
+      below); the on-device client SDK (`react-native-purchases` to INITIATE purchases) is
+      native + owner-blocked (needs RevenueCat keys + store accounts) and stays unticked.
+- [x] Mobile: entitlement gate reads verified subscription state — the entitlement gate
+      (server-side `users.tier` checks + the mobile app reading `tier` via `/me`) now reads
+      state that is verified-subscription-backed for BOTH web (Stripe) and mobile (RevenueCat).
+      `users.tier` is the single source of truth, flipped only by verified webhooks (PR #87).
+- [x] Receipt / signature verification server-side (no client-trusted unlocks) — `POST
+      /api/billing/revenuecat-webhook` (`src/mobile_billing.py`) verifies RevenueCat's
+      shared-secret `Authorization` header (constant-time) and flips `users.tier` ONLY from a
+      verified lifecycle event (grant on purchase/renewal, revoke on EXPIRATION/PAUSED).
+      Forged/missing header grants NOTHING (401); unconfigured refuses honestly (503). Round-
+      trip tested (`tests/test_mobile_billing.py`: 12 cases incl. forged/unconfigured/malformed
+      grant-nothing) — no client-trusted unlock (PR #87, 2 Sonnet reviewers). Live RevenueCat
+      keys are Human-Core (PENDING_OPS).
 
 ### D — Store readiness & compliance (Apple App Store + Google Play)
 - [x] Privacy policy (hosted + in-repo) and ToS — `/privacy` + `/terms` render real,

@@ -43,11 +43,11 @@ OWNER_ACTIONS:
       why: "Required to submit the Android app."
       how: "play.google.com/console; create app; set up Play Billing products."
     - id: revenuecat
-      title: "Create RevenueCat account + map StoreKit/Play Billing products"
+      title: "Create RevenueCat account + map StoreKit/Play Billing products + set the webhook secret"
       priority: normal
       status: open
-      why: "Mobile entitlement verification needs the cross-store keys + product mapping."
-      how: "Create RevenueCat project; add iOS/Android API keys to mobile build env (public SDK key only on device; secret stays server-side)."
+      why: "Mobile entitlement verification needs the cross-store keys + product mapping. The SERVER half is now BUILT (PR #87): POST /api/billing/revenuecat-webhook verifies a shared-secret Authorization header and flips users.tier ONLY from a verified event (grant on purchase/renewal, revoke on EXPIRATION/PAUSED); forged/missing grants nothing (401); unset secret refuses honestly (503). It stays inert until the owner-only secret + keys exist. The on-device client SDK (react-native-purchases) to INITIATE purchases is still owner-blocked/native."
+      how: "1) Create the RevenueCat project; map the StoreKit + Play Billing products to a 'premium' entitlement. 2) In the deploy env set REVENUECAT_WEBHOOK_AUTH to a strong random secret (never commit it). 3) In the RevenueCat dashboard add a webhook -> https://<deploy>/api/billing/revenuecat-webhook with that same Authorization header value. 4) Add the public iOS/Android SDK keys to the mobile build env (public SDK key only on device; never the secret). 5) Configure the app to set RevenueCat's appUserID to our User.id so events map back. FOLLOW-UPS (loop, code — not owner): wire the on-device react-native-purchases SDK to initiate purchases (Track C line 114); handle the TRANSFER event (revoke the source user) and add event-ordering/idempotency (store last-event timestamp) before high-volume go-live."
     - id: app-signing
       title: "App signing / EAS credentials for iOS + Android"
       priority: normal
