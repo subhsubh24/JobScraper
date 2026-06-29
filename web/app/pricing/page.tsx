@@ -13,6 +13,25 @@ const FEATURES = [
   'Priority fit scoring',
 ];
 
+// An inline check glyph — a real icon, not an emoji (which renders inconsistently across
+// platforms and reads as generated). Decorative, so hidden from assistive tech.
+function CheckIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 20 20"
+      className="h-5 w-5 shrink-0 text-emerald-400"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.25"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M4 10.5l4 4 8-9" />
+    </svg>
+  );
+}
+
 type PlanId = 'pro_annual' | 'pro_monthly';
 
 export default function PricingPage() {
@@ -87,10 +106,10 @@ export default function PricingPage() {
         </div>
       </div>
 
-      <ul className="mt-8 space-y-2">
+      <ul className="mt-8 space-y-2.5">
         {FEATURES.map((f) => (
-          <li key={f} className="flex items-center gap-2">
-            <span className="text-emerald-400">✓</span>
+          <li key={f} className="flex items-center gap-3">
+            <CheckIcon />
             <span>{f}</span>
           </li>
         ))}
