@@ -39,8 +39,13 @@ _GRANT_EVENTS = {
 # Event types that REVOKE entitlement (access has actually lapsed). Note CANCELLATION is NOT
 # here: a cancellation only turns OFF auto-renew — the user keeps access until the period
 # ends, at which point RevenueCat sends EXPIRATION. BILLING_ISSUE is a grace period, also not
-# an immediate revoke. Everything not in either set is acknowledged with no entitlement change.
-_REVOKE_EVENTS = {"EXPIRATION"}
+# an immediate revoke. PAUSED (Android) DOES revoke: the user has surrendered access for the
+# pause window, and a subsequent RENEWAL re-grants on resume. Everything not in either set is
+# acknowledged with no entitlement change — including TRANSFER (entitlement moved between
+# app_user_ids), an intentional no-op for now: handling it would need to revoke the SOURCE
+# user (requires the transfer's source id), tracked as a follow-up. It can only UNDER-grant
+# (the source keeps access), never wrongly grant Premium to an unverified caller.
+_REVOKE_EVENTS = {"EXPIRATION", "PAUSED"}
 
 
 class MobileBillingNotConfigured(Exception):

@@ -90,6 +90,26 @@ def test_webhook_expiration_revokes_premium(client, monkeypatch, db_session):
     assert _tier(db_session, uid) == UserTier.FREE
 
 
+def test_webhook_paused_revokes_premium(client, monkeypatch, db_session):
+    # PAUSED (Android): the user surrendered access for the pause window -> revoke.
+    monkeypatch.setenv("REVENUECAT_WEBHOOK_AUTH", RC_SECRET)
+    uid, _ = _register(client)
+    _post(client, _rc_body("INITIAL_PURCHASE", uid))
+    assert _tier(db_session, uid) == UserTier.PREMIUM
+    r = _post(client, _rc_body("PAUSED", uid))
+    assert r.status_code == 200
+    assert _tier(db_session, uid) == UserTier.FREE
+
+
+def test_webhook_malformed_json_returns_400_and_grants_nothing(client, monkeypatch, db_session):
+    # A valid secret but a non-JSON body must 400 cleanly (no partial commit), never 500.
+    monkeypatch.setenv("REVENUECAT_WEBHOOK_AUTH", RC_SECRET)
+    uid, _ = _register(client)
+    r = _post(client, b"not-json-at-all")
+    assert r.status_code == 400
+    assert _tier(db_session, uid) == UserTier.FREE
+
+
 def test_webhook_cancellation_does_not_revoke(client, monkeypatch, db_session):
     # CANCELLATION only turns off auto-renew; access lasts until EXPIRATION. Tier must hold.
     monkeypatch.setenv("REVENUECAT_WEBHOOK_AUTH", RC_SECRET)
