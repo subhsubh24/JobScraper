@@ -7,6 +7,7 @@ Gemini key via heuristic scoring; AI features (prep packs, coach) return a truth
 """
 import logging
 import os
+import re
 import time
 import uuid
 from collections import defaultdict
@@ -19,6 +20,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
@@ -37,6 +39,7 @@ from src.db.models import (
     PrepArtifact,
     User,
     UserTier,
+    Waitlist,
 )
 from src.enrichment.llm_workflows import LLMWorkflows
 from src.llm import llm_available
@@ -341,8 +344,19 @@ class ImportPreviewRequest(BaseModel):
     careers_url: str = Field(min_length=4, max_length=500)
 
 
+class WaitlistJoin(BaseModel):
+    email: str = Field(min_length=5, max_length=255)
+    full_name: Optional[str] = Field(default=None, max_length=255)
+    source: Optional[str] = Field(default=None, max_length=50)
+
+
 # Cap the preview so one request can't fan out into a huge payload / long fetch.
 ATS_PREVIEW_LIMIT = 50
+
+# Pragmatic email shape check (we don't pull in the email-validator dep just for the
+# waitlist form): one "@", a dot in the domain, no whitespace. Rejects obvious junk while
+# staying permissive about real addresses.
+_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
 # ---------------------------------------------------------------------------
@@ -470,6 +484,41 @@ def delete_account(user: User = Depends(get_current_user), db: Session = Depends
     db.commit()
     _clear_login_failures((user.email or "").lower())
     return {"success": True, "deleted": True}
+
+
+# ---------------------------------------------------------------------------
+# Waitlist (pre-launch growth capture — Track G/H)
+# ---------------------------------------------------------------------------
+# A generic, identical response for both new and already-present emails: the endpoint must
+# never reveal whether an address is already on the list (enumeration defense, same posture
+# as register/login).
+_WAITLIST_OK = {"success": True, "message": "You're on the list — we'll be in touch."}
+
+
+@app.post("/api/waitlist/join", dependencies=[Depends(rate_limit("waitlist", 5, 3600))])
+def join_waitlist(data: WaitlistJoin, db: Session = Depends(get_db)):
+    """Capture a pre-launch waitlist signup.
+
+    NO email is sent (no provider is wired — gating on an unbuilt email loop would dead-end
+    the visitor; DECISION COROLLARY). The DB row IS the real, verifiable side-effect, which
+    makes visitor->signup measurable. Double-opt-in (confirmation email round-trip) lands
+    with a real/sandbox email provider under Track H / F4.1.
+    """
+    email = (data.email or "").strip().lower()
+    if not _EMAIL_RE.match(email):
+        raise HTTPException(status_code=400, detail="Enter a valid email address.")
+    if db.query(Waitlist).filter(Waitlist.email == email).first():
+        return _WAITLIST_OK  # already on the list — indistinguishable from a fresh signup
+    source = ((data.source or "").strip() or "organic")[:50]
+    full_name = ((data.full_name or "").strip() or None)
+    db.add(Waitlist(email=email, full_name=full_name, source=source))
+    try:
+        db.commit()
+    except IntegrityError:
+        # A concurrent request won the unique-email slot between the check and the insert.
+        # Still a success for the user, still no enumeration signal.
+        db.rollback()
+    return _WAITLIST_OK
 
 
 @app.post("/api/auth/verify-purchase")
