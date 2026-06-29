@@ -45,6 +45,7 @@ from src.enrichment.llm_workflows import LLMWorkflows
 from src.llm import llm_available
 from src.ranking.scorer import JobScorer
 from src import billing
+from src import mobile_billing
 
 load_dotenv()
 setup_logging()
@@ -529,11 +530,13 @@ def verify_purchase(
 ):
     """Upgrade to premium after a VERIFIED store purchase.
 
-    SIDE-EFFECT INTEGRITY (FACTORY_STANDARD §6): real receipt/signature verification
-    (Apple/Google/RevenueCat) is Track C and NOT yet implemented. We must NOT fake-grant
-    premium on an unverified receipt — a "purchase processed" the user can't trust is a
-    LIE and a billing-path correctness bug. Until verification exists, this endpoint
-    refuses honestly (501) and grants NOTHING. Tracked in ROADMAP Track C + PENDING_OPS.
+    SIDE-EFFECT INTEGRITY (FACTORY_STANDARD §6): a client-supplied receipt is NOT trusted to
+    grant entitlement — that would be a client-trusted unlock. Mobile purchases are verified
+    server-side out-of-band by RevenueCat, which POSTs a shared-secret-authenticated webhook
+    to ``/api/billing/revenuecat-webhook`` (the only path that flips a mobile user to
+    Premium). This client endpoint therefore never grants anything; it refuses honestly (501)
+    so the app relies on the verified webhook + a ``/me`` refresh, never a self-reported
+    unlock. Tracked in ROADMAP Track C + PENDING_OPS.
     """
     raise HTTPException(
         status_code=501,
@@ -604,6 +607,33 @@ async def billing_webhook(request: Request, db: Session = Depends(get_db)):
         # Invalid signature / malformed payload — grant NOTHING.
         raise HTTPException(status_code=400, detail="Invalid signature.")
     billing.apply_event(event, db)
+    db.commit()
+    return {"received": True}
+
+
+@app.post("/api/billing/revenuecat-webhook")
+async def revenuecat_webhook(request: Request, db: Session = Depends(get_db)):
+    """Receive RevenueCat (mobile IAP) webhook events, VERIFY the shared secret, and persist
+    entitlement.
+
+    SIDE-EFFECT INTEGRITY: a mobile user becomes Premium ONLY here, from a webhook whose
+    ``Authorization`` header matches the owner-configured shared secret. A forged / missing
+    header grants NOTHING (401); when the secret isn't set we refuse honestly (503). The app
+    never self-reports entitlement — ``users.tier`` is flipped solely by a verified event.
+    """
+    auth = request.headers.get("authorization")
+    try:
+        mobile_billing.verify_authorization(auth)
+    except mobile_billing.MobileBillingNotConfigured:
+        raise HTTPException(status_code=503, detail="Mobile billing webhook is not configured.")
+    except mobile_billing.InvalidWebhookAuth:
+        # Wrong/missing secret — grant NOTHING.
+        raise HTTPException(status_code=401, detail="Invalid webhook authorization.")
+    try:
+        payload = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Malformed webhook payload.")
+    mobile_billing.apply_event(payload, db)
     db.commit()
     return {"received": True}
 
