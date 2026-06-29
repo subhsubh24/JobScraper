@@ -155,6 +155,16 @@ export const api = {
     ).prep_pack;
   },
 
+  // Join the pre-launch waitlist. Public (no auth). The backend never reveals whether the
+  // email is already on the list, so the caller always treats a resolved promise as success.
+  async joinWaitlist(email: string, source?: string): Promise<void> {
+    await request<{ success: boolean; message: string }>('/api/waitlist/join', {
+      method: 'POST',
+      body: { email, source },
+      auth: false,
+    });
+  },
+
   // Start a Stripe Checkout session for a subscription plan and return its hosted URL.
   // Throws ApiError(503) when billing isn't configured yet — the caller surfaces it
   // honestly rather than pretending a charge happened.
