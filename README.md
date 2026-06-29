@@ -103,7 +103,7 @@ npm run dev                             # http://localhost:3000
 ```bash
 cd mobile
 npm install
-npm run dev                             # open in Expo Go (scan the QR code)
+npm run start                           # `expo start` — open in Expo Go (scan the QR code)
 # Point it at an API:  EXPO_PUBLIC_API_URL=<your API base>
 ```
 
