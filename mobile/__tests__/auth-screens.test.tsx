@@ -68,8 +68,10 @@ describe('LoginScreen', () => {
     fireEvent.changeText(screen.getByPlaceholderText('you@example.com'), '  jane@example.com  ');
     fireEvent.changeText(screen.getByPlaceholderText('••••••••'), 'hunter2pw');
     fireEvent.press(screen.getByText('Log in'));
-    await waitFor(() => expect(mockSignIn).toHaveBeenCalledWith('jane@example.com', 'hunter2pw'));
-    await waitFor(() => expect(mockReplace).toHaveBeenCalledWith('/(tabs)'));
+    await waitFor(() => {
+      expect(mockSignIn).toHaveBeenCalledWith('jane@example.com', 'hunter2pw');
+      expect(mockReplace).toHaveBeenCalledWith('/(tabs)');
+    });
   });
 
   it('surfaces an ApiError message and does NOT navigate (no dead-end)', async () => {
@@ -127,6 +129,19 @@ describe('RegisterScreen', () => {
     fireEvent.changeText(screen.getByPlaceholderText('At least 8 characters'), 'hunter2pw');
     fireEvent.press(screen.getByText('Create account'));
     expect(await screen.findByText('Could not register with those details')).toBeTruthy();
+    // Confirm this is the API-error path, not a validation short-circuit (signUp WAS called).
+    expect(mockSignUp).toHaveBeenCalledTimes(1);
+    expect(mockReplace).not.toHaveBeenCalled();
+  });
+
+  it('blocks submit on a blank email even with a valid password (pins the OR guard)', async () => {
+    render(<RegisterScreen />);
+    fireEvent.changeText(screen.getByPlaceholderText('At least 8 characters'), 'hunter2pw');
+    fireEvent.press(screen.getByText('Create account'));
+    expect(
+      await screen.findByText('Use a valid email and a password of at least 8 characters.'),
+    ).toBeTruthy();
+    expect(mockSignUp).not.toHaveBeenCalled();
     expect(mockReplace).not.toHaveBeenCalled();
   });
 });
