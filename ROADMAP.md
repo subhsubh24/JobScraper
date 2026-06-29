@@ -313,6 +313,19 @@ storage/3rd-party write): "works" = the effect is OBSERVABLY produced in test/sa
 that the UI showed success. If a side-effect can't be exercised even in sandbox, gate/disable
 it with honest messaging or it's a release-blocking gap on the human checklist.
 
+### Self-validation manifest (the loop must be able to validate every capability)
+Every external dependency is declared in `docs/ci/VALIDATION.md` with HOW it's validated
+(`real` / `mock` / `degraded_only`). The required gate `scripts/check_validation.py`: (1) scans
+the code and FAILS on any secret-like env var (`*_KEY/_SECRET/_TOKEN/_WEBHOOK/DATABASE_URL`)
+not declared — a NEW service cannot ship unvalidated; (2) FAILS (blocks all merges) for any
+capability marked `blocking: true` that isn't truly validated; (3) requires every
+`degraded_only` GAP to name a real `OWNER_ACTION` so it surfaces on the dashboard. Policy: a
+newly-added capability whose REAL path needs an owner-only key defaults to `blocking: true`
+(surface + block until the owner provides the key or consciously defers); accepted existing
+gaps stay `false`. Current gap: `ai` (Gemini) is `degraded_only` in CI — adding a spend-capped
+`GEMINI_API_KEY` (OWNER_ACTION `validate-ai-ci`) auto-upgrades it to `real` via
+`tests/test_llm_live.py`. (Could be promoted to FACTORY_STANDARD for sibling parity.)
+
 ### Readiness audit gate (two gates; maker ≠ checker)
 The box-ticker is **not** the sole certifier. Submission-readiness requires BOTH:
 1. `scripts/preflight.sh` exits **0**; and
