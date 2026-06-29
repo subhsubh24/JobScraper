@@ -75,7 +75,8 @@ Start free today and run your search like an operator.
 ## Category / age rating
 - **Primary category:** Business (alt: Productivity)
 - **Age rating:** 4+ / Everyone — no objectionable content. *Note:* the AI coach produces
-  free-form text; keep the content-safety guardrail (audit item A1) on the roadmap.
+  free-form text; the content-safety guardrail (audit item A1) **shipped** (PR #51 — moderates
+  coach input AND output), so this is mitigated, not just planned.
 
 ## AI & generated content (disclosure)
 > Both stores expect apps that produce AI-generated content to disclose it, and Apple's
@@ -89,8 +90,13 @@ Start free today and run your search like an operator.
 
 This is code-accurate: Gemini powers prep packs (`src/enrichment/llm_workflows.py`), the coach
 (`src/ai_coach/career_coach.py`), and fit embeddings; the `ContentModerator` guardrail runs on
-coach input AND output. When no Gemini key is configured the app degrades honestly (truthful
-"needs configuration"), so no fabricated AI output is ever shown.
+coach input AND output. Honest degradation when no Gemini key is configured is **not uniform**,
+so state it precisely: AI prep packs and the AI Coach return a truthful "needs configuration"
+(HTTP 503, no output); **fit scoring degrades to keyword-heuristics** — the embedding-based
+semantic component defaults to a neutral value (`src/ranking/scorer.py`), so a score is still
+shown but it is heuristic-only, not AI-derived. The listing copy should therefore say AI fit
+scoring requires the AI service and otherwise falls back to heuristic matching — never imply the
+shown score is always AI-computed.
 
 ## Owner notes (Human-Core)
 - Final character-limit trim happens in the console at submission (limits drift).

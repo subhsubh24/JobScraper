@@ -108,8 +108,11 @@ The honest, code-backed answer:
 - **Account-linked data** (email, optional name, resume text, saved jobs/applications, coach
   messages, prep artifacts, subscription status): retained **only while the account exists**.
   There is **no soft-delete and no post-deletion retention window** in the app — `DELETE
-  /api/auth/me` cascade-removes every user-owned row immediately (proven by
-  `tests/test_account_and_security.py`: zero rows across all user-owned tables after deletion).
+  /api/auth/me` cascade-removes every user-owned row immediately. `tests/test_account_and_security.py`
+  proves zero rows across the seeded user-owned tables (User, JobPosting, JobScore, Application,
+  PrepArtifact, ChatMessage) after deletion; the `subscriptions` cascade is code-defined
+  (`User.subscription`, `cascade="all, delete-orphan"`) but not yet asserted in that test —
+  add a `Subscription` seed + assertion to make the proof exhaustive.
 - **Operational diagnostics** (server request logs: IP + timestamp): retained per the hosting
   platform's default log-retention window, not in the application DB. **Owner action:** set an
   explicit log-retention cap on the platform and record the number here (do not invent one).
