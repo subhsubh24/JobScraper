@@ -14,6 +14,8 @@ Golden values follow directly:
 If these drift, either the weighting or the skill extraction changed — a deliberate decision
 that should update this eval, not slip through silently.
 """
+import math
+
 import pytest
 
 from src.db.models import JobPosting, User, UserTier
@@ -116,3 +118,28 @@ def test_explanation_truncates_skill_lists(db_session):
     assert "m5" not in expl                    # 6th matching skill dropped
     assert "Skills to highlight: x0, x1, x2" in expl
     assert "x3" not in expl                    # 4th missing skill dropped
+
+
+# A degenerate embedding (all zeros) makes cosine similarity undefined: the naive
+# dot/(norm*norm) is 0/0 == nan, which is NOT an exception and would slip past the
+# scorer's try/except to surface as a `nan` fit score. The guard must return a neutral
+# 0.5 so a bad embedding can never corrupt a user-visible score.
+@pytest.mark.parametrize(
+    "v1,v2",
+    [
+        ([0.0, 0.0, 0.0], [1.0, 2.0, 3.0]),   # left zero vector
+        ([1.0, 2.0, 3.0], [0.0, 0.0, 0.0]),   # right zero vector
+        ([0.0, 0.0], [0.0, 0.0]),             # both zero
+    ],
+)
+def test_cosine_similarity_zero_vector_returns_neutral_not_nan(db_session, v1, v2):
+    sim = JobScorer(db_session).cosine_similarity(v1, v2)
+    assert sim == 0.5
+    assert math.isfinite(sim)
+
+
+def test_cosine_similarity_normal_vectors(db_session):
+    scorer = JobScorer(db_session)
+    assert scorer.cosine_similarity([1.0, 0.0], [1.0, 0.0]) == pytest.approx(1.0)
+    assert scorer.cosine_similarity([1.0, 0.0], [0.0, 1.0]) == pytest.approx(0.0)
+    assert scorer.cosine_similarity([1.0, 0.0], [-1.0, 0.0]) == pytest.approx(-1.0)

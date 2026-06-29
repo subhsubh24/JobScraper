@@ -28,10 +28,21 @@ class JobScorer:
         return response.data[0].embedding
 
     def cosine_similarity(self, vec1: List[float], vec2: List[float]) -> float:
-        """Calculate cosine similarity between two vectors."""
-        a = np.array(vec1)
-        b = np.array(vec2)
-        return float(np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b)))
+        """Calculate cosine similarity between two vectors.
+
+        Guards the zero-vector case: if either vector has zero magnitude the cosine is
+        undefined and the naive ``dot / (norm * norm)`` yields ``nan`` (0/0) — which is NOT
+        an exception, so it would slip past the caller's ``try/except`` and surface as a
+        ``nan`` fit score to the user. We return a neutral 0.5 instead (the same value the
+        scorer uses when embeddings are unavailable), so a degenerate embedding can never
+        corrupt a score.
+        """
+        a = np.array(vec1, dtype=float)
+        b = np.array(vec2, dtype=float)
+        denom = float(np.linalg.norm(a) * np.linalg.norm(b))
+        if denom == 0.0:
+            return 0.5
+        return float(np.dot(a, b) / denom)
 
     def ensure_user_embedding(self, user: User) -> List[float]:
         """Ensure user has a resume embedding, create if missing."""
