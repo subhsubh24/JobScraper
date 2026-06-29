@@ -81,3 +81,38 @@ def test_scoring_is_reproducible_and_updates_in_place(db_session):
     assert s1 == s2
     # Re-scoring must UPDATE the existing JobScore row, not insert a duplicate.
     assert db_session.query(JobScore).filter(JobScore.job_id == job.id).count() == 1
+
+
+# --- Explanation rating + formatting ---------------------------------------------------
+# The explanation string is user-facing (it renders on the job-detail screen). The four
+# rating bands and the list truncation (top 5 matching, top 3 to-highlight) are tested
+# directly because the key-free heuristic path caps overall at 70 — so the "Excellent"
+# (>=80) band is only reachable when embeddings are available in prod. A direct unit test
+# pins every band + truncation so a threshold/weight drift can't silently change the copy.
+@pytest.mark.parametrize(
+    "score,expected_rating",
+    [
+        (100, "Excellent match!"),
+        (80, "Excellent match!"),   # lower bound of the band
+        (79.99, "Good match"),
+        (60, "Good match"),         # lower bound
+        (59.99, "Moderate match"),
+        (40, "Moderate match"),     # lower bound
+        (39.99, "Low match"),
+        (0, "Low match"),
+    ],
+)
+def test_explanation_rating_bands(db_session, score, expected_rating):
+    # No skills passed -> the explanation is exactly the rating (no " | " segments).
+    assert JobScorer(db_session)._generate_explanation(score, [], []) == expected_rating
+
+
+def test_explanation_truncates_skill_lists(db_session):
+    matching = [f"m{i}" for i in range(8)]   # > 5
+    missing = [f"x{i}" for i in range(6)]     # > 3
+    expl = JobScorer(db_session)._generate_explanation(85, matching, missing)
+    assert expl.startswith("Excellent match!")
+    assert "Matching skills: m0, m1, m2, m3, m4" in expl
+    assert "m5" not in expl                    # 6th matching skill dropped
+    assert "Skills to highlight: x0, x1, x2" in expl
+    assert "x3" not in expl                    # 4th missing skill dropped
