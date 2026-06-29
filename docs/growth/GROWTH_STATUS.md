@@ -18,7 +18,7 @@ All metrics below are null/0 — the honest pre-launch state. Nothing is fabrica
 ```yaml
 GROWTH_STATUS:
   project: jobscraper
-  as_of: 2026-06-27
+  as_of: 2026-06-29
   phase: pre_launch
   engine_built: false
   engine_pct: 0
@@ -42,7 +42,7 @@ GROWTH_STATUS:
     ltv_usd: null
     ltv_cac_ratio: null
     top_channel: null
-  pmf:                       # leading indicator (FACTORY_STANDARD §9); 0/null pre-launch
+  pmf:                       # leading indicator (FACTORY_STANDARD s9); 0/null pre-launch
     activation_rate: null    # new users who add a job + get a fit score in session 1
     retention_d1: null
     retention_d7: null
@@ -66,12 +66,27 @@ GROWTH_STATUS:
     queued: 0
     published: 0
     last_published: null
-  learnings: []
+  learnings:
+    - "2026-06-29: QUALITY_SCORECARD (independent audit) = C overall, ship gate NOT met.
+       4 ship-critical dims below A: business-case-strength C ($57.5K < $100K floor;
+       referral loop, Career+ tier, B2B2C tier all unbuilt), store-readiness C (no
+       rendered store assets, mobile IAP not integrated, 4 open ACCEPTANCE_AUDIT FAILs),
+       security B (CAPTCHA + cross-instance rate-limit missing; CORS fixed in PR #96),
+       design-taste B (no committed visual screenshots, template icon, web/mobile accent
+       divergence). Pre-PMF: binding growth constraint is PRODUCT QUALITY, not
+       acquisition. Insufficient funnel data for any PMF inference (expected pre-launch)."
   next_actions:
-    - "Owner connects an email provider + analytics (see CONNECT.md) to move engine off 0%"
-    - "Stand up waitlist capture so visitor_to_signup_rate becomes measurable"
+    - "Factory: drive 4 ship-critical quality dims to A in scorecard order (business-case
+       -> store-readiness -> security -> design-taste) before the ship gate can open."
+    - "Owner: apply SITE_GATE_PASSWORD to deployed app (ROADMAP Track G) -- required
+       before site_gate_up flips true and execute-mode outreach unlocks."
+    - "Owner: connect an email provider + analytics (see CONNECT.md) to move engine off 0%."
+    - "Stand up waitlist capture analytics so visitor_to_signup_rate becomes measurable."
   owner_blockers:
-    - "No marketing channels connected — Growth Agent stays in prepare-mode"
+    - "QUALITY_SCORECARD C (ship gate not met): 4 ship-critical dims below A -- no launch
+       until the factory drives them to A."
+    - "SITE_GATE_PASSWORD not applied: site_gate_up remains false; execute-mode blocked."
+    - "No marketing channels connected -- Growth Agent stays in prepare-mode."
   links:
     connect_runbook: docs/growth/CONNECT.md
     playbook: docs/growth/ANALYSIS_PLAYBOOK.md
