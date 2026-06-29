@@ -102,6 +102,26 @@ device/advertising ID, so "Device or other IDs" is **not** collected.)
 Policy documents the deletion path. (Owner action: confirm the public deletion-request URL
 in the Play listing.)
 
+### Data retention (code-accurate)
+Both consoles' privacy reviews — and the Privacy Policy — should state how long data is kept.
+The honest, code-backed answer:
+- **Account-linked data** (email, optional name, resume text, saved jobs/applications, coach
+  messages, prep artifacts, subscription status): retained **only while the account exists**.
+  There is **no soft-delete and no post-deletion retention window** in the app — `DELETE
+  /api/auth/me` cascade-removes every user-owned row immediately. `tests/test_account_and_security.py`
+  proves zero rows across the seeded user-owned tables (User, JobPosting, JobScore, Application,
+  PrepArtifact, ChatMessage) after deletion; the `subscriptions` cascade is code-defined
+  (`User.subscription`, `cascade="all, delete-orphan"`) but not yet asserted in that test —
+  add a `Subscription` seed + assertion to make the proof exhaustive.
+- **Operational diagnostics** (server request logs: IP + timestamp): retained per the hosting
+  platform's default log-retention window, not in the application DB. **Owner action:** set an
+  explicit log-retention cap on the platform and record the number here (do not invent one).
+- **HONEST CAVEAT — backups:** if the owner enables point-in-time recovery / DB backups (a
+  recoverability net the auto-migrate runbook recommends), deleted rows may persist in those
+  backups until the backup window rolls off. This is standard and must be disclosed: live data
+  is deleted immediately, but a backup copy expires on the provider's backup schedule. The
+  Privacy Policy should state the backup-retention window once the owner sets it.
+
 ---
 
 ## Open items (owner / not buildable in-repo)
