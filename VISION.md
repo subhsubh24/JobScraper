@@ -10,7 +10,7 @@
 search like an operator: ingest roles, score fit against their profile, generate
 interview prep, and coach them through the pipeline. It ships as **both**:
 
-- a **web product + API** (Python: FastAPI API, Flask web app), and
+- a **web product + API** (Next.js web app + Python FastAPI API), and
 - a **native mobile app** (Expo / React Native, TypeScript, iOS + Android),
 
 with the mobile app at **full parity** with the web product, talking to the same

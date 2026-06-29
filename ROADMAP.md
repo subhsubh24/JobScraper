@@ -41,7 +41,9 @@ the guard tests, and **`FACTORY_STANDARD.md`**.
       prep), empty + honest error states, and prep content rendered as markdown not raw
       `<pre>` (PR #41, 2 Sonnet reviewers incl. design). (Visual screenshot verification is
       separate — Track E.)
-- [ ] (legacy) Flask `app.py` — superseded by the Next.js web app; keep or retire
+- [x] (legacy) Flask `app.py` — **RETIRED** (superseded by the Next.js web app + `asgi.py`);
+      deleted along with `start_webapp.sh` + the unused flask/flask-cors/flask-login/flask-session
+      dev deps (PR #70, 2 Sonnet reviewers; gate green — no surviving flask import)
 - [x] ATS ingestion (Greenhouse/Lever) returns real listings or a truthful empty state
       (`POST /api/jobs/import-preview`; tests prove real listings, unreachable-vs-empty
       honesty, unsupported ATS, and SSRF refusal — PR #34)
@@ -64,14 +66,25 @@ the guard tests, and **`FACTORY_STANDARD.md`**.
 ### B — Native mobile app (NEW Expo / React Native, iOS + Android, TypeScript, `/mobile`)
 - [x] Expo app scaffolded, `tsc --noEmit` clean, lint clean
 - [ ] Navigation + auth (login/register) wired to the Python API
-- [ ] Jobs list + job detail screens render real API data (no placeholders)
+- [x] Jobs list + job detail screens render real API data (no placeholders) — jest-expo
+      component tests render the REAL `PipelineScreen` + `JobDetailScreen` with mocked API
+      responses and assert the actual data shows (job title/company/fit score/explanation,
+      aggregate stats), plus empty + honest error states (PR #71, 2 Sonnet reviewers). The
+      API client itself (token attach, path/method/body, response unwrap, error mapping) is
+      separately tested. (A real on-device run remains human/CI.)
 - [x] Prep pack + AI coach screens at parity with web — prep packs render structured
       markdown (headings/bold/lists) via a dependency-free native renderer, not a flat text
       block (PR #42, 2 Sonnet reviewers); AI coach screen present + Premium-gated on both.
-- [ ] Pipeline / dashboard screen
+- [x] Pipeline / dashboard screen — `(tabs)/index.tsx` renders live jobs + aggregate stats
+      (tracked / avg fit / active) with loading, empty, and error states; a jest-expo test
+      proves it renders the real API payload and that the loading spinner is replaced — no
+      stuck spinner (PR #71).
 - [ ] Paywall screen wired to entitlement state
 - [ ] Polished design-bar UI; real empty/loading/error states; not a thin wrapper
-- [ ] Component/integration tests green; typecheck-clean release build (native device run = human/CI)
+- [x] Component/integration tests green; typecheck-clean (native device run = human/CI) —
+      jest-expo suite now covers the API client + Pipeline + Job-detail screens + the prep
+      markdown renderer (21 tests green), `tsc --noEmit` + `expo lint` clean, all gated in CI
+      (PR #66 harness, #71 screens). The signed native device/release build stays human/CI.
 - [x] **Distribution/release config is REAL (don't trust a ticked "build-ready" box):**
       `mobile/eas.json` build+submit profiles + `app.json`/`app.config.ts` with bundle id,
       version + `buildNumber`/`versionCode`, icon/splash, permission strings (only for
@@ -197,7 +210,13 @@ the guard tests, and **`FACTORY_STANDARD.md`**.
       **BLOCKING:** pre-launch execute-mode outreach is FORBIDDEN until
       `GROWTH_STATUS.site_gate_up: true` (see docs/growth/ANALYSIS_PLAYBOOK.md marketing
       maturity gate).
-- [ ] Waitlist landing page + capture
+- [x] Waitlist landing page + capture — `POST /api/waitlist/join` (server-side email
+      validation, per-IP rate limit 5/hr, enumeration defense, idempotent on the unique-email
+      race, persists to a NEW `waitlist` table + Alembic migration) + a premium on-brand
+      `web/app/waitlist` landing/capture page (SEO metadata + sitemap). NO email sent — the DB
+      row is the real side-effect; double-opt-in waits for an email provider (Track H, below).
+      `tests/test_waitlist.py` asserts the row, enumeration indistinguishability, no fake-email
+      claim, and the rate-limit throttle (PR #68, 2 Sonnet reviewers).
 - [ ] Brand kit (logo, palette, voice) — committed assets
 - [ ] ASO/SEO plan + content calendar skeleton
 - [ ] Privacy-safe analytics instrumentation (aggregates only)
