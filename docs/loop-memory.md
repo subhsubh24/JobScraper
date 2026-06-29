@@ -4,6 +4,51 @@ Durable lessons for the factory loop. Append dated entries. Keep it honest and s
 
 ---
 
+### 2026-06-29 (run 4) — Maximal run: 5 PRs (mobile monetization server-side, paywall entitlement, prep moderation, scorer bug, web hierarchy) + 8-scout sweep
+Ran the full 8-scout sweep (mobile-paywall / mobile-monetization / web-security / store / marketing /
+web-design / backend-tests / functional-reality) which doubled as the ~daily DEEP AUDIT.
+Functional-reality found NO critical bugs (core web+mobile loops + side-effects sound). asgi.py was
+the single contended backend file → owned by exactly ONE PR (mobile monetization, the lowest-incomplete
++ biggest product gap); CAPTCHA, CORS-lock, and privacy-analytics (all want asgi.py) deferred again,
+correctly. Shipped 5 file-disjoint value-bar PRs through 2 Sonnet reviewers each + the CI gate:
+- **#87 server-side RevenueCat webhook** (Track C → ticked 115+116): `src/mobile_billing.py` +
+  `POST /api/billing/revenuecat-webhook` — verifies a shared-secret Authorization header
+  (constant-time) and flips `users.tier` ONLY from a verified event (grant on purchase/renewal,
+  revoke on EXPIRATION/PAUSED); forged/missing → 401 grant-nothing; unset → 503. Mirrors the Stripe
+  webhook's SIDE-EFFECT INTEGRITY; no new table (RevenueCat events carry `app_user_id` = our User.id,
+  so user resolution needs no durable row — smallest implementation that fully delivers). Reviewer A
+  (REQUEST_CHANGES → 1 cycle): add PAUSED to the revoke set (a paused Android sub must lose access) +
+  a malformed-JSON 400 test; documented TRANSFER as an intentional no-op (can only under-grant).
+- **#88 mobile paywall ↔ entitlement** (Track B line 88 → ticked): reads tier + refreshes on open;
+  PREMIUM → confirmation state (no buy CTA, fixes a real stale-prompt bug), FREE → honest offer (no
+  fake purchase success). jest-expo test both states + refresh + honest-purchase. Clean first pass.
+- **#86 prep-pack output moderation** (Apple §1.2): the coach moderated output but prep packs/cover
+  letters/etc. did not — closed the asymmetry at the single `_call_llm` chokepoint (json-mode parsing
+  skipped to avoid false positives). Clean first pass both reviewers.
+- **#85 scorer zero-vector guard** (real bug): `cosine_similarity` did `0/0 == nan` on a degenerate
+  embedding — NOT an exception, so it slipped past `score_job`'s try/except into a `nan` fit score.
+  Reviewer B (REQUEST_CHANGES → 1 cycle): dropped an out-of-scope normal-path test + a redundant assert.
+- **#89 web visual hierarchy** (design): pricing plan NAMES were muted to the same gray as helper text
+  (hierarchy inversion on a conversion surface) → promoted; job-detail section headers had no size →
+  text-lg; "Salary negotiation scripts" → "coaching" (honesty; no standalone scripts artifact). Both
+  reviewers APPROVE; B confirmed it's a real taste fix, not churn.
+LESSONS: (1) **`git add -A` is a foot-gun while reviewer worktrees live under `.claude/worktrees/`.**
+During a post-review trim commit, `git add -A` swept the reviewers' worktree gitlinks AND cross-branch
+files into the scorer branch (the commit showed `.claude/worktrees/*` + asgi.py + mobile_billing.py +
+other branches' tests). Self-caught via the push warning + a `git show --stat`. FIX/RULE: after the
+first push, NEVER `git add -A` — stage explicit paths only (`git add src/x.py tests/y.py`); reset the
+contaminated commit with `git reset --hard <prev>` then re-add explicitly. Recovered cleanly, no bad
+merge. (2) **maker≠checker earned its keep again** — both must-fixes (PAUSED revoke + the 400 test;
+the padding test) were reviewer finds, resolved in 1 cycle; 3 of 5 PRs were clean first pass. (3)
+**Smallest-implementation call paid off**: skipping a MobileSubscription table (no new migration/cascade
+risk) because RevenueCat events carry `app_user_id` kept #87 a clean 3-file PR; both reviewers agreed it's
+sound for the server half (out-of-order/TRANSFER flagged as named follow-ups, not blockers).
+FOLLOW-UPS (named, buildable): (a) **on-device react-native-purchases SDK** to initiate mobile purchases
+(Track C line 114) — needs owner RevenueCat keys, native. (b) **CAPTCHA** as a coherent web+mobile+api
+unit (still wants asgi.py). (c) **privacy-safe server-side analytics** (aggregate counters, no PII) — the
+marketing scout's top pick, wants asgi.py + a new table/migration (defer to a clean-asgi.py run; PMF
+measurement foundation). (d) **TRANSFER handling + event idempotency** in the RC webhook before go-live.
+
 ### 2026-06-29 (run 3) — Maximal run: 7 PRs (README, mobile-auth tests, billing tests, coach/scorer tests, store docs, web a11y, brand kit) + 8-scout sweep
 Ran the full 8-scout sweep (mobile / backend-security / store / README-freshness / marketing /
 web-design / backend-tests / functional-reality) which doubled as the ~daily DEEP AUDIT.
