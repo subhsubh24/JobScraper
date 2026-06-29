@@ -4,6 +4,68 @@ Durable lessons for the factory loop. Append dated entries. Keep it honest and s
 
 ---
 
+### 2026-06-29 (run 3) — Maximal run: 7 PRs (README, mobile-auth tests, billing tests, coach/scorer tests, store docs, web a11y, brand kit) + 8-scout sweep
+Ran the full 8-scout sweep (mobile / backend-security / store / README-freshness / marketing /
+web-design / backend-tests / functional-reality) which doubled as the ~daily DEEP AUDIT.
+Functional-reality found NO critical bugs (core web+mobile loops + side-effects sound; signup→
+dashboard→fit score→detail, billing webhook-gated, account-deletion cascade all solid). Selected
+the MAXIMAL file-disjoint value-bar set across 7 PRs (+ this bookkeeping), each through 2 Sonnet
+reviewers + the CI gate. NO PR owned `asgi.py` this run (see CAPTCHA decision below):
+- **#77 README + setup.sh freshness** (Track A/§14): the README was a stale prototype doc
+  ($4.99 one-time / $350K / Flutter / Railway, linking dead files). Rewrote to reality
+  (subscription $12/$24, Expo/Next/FastAPI/Vercel/Neon/Gemini, honest $57.5K planning case).
+  Reviewer A: mobile quick-start said `npm run dev` (no such script) → `npm run start`.
+- **#78 mobile auth-screen tests** (Track B → TICKED "auth wired"): jest-expo tests render the
+  REAL Login/Register screens, assert validation/API-call/navigation/error. Reviewer A: assert
+  `signUp` WAS called in the ApiError test (not a validation short-circuit) + add a blank-email
+  case to pin the `||` guard + collapse a two-`waitFor` race.
+- **#79 billing webhook test hardening** (Track C/F): the webhook user-mapping FALLBACKS
+  (by customer_id, by subscription_id) were untested — every existing test passed
+  `metadata.user_id`, but Stripe's own renewal/dunning events omit it (silent entitlement-loss
+  risk). + `_period_end` edge cases. Both reviewers APPROVE first pass.
+- **#80 coach/scorer deterministic tests** (Track E): scorer explanation rating bands +
+  truncation (tested DIRECTLY — the key-free heuristic caps overall at 70, so the ≥80
+  "Excellent" band is only reachable with embeddings), coach context-omits-missing + history
+  chronological-order + session-scoping. Both reviewers APPROVE first pass.
+- **#81 store-docs accuracy** (Track D/§14): APP_PRIVACY_LABELS claimed the subscription cascade
+  "not yet asserted" — but `test_billing.py::test_account_deletion_cascades_subscription` ALREADY
+  proves it (a stale note that would send a future loop to redo done work). Corrected + refreshed
+  ACCEPTANCE_AUDIT G7 to current Play asset spec (feature graphic required, 2026 alt text).
+- **#82 web a11y focus rings** (Track A/E): WCAG 2.4.7 — buttons + nav/footer/auth/legal links
+  had hover-only styles (unusable for keyboard users). Added focus-visible rings (offset on
+  bordered buttons, snug on inline text links). Reviewer A caught 2 missed links (waitlist-form,
+  login) → completed coverage across register/settings/terms/privacy too.
+- **#83 brand kit** (Track G → TICKED): `docs/brand/BRAND_KIT.md` codifying the real palette/
+  type/voice. Reviewer A: cite the real file for the web accent (`web/components/ui.tsx`
+  `bg-indigo-500`), not just "Tailwind indigo-500".
+ROADMAP ticked this run: Track A auto-migrate (owner done + verified), Track B auth-wired (#78),
+Track E gates-enforced-in-CI (verified live: a merge was BLOCKED "2 of 2 required checks in
+progress"), Track G brand kit (#83).
+LESSONS: (1) **maker≠checker earned its keep again** — every must-fix (the `npm run dev` ghost
+script, the validation-short-circuit blind spot in the register test, 2 missed a11y links, the
+uncited accent token) was a reviewer find, not a maker find; 4 PRs drew a REQUEST_CHANGES, all
+resolved in ONE cycle. (2) **A scout can be WRONG — verify before building.** The store scout
+recommended adding a "subscription cascade assertion" test; it ALREADY existed
+(test_account_deletion_cascades_subscription). Caught it by reading the file end before writing →
+dropped the redundant test (value bar forbids duplicate coverage) and instead fixed the STALE doc
+note that had sent the scout down that path. (3) **CAPTCHA deferred, on purpose (DECISION
+COROLLARY).** Track F's only remaining buildable security item is CAPTCHA, but a server-side
+verify that becomes a hard gate the moment the owner sets the secret would dead-end signup unless
+the web+mobile widgets send a token too — so it's a coherent web+mobile+api unit, not a clean
+single-file PR, and it sprawls into web/app (colliding with the a11y PR). Deferred as a dedicated
+future run rather than shipped half-wired; recorded in PENDING_OPS. So NO PR owned asgi.py this
+run — and that's correct, not artificial scarcity (security headers + CORS-lock mechanism already
+shipped; the audit-suggested CORS "validation/`default-src 'none'`" was REJECTED as padding/risky:
+`default-src 'none'` would break the Swagger /docs CDN assets the existing CSP comment explains).
+FOLLOW-UPS (named, buildable, next runs): (a) **CAPTCHA** as a coherent web+mobile+api unit
+(Cloudflare Turnstile, env-gated no-op, round-trip-tested with the test keys) on a clean-asgi.py
+run. (b) **mobile RevenueCat/StoreKit + Play Billing + server-side receipt verification** (Track
+C, store FAIL A4/G4) — the big remaining product gap; needs asgi.py + owner RevenueCat keys. (c)
+**ASO/SEO plan + Launch plan docs** (Track G) — deferred this run as lower-priority pre-PMF
+planning to avoid doc-padding; brand kit was the one genuine Track G asset. (d) **mobile/web
+accent convergence** (pick one canonical accent hex). (e) **scorer heuristic-only flag** surfaced
+to the UI (needs frontend coupling).
+
 ### 2026-06-29 (run 2) — Maximal run: 4 PRs (waitlist, mobile screen tests, design, retire Flask) + 8-scout sweep
 Ran the full 8-scout sweep (mobile / waitlist+email / web design / security / scorer-honesty /
 tests / store / functional-reality). Picked the MAXIMAL file-disjoint set; `asgi.py` was the

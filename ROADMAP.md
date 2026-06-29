@@ -56,16 +56,22 @@ the guard tests, and **`FACTORY_STANDARD.md`**.
       (env.py reads `DATABASE_URL`, no committed creds) + initial-schema migration (all 10
       tables). `tests/test_migrations.py` proves `upgrade head` rebuilds the full schema with
       ZERO drift vs the models AND fails the gate if a model changes without a migration.
-- [ ] **Auto-migrate on deploy** (`alembic upgrade head` on `main`, post-gate, forward-only):
-      job STAGED in `docs/ci/PROPOSED_CI.md`; owner one-time = enable Neon PITR, `alembic stamp
-      head` the existing DB, add the `DATABASE_URL` Actions secret, set `AUTO_CREATE_TABLES=0`,
-      apply (OWNER_ACTION `auto-migrate`). Removes the manual `init_db.py` schema push.
+- [x] **Auto-migrate on deploy** (`alembic upgrade head` on `main`, post-gate, forward-only):
+      ENABLED + verified 2026-06-29 (PENDING_OPS `auto-migrate` = done): the `migrate` job runs
+      `alembic upgrade head` on push to `main` post-gate; owner enabled Neon PITR, set the
+      `DATABASE_URL` Actions secret, and stamped the existing DB at head (verified live schema ==
+      models). Future migrations self-apply on merge; `AUTO_CREATE_TABLES=0` is optional cleanup.
 - [x] External Postgres wired for serverless (no SQLite persistence on Vercel)
 - [x] Health/readiness endpoints + **Vercel serverless deploy** verified live (see docs/DEPLOY_VERCEL.md)
 
 ### B — Native mobile app (NEW Expo / React Native, iOS + Android, TypeScript, `/mobile`)
 - [x] Expo app scaffolded, `tsc --noEmit` clean, lint clean
-- [ ] Navigation + auth (login/register) wired to the Python API
+- [x] Navigation + auth (login/register) wired to the Python API — the login/register screens
+      call `signIn`/`signUp` → `api.login`/`register` → restore session on launch → route into
+      `/(tabs)` on success and surface `ApiError` honestly (no dead-end); the root router gates
+      on auth state. jest-expo component tests render the REAL screens and assert render +
+      input-validation + the API call + navigation + error states (PR #78, 2 Sonnet reviewers).
+      The signed on-device run remains human/CI.
 - [x] Jobs list + job detail screens render real API data (no placeholders) — jest-expo
       component tests render the REAL `PipelineScreen` + `JobDetailScreen` with mocked API
       responses and assert the actual data shows (job title/company/fit score/explanation,
@@ -146,12 +152,12 @@ the guard tests, and **`FACTORY_STANDARD.md`**.
       running web build + running API + seeded throwaway DB and asserts the core-product
       OUTPUT renders (signup → working dashboard → add job → **fit score renders** → detail,
       no dead-end). Self-seeds; verified green locally.
-- [ ] **Gates ENFORCED as REQUIRED CI checks** (resolves loop-health proposal "gates not
-      enforced in CI"). The loop cannot push `.github/`, so the workflow + branch-protection
-      required-checks list are STAGED in `docs/ci/PROPOSED_CI.md` for the owner to apply
-      (`preflight (lint + typecheck + tests)` + `functional journeys (web E2E)`). DoD: both
-      checks required on `main` and GREEN; then flip `LOOP_HEALTH.enforced_in_ci: true` and
-      close the proposal. Until applied, the gate runs locally/in-routine only.
+- [x] **Gates ENFORCED as REQUIRED CI checks** (resolved the loop-health proposal "gates not
+      enforced in CI"). `.github/workflows/ci.yml` is live; branch protection on `main` requires
+      `preflight (lint + typecheck + tests)` + `functional journeys (web E2E)` with
+      enforce_admins=ON; `LOOP_HEALTH.enforced_in_ci: true`; proposal #57 closed. Verified live
+      THIS run: a squash merge was BLOCKED with "2 of 2 required status checks in progress" until
+      green — the rail demonstrably holds for admins too (PENDING_OPS `ci-wiring` = done).
 - [ ] **Visual verification — DUAL-AXIS (FACTORY_STANDARD §6).** Build AFTER the functional
       journey suite (functional correctness first); the screenshots are captured BY it. DoD
       = BOTH:
@@ -217,7 +223,11 @@ the guard tests, and **`FACTORY_STANDARD.md`**.
       row is the real side-effect; double-opt-in waits for an email provider (Track H, below).
       `tests/test_waitlist.py` asserts the row, enumeration indistinguishability, no fake-email
       claim, and the rate-limit throttle (PR #68, 2 Sonnet reviewers).
-- [ ] Brand kit (logo, palette, voice) — committed assets
+- [x] Brand kit (logo, palette, voice) — committed asset `docs/brand/BRAND_KIT.md` codifies the
+      REAL design system (palette from `mobile/src/theme.ts` + `web/app/globals.css` incl. the
+      fit-score scale; Geist Sans/Mono; operator-grade voice from ASO_COPY/VISION; iconography
+      rule). Honest: flags the Expo-template icon (brand-aware icon = owner/designer) + the
+      mobile/web accent divergence as named follow-ups (PR #83, 2 Sonnet reviewers).
 - [ ] ASO/SEO plan + content calendar skeleton
 - [ ] Privacy-safe analytics instrumentation (aggregates only)
 - [ ] Launch plan doc
