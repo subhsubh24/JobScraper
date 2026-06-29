@@ -21,6 +21,8 @@ jobs:
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |
+          echo "secret DATABASE_URL length: ${#DATABASE_URL}"
+          echo "secret DATABASE_URL starts: ${DATABASE_URL:0:13}"
           if [ -z "$DATABASE_URL" ]; then
             echo "DATABASE_URL secret not set — cannot stamp."; exit 1
           fi
