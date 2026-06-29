@@ -46,7 +46,7 @@ export default function BillingSuccessPage() {
     >
       {status === 'active' ? (
         <>
-          <h1 className="text-3xl font-extrabold">You’re Premium 🎉</h1>
+          <h1 className="text-3xl font-extrabold">Welcome to Premium</h1>
           <p className="mt-3 text-slate-400">
             Your subscription is active. Unlimited jobs, AI prep packs, and the Career Coach are
             unlocked.
