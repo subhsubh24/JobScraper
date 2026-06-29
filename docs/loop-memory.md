@@ -4,6 +4,50 @@ Durable lessons for the factory loop. Append dated entries. Keep it honest and s
 
 ---
 
+### 2026-06-29 — Maximal run: 5 feature PRs (security, tests, design, store docs, mobile harness) + DEEP AUDIT
+First product-feature run after ~6 runs of pure CI/enforcement plumbing. Ran the full 8-scout
+sweep (which doubled as the ~daily DEEP AUDIT — functional-reality + security + store + quality +
+design lenses; gate confirmed GREEN: 94 tests, ~78% cov, 9 journeys). Selected a maximal
+file-disjoint set; asgi.py was the single contended file → owned by exactly ONE PR (the security
+fix, the lowest-incomplete Track). Shipped 5 through 2 Sonnet reviewers each + the CI gate:
+- **#62 rate-limit proxy-IP + Permissions-Policy** (Track F): `request.client.host` is the PROXY
+  IP on Vercel, so per-IP limits collapsed every user into one bucket. New
+  `src/api/ip_extraction.get_client_ip()` reads platform forwarding headers ONLY behind a trusted
+  proxy (TRUST_PROXY_HEADERS, default ON under VERCEL); off-proxy uses the un-spoofable peer (NOT
+  trusting headers is the point — else a client spoofs XFF to bypass the limiter). + a default-deny
+  Permissions-Policy header. Reviewers: added the explicit-opt-out test + swapped dead
+  `interest-cohort` for live `browsing-topics`.
+- **#63 endpoint outcome tests** (Track A/C/E/F): jobs AUTHZ BOUNDARY (user B can't GET/PATCH user
+  A's job → 404, no leak; A's data untouched), all status transitions persist, prep-pack
+  free-tier limit WITH key present + premium-unlimited + honest 503, coach success contract +
+  daily LLM ceiling 429. BOTH reviewers flagged 4 tests already covered in test_core_journey /
+  test_coach_safety → removed (value bar forbids re-testing covered behavior); 12 kept.
+- **#64 design** (Track A/E): killed landing card-spam (avoid-list) → content-first section;
+  pricing emoji `✓` → inline SVG. Reviewer B (taste) rejected a decorative accent bar I added
+  (not a system motif) → removed; let type weight + spacing carry it.
+- **#65 store compliance docs** (Track D): data-retention disclosure (honest, with the PITR/backup
+  caveat) + AI-content disclosure (Apple §1.2). Reviewer A caught 2 HONESTY overclaims →
+  corrected: "no fabricated AI output" is FALSE (fit scoring silently falls back to a neutral
+  semantic score with no key); and the deletion test doesn't assert the Subscription cascade.
+- **#66 mobile jest-expo harness** (Track B/E): FIRST mobile test infra — jest-expo 56.0.5 + RTL +
+  a component test of the Markdown prep-renderer asserting intended output (hashes/bold stripped,
+  lists render). Wired into preflight ci (CI runs it). Reviewer A: jest absence must FAIL the gate
+  (added else-fail) + strengthened the empty-render assertion. VERIFIED locally: npm install + jest
+  4/4 green + tsc clean — bleeding-edge RN 0.85/React 19.2/Expo 56 DID have a matching jest-expo.
+LESSONS: (1) **maker≠checker earned its keep hard this run** — EVERY PR drew a real reviewer
+REQUEST_CHANGES (4 duplicate tests, a taste-failing accent bar, 2 honesty overclaims, a silent-pass
+gate guard); none were maker finds. (2) **`cmd && echo … ; git push` foot-gun**: a `;` after a
+failing `&&` flake8 let an F401 push anyway — use `&&` through the whole chain or check exit
+explicitly. (3) The mobile toolchain IS reachable headlessly (jest-expo pinned to the SDK) — mobile
+component tests are now a real, gated BUILDS≠WORKS path, not just tsc/lint. FOLLOW-UPS (named,
+buildable, next runs): (a) **scorer honest-degradation flag** — fit scoring silently shows a
+heuristic-only score when no Gemini key (src/ranking/scorer.py ~109); surface a "heuristic-only"
+signal to the UI so the score isn't implied AI-derived (a real BUILDS≠WORKS/honesty gap). (b) add a
+Subscription seed+assertion to the account-deletion test so the cascade proof is exhaustive. (c)
+**waitlist landing + capture + email-provider abstraction** (Track G/H) is the next asgi.py owner —
+binding growth constraint, deferred this run because security owned the asgi.py slot. (d) more
+mobile screen tests before ticking Track B's component-tests box (one renderer = a start).
+
 ### 2026-06-28 — Enforcement turned ON: required checks (admins included) + `--auto` merge protocol
 After CI was verified GREEN on the first run, the owner authorized turning enforcement on.
 Changes: (1) branch protection on `main` requires `preflight (lint + typecheck + tests)` +
