@@ -23,6 +23,7 @@ from sqlalchemy.orm import Session
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from src.api.errors import error_body
+from src.api.ip_extraction import get_client_ip
 from src.api.logging_config import request_id_var, setup_logging
 
 from src.ai_coach.career_coach import CareerCoach
@@ -116,6 +117,14 @@ SECURITY_HEADERS = {
     "Referrer-Policy": "no-referrer",
     "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
     "Content-Security-Policy": "frame-ancestors 'none'",
+    # Deny powerful browser capabilities by default. The API serves JSON (and the
+    # Swagger UI at /docs), neither of which needs camera/mic/geolocation/etc., so a
+    # blanket deny is free defense-in-depth — an embedded/abused response can never
+    # prompt for these features.
+    "Permissions-Policy": (
+        "camera=(), microphone=(), geolocation=(), payment=(), usb=(), "
+        "magnetometer=(), gyroscope=(), accelerometer=(), browsing-topics=()"
+    ),
 }
 
 
@@ -258,7 +267,7 @@ def rate_limit(bucket: str, limit: int, window_seconds: int = 60):
     def _dep(request: Request) -> None:
         if _RATE_LIMIT_DISABLED:
             return
-        client = request.client.host if request.client else "unknown"
+        client = get_client_ip(request)
         key = (client, bucket)
         now = time.time()
         hits = [t for t in _RATE_BUCKET[key] if now - t < window_seconds]
