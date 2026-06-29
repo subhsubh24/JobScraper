@@ -43,5 +43,10 @@ next-env.d.ts
 # playwright e2e artifacts (generated; CI uploads them — not committed)
 /test-results/
 /playwright-report/
-/e2e/__screenshots__/
 /.last-run.json
+# The dual-axis visual-verification baseline (ROADMAP Track E) is intentionally COMMITTED
+# (judged on a vision model + gated by scripts/preflight.sh). Scope the un-ignore to the
+# PNGs ONLY so a failing local run can never leak stray artifacts (traces, error-context.md,
+# partial junk) into a commit — only the named page screenshots are trackable.
+/e2e/__screenshots__/*
+!/e2e/__screenshots__/*.png
