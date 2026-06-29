@@ -84,7 +84,7 @@ export default function JobDetailPage() {
       </Card>
 
       <div>
-        <h2 className="mb-2 font-semibold">Pipeline status</h2>
+        <h2 className="mb-2 text-lg font-semibold">Pipeline status</h2>
         <div className="flex flex-wrap gap-2">
           {STATUS_ORDER.map((s) => (
             <button
@@ -104,7 +104,7 @@ export default function JobDetailPage() {
       </div>
 
       <div>
-        <h2 className="mb-2 font-semibold">Interview prep</h2>
+        <h2 className="mb-2 text-lg font-semibold">Interview prep</h2>
         <Button onClick={generatePrep} disabled={prepLoading}>
           {prepLoading ? 'Generating…' : 'Generate prep pack'}
         </Button>

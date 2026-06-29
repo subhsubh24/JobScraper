@@ -9,7 +9,7 @@ const FEATURES = [
   'Unlimited tracked jobs',
   'AI interview prep packs',
   'AI Career Coach',
-  'Salary negotiation scripts',
+  'Salary negotiation coaching',
   'Priority fit scoring',
 ];
 
@@ -71,7 +71,7 @@ export default function PricingPage() {
       <div className="mt-10 grid gap-6 sm:grid-cols-2">
         <div className="rounded-2xl border border-indigo-500 bg-slate-900/60 p-6">
           <div className="flex items-center justify-between">
-            <h2 className="text-slate-400">Annual</h2>
+            <h2 className="text-base font-semibold text-slate-100">Annual</h2>
             <span className="rounded-full bg-indigo-500/15 px-2 py-0.5 text-xs font-semibold text-indigo-300">
               Best value
             </span>
@@ -90,7 +90,7 @@ export default function PricingPage() {
         </div>
 
         <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6">
-          <h2 className="text-slate-400">Monthly</h2>
+          <h2 className="text-base font-semibold text-slate-100">Monthly</h2>
           <p className="mt-1 text-4xl font-extrabold">
             $12<span className="text-base text-slate-500">/mo</span>
           </p>
