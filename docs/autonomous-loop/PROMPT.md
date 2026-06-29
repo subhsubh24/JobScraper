@@ -76,7 +76,12 @@ path can only be validated with an owner-provided key you don't have, set `valid
 degraded_only` + `blocking: true` and file the matching `OWNER_ACTION` — this intentionally
 surfaces it and blocks merges until the owner provides the key (or consciously sets
 `blocking: false`). Validate real paths with a live/test key or a real local engine where you
-can; mock (with a genuine round-trip) where you can't.
+can; mock (with a genuine round-trip) where you can't — and a `mock`/`real` claim needs a
+`covered_by` test that genuinely exercises it (no stub hiding an un-exercised critical path).
+SURFACE every unmet capability in BOTH places or it's invisible to the owner: an urgent
+`OWNER_ACTION` id `validation-capability-<service>` in PENDING_OPS, AND the LOOP_HEALTH
+`validation` block (`enforced_in_ci`, `capabilities_total`, `unmet`) — recompute it every
+bookkeeping run via `python scripts/check_validation.py --report`.
 
 ## REVIEW (maker ≠ checker — Task tool; 2 reviewers on Sonnet `claude-sonnet-4-6`, ≤2 cycles)
 Spawn TWO independent reviewer subagents on `git diff main...HEAD`: **A — correctness &

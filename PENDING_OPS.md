@@ -96,9 +96,9 @@ OWNER_ACTIONS:
       status: open
       why: "During auto-migrate setup the Neon connection string (incl. password) was pasted into an assistant chat several times, so it must be treated as compromised. The DB is SSL-gated by this password; anyone with the string could connect."
       how: "Neon Console -> Roles -> reset neondb_owner password. Then update the NEW pooled string in BOTH places via UI (no terminal/transcript): GitHub repo Settings -> Secrets -> Actions -> DATABASE_URL, and Vercel env DATABASE_URL -> redeploy. The DB stays stamped (the marker lives in the DB, survives password change); no re-stamp needed."
-    - id: validate-ai-ci
+    - id: validation-capability-gemini
       title: "Add GEMINI_API_KEY (test key + spend cap) to CI so the REAL AI path is validated"
-      priority: normal
+      priority: urgent
       status: open
       why: "The self-validation manifest (docs/ci/VALIDATION.md) flags `ai` as validation=degraded_only: CI runs Gemini with an EMPTY key, so only the honest-503/heuristic path is exercised — the REAL Gemini call (prompt + response parsing) is never validated. A loop change that breaks the real AI call would NOT be caught by CI."
       how: "Create a Gemini API key scoped to a HARD monthly spend cap (Google AI Studio usage limits), then add it as a GitHub Actions repository secret GEMINI_API_KEY (Settings -> Secrets -> Actions). tests/test_llm_live.py auto-runs a tiny real chat+embedding call when the key is present. Wire the key into the CI jobs' env, then flip VALIDATION.md `ai`: key_in_ci: true, validation: real. To FORCE this before more AI work ships, set `ai.blocking: true` (the gate will then block merges until the key is in CI)."

@@ -37,5 +37,9 @@ LOOP_HEALTH:
     harness_proposals_open: 0     # #57 RESOLVED 2026-06-28 — gates now enforced as required checks
   enforced_in_ci: true           # required checks on main (preflight + web E2E), enforce_admins=ON
   auto_migrate_on_deploy: enabled # 2026-06-29: secret set + Neon PITR on + DB stamped at head & VERIFIED (schema==models); future migrations self-apply on merge
+  validation:                    # self-validation manifest readiness (compute every run: scripts/check_validation.py --report)
+    enforced_in_ci: true         # validate-capabilities runs inside the required `preflight` check
+    capabilities_total: 5
+    unmet: [ai]                  # degraded_only — surfaced as OWNER_ACTION validation-capability-gemini (urgent)
   signal: improving              # bootstrapping | improving | steady | churning | stuck — 4 shipped, 0 abandoned, every reviewer find resolved in 1 cycle, no recurring wall; dual-axis visual review caught a real DOM-passing bug (nav overlap) and shipped the fix same run
 ```

@@ -4,6 +4,24 @@ Durable lessons for the factory loop. Append dated entries. Keep it honest and s
 
 ---
 
+### 2026-06-29 — Self-validation gate: convergence addendum (modes + surfacing + honesty)
+Aligned the gate to the cross-factory addendum. SURFACING (A): unmet capabilities now live in
+BOTH the dashboard channels — an URGENT OWNER_ACTION `validation-capability-<service>` in
+PENDING_OPS (renamed validate-ai-ci -> validation-capability-gemini, urgent) AND a LOOP_HEALTH
+`validation` sub-block (enforced_in_ci/capabilities_total/unmet) computed via
+`check_validation.py --report` each bookkeeping run. CORRECTNESS (B): (1) scan is runtime-only
+(src/+asgi.py) already; (2) PyYAML is a DECLARED dep (requirements-dev) not transitive; (3)
+per-PR scoped block needs the base diff -> ci.yml preflight checkout now fetch-depth:0, and the
+gate diffs against origin/$GITHUB_BASE_REF (conservative block if unavailable); (4) TWO modes:
+default per-PR (declaration+surfacing+honesty always; blocking caps fail only if the PR TOUCHES
+them) vs --readiness (any unmet fails — wired into the FULL preflight ship gate); (5) HONESTY: a
+real/mock claim must name a covered_by test that EXISTS (gate-checked) and readiness auditors
+reconcile it genuinely exercises the path (email-verify trap). Verified: per-PR green, --report
+emits total=5/unmet=[ai], --readiness FAILS on the ai gap, honesty FAILS on a bad covered_by.
+validate-capabilities is enforced via the existing required `preflight` check (not a separate
+required check). required_status_checks unchanged: preflight + functional journeys.
+
+
 ### 2026-06-29 — Self-validation gate: the loop must be able to validate every capability
 Owner concern: the journey suite can pass in DEGRADED mode (no key) while the REAL path was
 never exercised — so a broken integration could ship green. Built a self-validation gate:
