@@ -48,7 +48,7 @@ across web + mobile; the **accent differs slightly** between the two and should 
 | Text | `#F4F6FB` | mobile `text` / web `--foreground` | Primary text |
 | Text (muted) | `#9AA6C2` | mobile `textMuted` (web: `slate-400/500`) | Secondary text, labels |
 | **Accent (mobile)** | `#5B8CFF` | mobile `primary` | Primary actions, links |
-| **Accent (web)** | `#6366F1` | web Tailwind `indigo-500` | Primary actions, links, focus ring |
+| **Accent (web)** | `#6366F1` | `web/components/ui.tsx` `bg-indigo-500` (Tailwind `indigo-500`) | Primary actions, links, focus ring |
 | Success | `#34D399` | mobile `success` (web: `emerald`) | Good fit, positive state |
 | Warning | `#FBBF24` | mobile `warning` (web: `amber`) | Moderate fit, caution |
 | Danger | `#F87171` | mobile `danger` (web: `red-4xx/6xx`) | Weak fit, destructive, errors |
