@@ -67,6 +67,17 @@ For mobile/native edits: you run on Linux and cannot compile native — keep `ts
 green, lean on the mobile check, and ABANDON a mobile change that fails its check twice.
 Fix until green within ≤2 cycles; else abandon (clean tree) + file an FYI issue.
 
+**SELF-VALIDATION (every capability must be truly validatable).** When a change adds or uses an
+external service (any secret-like env var: `*_KEY`, `*_SECRET`, `*_TOKEN`, `*_WEBHOOK`,
+`DATABASE_URL`, …), you MUST declare it in `docs/ci/VALIDATION.md` — the gate
+(`scripts/check_validation.py`) FAILS on any undeclared dependency, so a new service can't ship
+unvalidated. Make it degrade gracefully (honest 503/disabled, never fake success). If its REAL
+path can only be validated with an owner-provided key you don't have, set `validation:
+degraded_only` + `blocking: true` and file the matching `OWNER_ACTION` — this intentionally
+surfaces it and blocks merges until the owner provides the key (or consciously sets
+`blocking: false`). Validate real paths with a live/test key or a real local engine where you
+can; mock (with a genuine round-trip) where you can't.
+
 ## REVIEW (maker ≠ checker — Task tool; 2 reviewers on Sonnet `claude-sonnet-4-6`, ≤2 cycles)
 Spawn TWO independent reviewer subagents on `git diff main...HEAD`: **A — correctness &
 safety** (bugs, edge cases, auth/tenant leaks, broken contracts, regressions, guard-test

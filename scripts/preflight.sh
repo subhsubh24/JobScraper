@@ -122,6 +122,9 @@ fi
 sect "quality scorecard parse guard (auditor-owned; we never author it)"
 $PY scripts/check_quality.py parse || fail "QUALITY_SCORECARD malformed"
 
+sect "self-validation manifest (every external dep declared + validatable)"
+$PY scripts/check_validation.py || fail "self-validation gate failed (see docs/ci/VALIDATION.md)"
+
 if [ "$MODE" = "ci" ]; then
   echo ""; echo "PREFLIGHT(ci): mechanical gate GREEN"; exit 0
 fi

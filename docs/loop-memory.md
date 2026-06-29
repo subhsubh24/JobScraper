@@ -4,6 +4,25 @@ Durable lessons for the factory loop. Append dated entries. Keep it honest and s
 
 ---
 
+### 2026-06-29 — Self-validation gate: the loop must be able to validate every capability
+Owner concern: the journey suite can pass in DEGRADED mode (no key) while the REAL path was
+never exercised — so a broken integration could ship green. Built a self-validation gate:
+docs/ci/VALIDATION.md declares every external dependency + HOW it's validated (real/mock/
+degraded_only); scripts/check_validation.py (wired into preflight ci, REQUIRED check)
+(1) scans src/+asgi.py and FAILS on any secret-like env var not declared — proven: it caught
+the loop's own undeclared REVENUECAT_WEBHOOK_AUTH (added in #87) on first run; (2) FAILS/blocks
+for any blocking:true cap not truly validated; (3) requires each degraded_only GAP to name a
+real OWNER_ACTION. Capabilities seeded: auth=real, database=real, billing(Stripe)=mock(signed
+round-trip), mobile-billing(RevenueCat)=mock, ai(Gemini)=degraded_only GAP. Closed the AI gap
+mechanism: tests/test_llm_live.py (skipif no GEMINI_API_KEY) runs a REAL chat+embedding call
+once a spend-capped key is in CI + OWNER_ACTION validate-ai-ci. POLICY (owner-chosen): new
+can't-self-validate caps default blocking:true (surface+block until keyed); existing accepted
+gaps stay false so the loop isn't halted. PROCESS LESSON: I started editing on a stale already-
+merged branch (21 commits behind); the loop had edited the shared ledger files since, so I moved
+the work to a fresh branch off main and RE-APPLIED the ledger edits rather than clobber newer
+loop changes. Always branch off CURRENT main before editing shared files.
+
+
 ### 2026-06-29 (run 5) — Maximal run: 4 PRs (CORS-lock, Track E visual verification, mobile-nav fix, test coverage) + 8-scout sweep, consuming the first QUALITY_SCORECARD
 First run after the independent Quality Auditor bootstrapped docs/quality/QUALITY_SCORECARD.md
 (Overall C, ship gate NOT met; 4 ship-critical dims below A: business-case-strength C, store-
