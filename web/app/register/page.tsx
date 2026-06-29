@@ -78,7 +78,7 @@ export default function RegisterPage() {
       </Card>
       <p className="mt-5 text-center text-sm text-slate-400">
         Already have an account?{' '}
-        <Link href="/login" className="font-semibold text-indigo-400">Log in</Link>
+        <Link href="/login" className="rounded font-semibold text-indigo-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400">Log in</Link>
       </p>
     </main>
   );

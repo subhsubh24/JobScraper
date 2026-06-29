@@ -90,7 +90,7 @@ export default function JobDetailPage() {
             <button
               key={s}
               onClick={() => setStatus(s)}
-              className={`rounded-lg border px-3 py-1.5 text-sm ${
+              className={`rounded-lg border px-3 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 ${
                 job.status === s
                   ? 'border-indigo-500 bg-indigo-500 text-white'
                   : 'border-slate-700 text-slate-300 hover:bg-slate-800'

@@ -84,7 +84,7 @@ export default function SettingsPage() {
         {user.tier === 'premium' && (
           <p className="mt-3 text-sm text-slate-400">
             To change or cancel your plan, email{' '}
-            <a href="mailto:support@careeroperator.app" className="text-indigo-400 hover:underline">
+            <a href="mailto:support@careeroperator.app" className="rounded text-indigo-400 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400">
               support@careeroperator.app
             </a>{' '}
             and we&rsquo;ll take care of it.

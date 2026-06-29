@@ -44,7 +44,7 @@ export function WaitlistForm() {
             </p>
             <Link
               href="/pricing"
-              className="mt-6 inline-block text-sm font-semibold text-indigo-400 hover:text-indigo-300"
+              className="mt-6 inline-block rounded text-sm font-semibold text-indigo-400 hover:text-indigo-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
             >
               See what&rsquo;s coming →
             </Link>

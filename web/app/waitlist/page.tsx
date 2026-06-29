@@ -20,7 +20,7 @@ export default function WaitlistPage() {
     <main className="mx-auto flex min-h-screen w-full max-w-5xl flex-col px-6 py-10">
       <header className="flex items-center justify-between">
         <span className="text-lg font-bold">Career Operator</span>
-        <Link href="/login" className="text-sm font-semibold text-slate-300 hover:text-white">
+        <Link href="/login" className="rounded text-sm font-semibold text-slate-300 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400">
           Log in
         </Link>
       </header>
@@ -57,8 +57,8 @@ export default function WaitlistPage() {
       <footer className="flex flex-col items-center gap-2 border-t border-slate-800 pt-8 text-sm text-slate-500 sm:flex-row sm:justify-between">
         <span>© 2026 Career Operator</span>
         <nav className="flex gap-4">
-          <Link href="/privacy" className="hover:text-slate-300">Privacy</Link>
-          <Link href="/terms" className="hover:text-slate-300">Terms</Link>
+          <Link href="/privacy" className="rounded hover:text-slate-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400">Privacy</Link>
+          <Link href="/terms" className="rounded hover:text-slate-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400">Terms</Link>
         </nav>
       </footer>
     </main>
