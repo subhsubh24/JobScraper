@@ -1,326 +1,140 @@
-# Career Operator 🚀
+# Career Operator
 
-> AI-powered job search app. $4.99 one-time purchase. $350K Year 1 potential.
+> Run your job search like an operator. AI fit scoring, interview prep, an AI career
+> coach, and a pipeline CRM — across a Next.js web app and a native mobile app, on one
+> Python API.
 
-## What Is This?
+Career Operator is a subscription job-search platform for active mid-to-senior job
+seekers. It scores how well each role fits your resume, generates role-specific
+interview prep, answers career questions through an AI coach, and tracks your pipeline.
 
-Career Operator is a mobile app (iOS + Android) that helps tech professionals land high-paying jobs ($150K+) using AI.
+It ships as three surfaces over one backend:
 
-**Core Features:**
-- 🎯 AI job scoring (0-100 based on your resume)
-- 📝 Interview prep pack generator
-- 📊 Application pipeline tracker (CRM-style)
-- 🤖 AI career coach (chat interface)
-- 💰 Salary negotiation scripts
+- **Web app + API** — Next.js (App Router, TypeScript, Tailwind) front end and a Python
+  **FastAPI** backend, deployed together on **Vercel** (Vercel Services: web at `/`, API
+  at `/api`).
+- **Native mobile app** — **Expo / React Native** (TypeScript), iOS + Android. Talks to
+  the same `/api`. Not deployed to Vercel; ships through the App Store / Google Play.
 
-**Business Model:**
-- Free version: 5 jobs, 1 prep pack/month
-- Premium: $4.99 one-time purchase (unlimited)
-- No subscriptions, no ads (for paid users)
+> **Status:** pre-launch. The product is built and deployed; monetization code is wired
+> (Stripe for web; mobile billing is in progress). It is **not** yet store-submitted. See
+> [ROADMAP.md](./ROADMAP.md) for what's done and what's left, and
+> [docs/BUSINESS_CASE.md](./docs/BUSINESS_CASE.md) for honest revenue math.
 
-**Target Market:**
-- Software Engineers
-- Product Managers
-- Data Scientists
-- Analytics Engineers
-- BizOps / Strategy roles
+## Features
 
----
+- **Fit scoring** — a 0–100 score for how well a job matches your resume, with a
+  breakdown. Uses Google Gemini embeddings when a key is configured, and degrades
+  gracefully to a deterministic heuristic when it isn't (the core loop works key-free).
+- **Interview prep packs** — structured, role-specific prep generated for a job.
+- **AI career coach** — a chat coach with a conservative safety guardrail (Premium).
+- **Pipeline CRM** — track jobs through stages with fit scores surfaced inline.
+- **ATS import preview** — preview live listings from a Greenhouse/Lever careers URL
+  (SSRF-guarded), or an honest empty/unreachable state.
 
-## 📂 Repository Structure
+## Pricing
+
+Subscription, good-better-best + annual (annual ≈ 2 months free). See
+[docs/BUSINESS_CASE.md](./docs/BUSINESS_CASE.md) for the full model.
+
+| Tier | Monthly | Annual | Who | Key gates |
+|---|---|---|---|---|
+| **Free** | $0 | — | Trial / casual | 5 tracked jobs, 1 prep pack/mo, no AI coach |
+| **Pro** | $12 | $96 | Active seeker | Unlimited jobs, 10 prep packs/mo, AI coach (100 msg/mo) |
+| **Career+** | $24 | $192 | Senior / urgent | Everything unlimited, salary negotiation, outreach, priority |
+
+The honest Year-1 planning case is **~$57.5K ARR** (below the $100K factory floor —
+stated plainly, not inflated). The path to the floor is the buildable lever list in the
+business case, not a spreadsheet edit.
+
+## Repository layout
 
 ```
 JobScraper/
-├── asgi.py                     # FastAPI backend (web + mobile) — Vercel entrypoint
-├── src/
-│   ├── auth/                   # Authentication & JWT
-│   ├── payments/               # Stripe integration (unused in app model)
-│   ├── ai_coach/               # AI career coach
-│   ├── db/                     # Database models
-│   ├── enrichment/             # LLM workflows
-│   ├── ranking/                # Job scoring algorithm
-│   └── ingestion/              # ATS job scrapers
-├── requirements.txt            # Python dependencies
-├── Dockerfile.api              # Docker container
-├── railway.json                # Railway deployment config
-│
-├── SHIP_IT.md                  # 👈 START HERE - Complete launch guide
-├── LAUNCH_CHECKLIST.md         # Step-by-step tasks
-├── APP_STORE_STRATEGY.md       # Business model & monetization
-├── PRODUCT_STRATEGY.md         # Market positioning
-└── SAAS_ARCHITECTURE.md        # Technical architecture
+├── asgi.py                 # FastAPI app (`app`) — the Vercel Services API entrypoint
+├── vercel.json             # Vercel Services: web at /, FastAPI at /api
+├── src/                    # Backend business logic
+│   ├── auth/               # Auth + JWT
+│   ├── billing.py          # Stripe checkout + webhook + entitlement
+│   ├── ai_coach/           # AI career coach + content moderation
+│   ├── ranking/            # Fit-scoring algorithm (heuristic + embeddings)
+│   ├── enrichment/         # LLM prep-pack workflows
+│   ├── ingestion/          # Greenhouse/Lever ATS import
+│   └── db/                 # SQLAlchemy models + session
+├── web/                    # Next.js web app (App Router, TypeScript, Tailwind)
+├── mobile/                 # Expo / React Native app (TypeScript) — iOS + Android
+├── mobile-flutter-legacy/  # Retired Flutter prototype (reference only)
+├── migrations/             # Alembic migrations (auto-applied on deploy)
+├── tests/                  # Backend tests + outcome-asserting journey suite
+│   └── journeys/           # Functional journey suite (E2E_JOURNEYS)
+├── scripts/                # preflight.sh (gate), run_journeys.sh, db tools
+├── docs/                   # BUSINESS_CASE, DEPLOY_VERCEL, store/, growth/, quality/, …
+├── ROADMAP.md              # The convergence anchor — what to build, in what order
+├── VISION.md               # North star + design/quality bar
+└── FACTORY_STANDARD.md     # Shared operating discipline
 ```
 
----
+## Quick start
 
-## 🚀 Quick Start
-
-### Option 1: Deploy Backend (30 min)
+### Backend API
 
 ```bash
-# 1. Install dependencies
-pip install -r requirements.txt
-
-# 2. Set up environment
-cp .env.example .env
-# Edit .env and add your GEMINI_API_KEY (optional — AI degrades gracefully without it)
-
-# 3. Run API locally
-./start_api.sh
-# API runs on http://0.0.0.0:8000
-# Docs at http://0.0.0.0:8000/docs
-
-# 4. Deploy to Railway
-# - Push to GitHub
-# - Go to railway.app
-# - Deploy from repo
-# - Add PostgreSQL database
-# - Set environment variables
-# Done! ✅
+pip install -r requirements.txt        # runtime deps (CI uses requirements-dev.txt)
+cp .env.example .env                    # then edit .env (see below)
+./start_api.sh                          # uvicorn asgi:app on http://0.0.0.0:8000
+# Interactive API docs: http://0.0.0.0:8000/docs
 ```
 
-### Option 2: Build Mobile App (2-4 weeks)
+`GEMINI_API_KEY` is **optional** — AI features degrade gracefully without it, so the core
+journey runs key-free. `JWT_SECRET` should be set for anything beyond local play (the API
+refuses to start in production with an unset/dev-default secret, by design).
 
-See **SHIP_IT.md** for complete instructions.
-
-**Quick version:**
-```bash
-# Install Flutter
-flutter create career_operator
-cd career_operator
-
-# Add this to pubspec.yaml
-dependencies:
-  http: ^1.1.0
-  provider: ^6.1.1
-  shared_preferences: ^2.2.2
-
-# Build app
-flutter run
-```
-
-Connect to your deployed API and you're ready!
-
----
-
-## 💰 Revenue Model
-
-**Unit Economics:**
-- App price: $4.99
-- Apple/Google cut: 30% ($1.50)
-- Your revenue: $3.49 per user
-- AI costs: ~$0.35 per user (5 prep packs)
-- **Net profit: $3.14 per user**
-
-**Year 1 Projections:**
-
-| Downloads | Conversion | Paid Users | Revenue | After Stores | Profit |
-|-----------|-----------|------------|---------|--------------|--------|
-| 50K       | 30%       | 15,000     | $74,850 | $52,395      | $47K   |
-| 100K      | 40%       | 40,000     | $199,600| $139,720     | $125K  |
-| 250K      | 40%       | 100,000    | $499,000| $349,300     | $314K  |
-
-**Target: $350K Year 1 = Quit your job money**
-
----
-
-## 🎯 Why This Will Work
-
-1. **Price Point is Perfect**: $4.99 = impulse buy, no subscription friction
-2. **App Store Discovery**: Millions search "job search" monthly
-3. **Offline-First**: No servers = 90%+ profit margins
-4. **Proven Market**: Huntr (competitor) makes $2M/year at $40/month
-5. **AI Timing**: Everyone wants AI tools right now
-6. **Network Effects**: Every user = potential referral
-
-**You're 8x cheaper than Huntr with better AI. You win.**
-
----
-
-## 🛠️ Tech Stack
-
-**Backend:**
-- FastAPI (Python) - API server
-- PostgreSQL - Database
-- Google Gemini - AI features (via OpenAI-compatible API)
-- Railway - Hosting ($5/month)
-
-**Mobile:**
-- Flutter (recommended) - iOS + Android from single codebase
-- OR Swift (iOS only) - Native feel
-- OR hire dev on Upwork ($2K-5K)
-
-**Cost to Launch:**
-- Backend: $5/month (Railway)
-- AI: $0.35 per paid user
-- Apple Developer: $99/year
-- Google Play: $25 one-time
-- **Total Year 1: ~$500**
-
-**Potential Revenue: $350K**
-**ROI: 700x** 🤯
-
----
-
-## 📈 Growth Strategy
-
-### Week 1: Launch
-- Post on Product Hunt
-- Twitter thread with demo
-- Reddit (5 subreddits)
-- Target: 1,000 downloads
-
-### Month 1: ASO Optimization
-- Improve screenshots
-- Get reviews (4.5+ stars)
-- Keywords: "job search", "career", "interview"
-- Target: 10,000 downloads
-
-### Month 3: Content Marketing
-- Blog posts about job search
-- YouTube tutorials
-- Twitter tips
-- Target: 50,000 downloads
-
-### Month 6: Viral Features
-- Referral program (share = free credits)
-- App Store featuring (if lucky)
-- Press coverage (TechCrunch, etc.)
-- Target: 100,000 downloads
-
----
-
-## 📚 Documentation
-
-### For Launching
-1. **SHIP_IT.md** - Complete step-by-step guide (READ THIS FIRST)
-2. **LAUNCH_CHECKLIST.md** - Tasks with checkboxes
-
-### For Strategy
-3. **APP_STORE_STRATEGY.md** - Business model, ASO, monetization
-4. **PRODUCT_STRATEGY.md** - Market positioning, target users
-
-### For Development
-5. **SAAS_ARCHITECTURE.md** - Technical architecture
-6. API docs: http://your-api.railway.app/docs (auto-generated by FastAPI)
-
----
-
-## 🎓 What You've Built
-
-You have a **production-ready SaaS backend** that can:
-- Handle unlimited users (multi-tenant)
-- Score jobs using AI embeddings
-- Generate interview prep packs with LLM
-- Provide career coaching via chat
-- Track usage limits by tier
-- Work offline-first for mobile
-
-**This is a $100K+ codebase.** You just need to wrap it in a mobile UI.
-
----
-
-## ⚡ Next Steps
-
-**Today:**
-1. Read SHIP_IT.md (15 min)
-2. Deploy API to Railway (30 min)
-3. Test endpoints work (15 min)
-
-**This Week:**
-- Choose: Build app yourself (Flutter) or hire dev
-- If hiring: Post on Upwork ($3K budget)
-- If building: Start Flutter tutorial
-
-**Week 2-4:**
-- Build mobile app
-- Test on devices
-- Take screenshots
-
-**Week 5:**
-- Submit to App Store
-- Launch marketing
-- GO LIVE! 🎉
-
-**Month 2-6:**
-- Optimize ASO
-- Ship updates weekly
-- Grow to $350K
-
----
-
-## 🤝 Need Help?
-
-**Technical Issues:**
-- Check API logs: `railway logs`
-- Test endpoints: FastAPI docs at /docs
-- Database: Railway dashboard
-
-**Product Questions:**
-- Read APP_STORE_STRATEGY.md
-- Study competitors: Huntr, JibberJobber
-- Join IndieHackers community
-
-**Marketing:**
-- Follow @levelsio, @marckohlbrugge on Twitter
-- Read "Traction" by Gabriel Weinberg
-- Post on /r/SideProject for feedback
-
----
-
-## 💡 Remember
-
-**You have:**
-- ✅ Working code
-- ✅ Clear roadmap
-- ✅ $350K opportunity
-- ✅ This documentation
-
-**You need:**
-- ⚡ Execution
-- ⚡ Consistency
-- ⚡ Resilience
-
-**The only thing stopping you is you.**
-
-Stop overthinking. Start shipping.
-
-**Your first $1K is 286 downloads away.**
-
-**Your first $100K is 28,653 downloads away.**
-
-**Your first $350K is 100,000 downloads away.**
-
-**Every day you don't ship, someone else might.**
-
----
-
-## 🚀 Let's Go!
+### Web app
 
 ```bash
-# Step 1: Deploy API (do this RIGHT NOW)
-git add .
-git commit -m "Ready to ship! 🚀"
-git push origin main
-
-# Go to railway.app and deploy
-
-# Step 2: Build app
-# See SHIP_IT.md
-
-# Step 3: Launch
-# See LAUNCH_CHECKLIST.md
-
-# Step 4: Get rich
-# See your bank account 💰
+cd web
+npm install
+npm run dev                             # http://localhost:3000
+# Point it at a local API:  NEXT_PUBLIC_API_URL=http://localhost:8000
 ```
 
-**Now stop reading and start building.**
+### Mobile app (Expo / React Native — not Flutter)
 
-**The world needs Career Operator. Go ship it! 🚀**
+```bash
+cd mobile
+npm install
+npm run dev                             # open in Expo Go (scan the QR code)
+# Point it at an API:  EXPO_PUBLIC_API_URL=<your API base>
+```
 
----
+## Deployment
 
-**P.S.** DM me when you hit your first $1K. I want to celebrate with you! 🎉
+Production is a **single Vercel project** using Vercel Services — Next.js at `/` and the
+FastAPI app (`asgi:app`) at `/api`, same origin, shared env. External Postgres (Neon) is
+required (no SQLite persistence on serverless). Full guide:
+[docs/DEPLOY_VERCEL.md](./docs/DEPLOY_VERCEL.md). The mobile app is **not** on Vercel — it
+points at the deployment's `/api` and ships through the app stores.
 
-**P.P.S.** Or your first $100K. I'll buy you dinner. 🥂
+## Tech stack
+
+- **Backend:** FastAPI (Python) on Vercel serverless · SQLAlchemy + Alembic · Neon
+  Postgres · Google Gemini (via the OpenAI-compatible endpoint) · Stripe (web billing).
+- **Web:** Next.js (App Router, TypeScript, Tailwind) on Vercel.
+- **Mobile:** Expo / React Native / TypeScript (iOS + Android).
+
+## Quality gate
+
+`scripts/preflight.sh ci` is the per-change gate (backend lint + tests + import smoke,
+mobile `tsc` + lint); `scripts/preflight.sh` is the full readiness gate. Both run in CI
+as required checks on `main` (`preflight (lint + typecheck + tests)` + `functional
+journeys (web E2E)`). The functional journey suite validates the core loop at runtime
+(signup → dashboard → add job → fit score renders → detail), not just that the build
+compiles.
+
+## Key documents
+
+- [VISION.md](./VISION.md) — product vision + design/quality bar
+- [ROADMAP.md](./ROADMAP.md) — execution plan, tracks, Definition of Done
+- [docs/BUSINESS_CASE.md](./docs/BUSINESS_CASE.md) — pricing, revenue projections, levers
+- [docs/DEPLOY_VERCEL.md](./docs/DEPLOY_VERCEL.md) — production deployment (Vercel Services)
+- [AGENTS.md](./AGENTS.md) — engineering conventions + the gate commands

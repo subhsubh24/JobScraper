@@ -36,7 +36,7 @@ if [ ! -f .env ]; then
     echo ""
     echo "Creating .env file from .env.example..."
     cp .env.example .env
-    echo "⚠️  Please edit .env and add your OPENAI_API_KEY"
+    echo "⚠️  Please edit .env and add your GEMINI_API_KEY (optional — AI degrades gracefully without it)"
 fi
 
 # Create data directories
@@ -56,7 +56,7 @@ echo "   Setup Complete!"
 echo "======================================"
 echo ""
 echo "Next steps:"
-echo "1. Edit .env and add your OPENAI_API_KEY"
+echo "1. Edit .env and add your GEMINI_API_KEY (optional — AI degrades gracefully without it)"
 echo "2. Activate the virtual environment: source venv/bin/activate"
 echo "3. Run: python cli.py ingest"
 echo "4. View top jobs: python cli.py top"
