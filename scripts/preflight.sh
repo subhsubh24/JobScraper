@@ -69,6 +69,12 @@ if [ -d mobile ] && [ -f mobile/package.json ]; then
     ( cd mobile && npm run -s lint ) || fail "mobile lint failed"
     ok "mobile lint clean"
   fi
+  # Component/integration tests (jest-expo). Headless, no native build — guards that the
+  # screens/components actually render their intended output (BUILDS != WORKS for mobile).
+  if [ -f mobile/node_modules/.bin/jest ]; then
+    ( cd mobile && npx jest --ci --silent ) || fail "mobile jest tests failed"
+    ok "mobile jest green"
+  fi
 else
   fail "mobile/ Expo app missing (package.json)"
 fi
