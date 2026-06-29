@@ -132,6 +132,9 @@ fi
 # ---------------------------------------------------------------------------
 # READINESS GATE (full) — these SHOULD fail until the product is actually done.
 # ---------------------------------------------------------------------------
+sect "self-validation READINESS (no unvalidated capability may ship)"
+$PY scripts/check_validation.py --readiness || fail "unvalidated capability (see docs/ci/VALIDATION.md + OWNER_ACTIONs)"
+
 sect "machine-readable YAML blocks"
 BLOCK_OUT="$($PY scripts/check_blocks.py)" || fail "YAML block validation failed"
 echo "$BLOCK_OUT" | sed 's/^/  /'
