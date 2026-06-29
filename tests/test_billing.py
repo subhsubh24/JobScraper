@@ -11,8 +11,12 @@ import hashlib
 import hmac
 import json
 import time
+from datetime import datetime
 from types import SimpleNamespace
 
+import pytest
+
+from src.billing import _period_end, _user_for_subscription
 from src.db.models import Subscription, User, UserTier
 
 WHSEC = "whsec_test_secret"
@@ -223,3 +227,100 @@ def test_account_deletion_cascades_subscription(client, monkeypatch, db_session)
     assert client.delete("/api/auth/me", headers=_auth(token)).status_code == 200
     db_session.expire_all()
     assert db_session.query(Subscription).count() == 0
+
+
+# --------------------------------------------------- webhook user-mapping fallbacks
+# Stripe does not always echo our metadata back. customer.subscription.* events fired by
+# Stripe's own lifecycle (renewals, dunning, portal cancels) often carry no `metadata.user_id`,
+# so the webhook must still resolve the user from a PRIOR Subscription row by customer id and,
+# failing that, by subscription id. Every existing test sends metadata.user_id, so these two
+# fallback chains in _user_for_subscription were entirely unexercised — a silent
+# entitlement-loss risk on real renewal events.
+def test_webhook_resolves_user_by_customer_id_when_metadata_absent(client, monkeypatch, db_session):
+    monkeypatch.setenv("STRIPE_WEBHOOK_SECRET", WHSEC)
+    user_id, _ = _register(client)
+    # A prior Subscription row records the Stripe customer for this user (as a real grant would).
+    db_session.add(Subscription(user_id=user_id, stripe_customer_id="cus_known", status="active"))
+    db_session.commit()
+
+    # A renewal-style event with NO metadata.user_id, but the SAME customer.
+    payload = _event(
+        "customer.subscription.updated",
+        {"id": "sub_new", "customer": "cus_known", "status": "active", "metadata": {}},
+    )
+    r = client.post(
+        "/api/billing/webhook", content=payload, headers={"stripe-signature": _sign(payload)}
+    )
+    assert r.status_code == 200, r.text
+    db_session.expire_all()
+    # The user was found via the customer-id fallback and granted Premium.
+    assert db_session.query(User).filter(User.id == user_id).first().tier == UserTier.PREMIUM
+    sub = db_session.query(Subscription).filter(Subscription.user_id == user_id).first()
+    assert sub.stripe_subscription_id == "sub_new"
+
+
+def test_webhook_resolves_user_by_subscription_id_when_no_customer(client, monkeypatch, db_session):
+    monkeypatch.setenv("STRIPE_WEBHOOK_SECRET", WHSEC)
+    user_id, _ = _register(client)
+    # A prior row records the subscription id (but the incoming event has no customer/metadata).
+    db_session.add(
+        Subscription(user_id=user_id, stripe_subscription_id="sub_anchor", status="active")
+    )
+    db_session.commit()
+
+    payload = _event(
+        "customer.subscription.deleted",
+        {"id": "sub_anchor", "status": "canceled", "metadata": {}},
+    )
+    r = client.post(
+        "/api/billing/webhook", content=payload, headers={"stripe-signature": _sign(payload)}
+    )
+    assert r.status_code == 200, r.text
+    db_session.expire_all()
+    # Found via the subscription-id fallback and downgraded.
+    assert db_session.query(User).filter(User.id == user_id).first().tier == UserTier.FREE
+
+
+def test_webhook_unknown_subscription_grants_nothing(client, monkeypatch, db_session):
+    """No metadata, no matching customer/subscription row -> no user, no entitlement change."""
+    monkeypatch.setenv("STRIPE_WEBHOOK_SECRET", WHSEC)
+    user_id, _ = _register(client)
+    payload = _event(
+        "customer.subscription.updated",
+        {"id": "sub_orphan", "customer": "cus_orphan", "status": "active", "metadata": {}},
+    )
+    r = client.post(
+        "/api/billing/webhook", content=payload, headers={"stripe-signature": _sign(payload)}
+    )
+    assert r.status_code == 200
+    db_session.expire_all()
+    assert db_session.query(User).filter(User.id == user_id).first().tier == UserTier.FREE
+
+
+def test_user_for_subscription_prefers_metadata_over_stale_rows(client, db_session):
+    """metadata.user_id wins even if a stale Subscription row points elsewhere."""
+    a_id, _ = _register(client, email="a@example.com")
+    b_id, _ = _register(client, email="b@example.com")
+    # A stale row maps cus_shared -> user B.
+    db_session.add(Subscription(user_id=b_id, stripe_customer_id="cus_shared", status="active"))
+    db_session.commit()
+    obj = {"id": "sub_x", "customer": "cus_shared", "metadata": {"user_id": a_id}}
+    user = _user_for_subscription(db_session, obj)
+    assert user is not None and user.id == a_id
+
+
+# ----------------------------------------------------------- _period_end edge cases
+# current_period_end drives renewal records; Stripe can omit it or (rarely) send junk.
+# The helper must degrade to None, never raise into the webhook handler.
+@pytest.mark.parametrize(
+    "value",
+    [None, "", "garbage", 10 ** 30, -(10 ** 30)],
+    ids=["missing", "empty", "non-numeric", "overflow", "negative-overflow"],
+)
+def test_period_end_returns_none_on_bad_input(value):
+    obj = {} if value is None else {"current_period_end": value}
+    assert _period_end(obj) is None
+
+
+def test_period_end_parses_valid_unix_timestamp():
+    assert _period_end({"current_period_end": 1700000000}) == datetime.utcfromtimestamp(1700000000)
