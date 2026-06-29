@@ -110,9 +110,10 @@ The honest, code-backed answer:
   There is **no soft-delete and no post-deletion retention window** in the app — `DELETE
   /api/auth/me` cascade-removes every user-owned row immediately. `tests/test_account_and_security.py`
   proves zero rows across the seeded user-owned tables (User, JobPosting, JobScore, Application,
-  PrepArtifact, ChatMessage) after deletion; the `subscriptions` cascade is code-defined
-  (`User.subscription`, `cascade="all, delete-orphan"`) but not yet asserted in that test —
-  add a `Subscription` seed + assertion to make the proof exhaustive.
+  PrepArtifact, ChatMessage) after deletion, and `tests/test_billing.py::test_account_deletion_cascades_subscription`
+  proves the `subscriptions` cascade too (`User.subscription`, `cascade="all, delete-orphan"`):
+  it grants a subscription via a signed webhook, then asserts zero `Subscription` rows after
+  `DELETE /api/auth/me` — so the deletion proof is exhaustive across every user-owned table.
 - **Operational diagnostics** (server request logs: IP + timestamp): retained per the hosting
   platform's default log-retention window, not in the application DB. **Owner action:** set an
   explicit log-retention cap on the platform and record the number here (do not invent one).

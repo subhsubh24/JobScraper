@@ -36,7 +36,7 @@
 | G4 | Subscriptions / Play Billing | Digital goods via Play Billing | FAIL | Web Stripe built (PR #40); **Play Billing** NOT integrated — required before Android submission |
 | G5 | Permissions | Request only necessary permissions + rationale | PASS | Zero dangerous permissions; audited in `PERMISSIONS_AUDIT.md` |
 | G6 | Broken functionality | App must work as described | OPEN | Backend journeys pass; native end-to-end pending a build (CI/Human) |
-| G7 | Store listing assets | Icon, feature graphic, screenshots (real files) | FAIL | App icon exists; feature graphic + screenshots need a running build — not yet produced |
+| G7 | Store listing assets | Icon, feature graphic, screenshots (real files) | FAIL | App icon exists; feature graphic + screenshots need a running build — not yet produced. CURRENT Play spec: feature graphic is REQUIRED to publish (1024×500, 24-bit PNG/JPEG, no alpha); screenshots ≥2 (16:9 / 9:16). 2026 a11y: provide alt text / accessible descriptions for each store graphic. The current `mobile/assets/images/icon.png` is the Expo template — a brand-aware icon is a design task, not loop-generable at the bar (owner/designer). |
 | G8 | Deceptive behavior | No misleading claims / fake metrics | OPEN | Honesty standard enforced; copy is truthful to current features |
 
 ## Cross-cutting blockers (must be PASS before submission)
@@ -46,7 +46,9 @@
 - [x] Permissions minimized + audited (A9, G5) — `PERMISSIONS_AUDIT.md`
 - [ ] Mobile subscription purchase flow w/ restore (A4–A5, G4) — StoreKit/Play Billing not built
 - [ ] All core flows verified at runtime on a real build (A2, G6) — needs signed build (CI/Human)
-- [ ] Rendered, accurate store assets committed (A3, G7) — needs a running build
+- [ ] Rendered, accurate store assets committed (A3, G7) — needs a running build; Play
+      requires a 1024×500 feature graphic (no alpha) + ≥2 screenshots, with 2026 a11y alt
+      text; a brand-aware icon (vs the current Expo-template `icon.png`) is owner/designer work
 - [x] AI-output safety guardrail (A1) — coach input+output moderation shipped (PR #51);
       follow-ups: user-facing report affordance + prep-pack generator output filter
 - [ ] Owner enters App Privacy / Data Safety answers in the consoles + counsel review (PENDING_OPS)
