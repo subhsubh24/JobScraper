@@ -176,3 +176,65 @@ def test_chat_normal_message_passes_through(db_session):
 
     assert reply == "Tailor your resume to each role."
     assert coach.client.called is True
+
+
+# --- Context assembly (deterministic, no LLM) -----------------------------------------
+# The prompt context is built from optional profile fields + recent applications. A minimal
+# user (no name/resume/applications) must yield a valid (empty) context, never a KeyError or
+# crash, so chat() works for a brand-new account. With data present, each piece must appear.
+def test_user_context_omits_missing_fields(db_session):
+    user = User(email="bare@example.com", password_hash="x", tier=UserTier.PREMIUM)
+    db_session.add(user)
+    db_session.flush()
+    ctx = CareerCoach(db_session)._get_user_context(user)
+    assert ctx == ""  # nothing to say yet — and crucially, no crash
+
+
+def test_user_context_includes_present_profile_and_applications(db_session):
+    from src.db.models import Application, ApplicationStatus, JobPosting
+
+    user = User(
+        email="full@example.com", password_hash="x", tier=UserTier.PREMIUM,
+        full_name="Jane Seeker", resume_text="Senior Python engineer, 8 years.",
+    )
+    db_session.add(user)
+    db_session.flush()
+    job = JobPosting(user_id=user.id, title="Staff Engineer", company_name="Acme")
+    db_session.add(job)
+    db_session.flush()
+    db_session.add(Application(user_id=user.id, job_id=job.id, status=ApplicationStatus.APPLIED))
+    db_session.flush()
+
+    ctx = CareerCoach(db_session)._get_user_context(user)
+    assert "User: Jane Seeker" in ctx
+    assert "Senior Python engineer" in ctx
+    assert "Staff Engineer at Acme" in ctx
+    assert ApplicationStatus.APPLIED.value in ctx
+
+
+def test_conversation_history_returned_oldest_first(db_session):
+    """History is queried newest-first (DESC) then reversed for the prompt; assert the
+    reversal actually yields chronological order (a regression here scrambles the thread)."""
+    from datetime import datetime, timedelta
+
+    user = _premium_user(db_session)
+    base = datetime(2026, 1, 1, 12, 0, 0)
+    # Insert out of chronological order to prove ordering comes from created_at, not insert order.
+    for content, offset in [("second", 1), ("third", 2), ("first", 0)]:
+        db_session.add(ChatMessage(
+            user_id=user.id, session_id="s1", role="user", content=content,
+            created_at=base + timedelta(minutes=offset),
+        ))
+    db_session.flush()
+
+    history = CareerCoach(db_session)._get_conversation_history(user, "s1")
+    assert [m["content"] for m in history] == ["first", "second", "third"]
+
+
+def test_conversation_history_scoped_to_session(db_session):
+    user = _premium_user(db_session)
+    db_session.add(ChatMessage(user_id=user.id, session_id="s1", role="user", content="in"))
+    db_session.add(ChatMessage(user_id=user.id, session_id="s2", role="user", content="out"))
+    db_session.flush()
+    history = CareerCoach(db_session)._get_conversation_history(user, "s1")
+    assert [m["content"] for m in history] == ["in"]
