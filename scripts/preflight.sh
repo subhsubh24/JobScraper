@@ -71,9 +71,13 @@ if [ -d mobile ] && [ -f mobile/package.json ]; then
   fi
   # Component/integration tests (jest-expo). Headless, no native build — guards that the
   # screens/components actually render their intended output (BUILDS != WORKS for mobile).
+  # jest is a declared devDependency, so its ABSENCE is a gate FAILURE, never a silent skip
+  # (unlike the optional eslint guard above).
   if [ -f mobile/node_modules/.bin/jest ]; then
     ( cd mobile && npx jest --ci --silent ) || fail "mobile jest tests failed"
     ok "mobile jest green"
+  else
+    fail "mobile jest not installed (declared devDep — run: cd mobile && npm ci)"
   fi
 else
   fail "mobile/ Expo app missing (package.json)"

@@ -28,9 +28,10 @@ describe('Markdown', () => {
     expect(screen.getByText('Step one')).toBeTruthy();
   });
 
-  it('renders nothing for empty content without crashing', () => {
-    const { toJSON } = render(<Markdown content={''} />);
-    // An empty pack must degrade to an empty render, never throw.
-    expect(toJSON()).toBeDefined();
+  it('renders no text for empty content without crashing', () => {
+    render(<Markdown content={''} />);
+    // An empty pack must degrade to a genuinely empty render — no stray text nodes
+    // (and implicitly no throw, since a throw would fail the render call above).
+    expect(screen.queryByText(/\S/)).toBeNull();
   });
 });
