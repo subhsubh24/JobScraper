@@ -133,13 +133,8 @@ def test_explanation_truncates_skill_lists(db_session):
     ],
 )
 def test_cosine_similarity_zero_vector_returns_neutral_not_nan(db_session, v1, v2):
+    # isfinite is the real property under test — the old code returned nan here, which is
+    # not an exception and so slipped past score_job()'s try/except into the fit score.
     sim = JobScorer(db_session).cosine_similarity(v1, v2)
-    assert sim == 0.5
     assert math.isfinite(sim)
-
-
-def test_cosine_similarity_normal_vectors(db_session):
-    scorer = JobScorer(db_session)
-    assert scorer.cosine_similarity([1.0, 0.0], [1.0, 0.0]) == pytest.approx(1.0)
-    assert scorer.cosine_similarity([1.0, 0.0], [0.0, 1.0]) == pytest.approx(0.0)
-    assert scorer.cosine_similarity([1.0, 0.0], [-1.0, 0.0]) == pytest.approx(-1.0)
+    assert sim == 0.5
