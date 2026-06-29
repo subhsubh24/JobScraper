@@ -63,6 +63,15 @@ def test_vercel_env_enables_trust_by_default():
     assert get_client_ip(req) == "5.6.7.8"
 
 
+def test_explicit_opt_out_overrides_vercel():
+    # The escape hatch: even on Vercel, TRUST_PROXY_HEADERS=0 forces use of the socket
+    # peer (e.g. if a future deploy's trust surface changes).
+    os.environ["VERCEL"] = "1"
+    os.environ["TRUST_PROXY_HEADERS"] = "0"
+    req = _request({"X-Real-IP": "5.6.7.8", "X-Forwarded-For": "9.9.9.9"}, peer="10.0.0.1")
+    assert get_client_ip(req) == "10.0.0.1"
+
+
 def test_garbage_forwarding_header_falls_back_to_peer():
     os.environ["TRUST_PROXY_HEADERS"] = "1"
     req = _request({"X-Forwarded-For": "not-an-ip", "X-Real-IP": "also-bad"}, peer="10.0.0.1")

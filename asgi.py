@@ -123,7 +123,7 @@ SECURITY_HEADERS = {
     # prompt for these features.
     "Permissions-Policy": (
         "camera=(), microphone=(), geolocation=(), payment=(), usb=(), "
-        "magnetometer=(), gyroscope=(), accelerometer=(), interest-cohort=()"
+        "magnetometer=(), gyroscope=(), accelerometer=(), browsing-topics=()"
     ),
 }
 
