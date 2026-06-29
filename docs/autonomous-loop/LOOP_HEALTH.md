@@ -27,8 +27,8 @@ LOOP_HEALTH:
     readiness_attempts: 0
     readiness_rejected: 0
     recurring_failures: []
-    harness_proposals_open: 1     # "gates not enforced in CI" — staged docs/ci/PROPOSED_CI.md (#57)
-  enforced_in_ci: false          # ci.yml committed (2026-06-28); flip true once checks are REQUIRED in branch protection
+    harness_proposals_open: 0     # #57 RESOLVED 2026-06-28 — gates now enforced as required checks
+  enforced_in_ci: true           # required checks on main (preflight + web E2E), enforce_admins=ON, --auto merge
   auto_migrate_on_deploy: job_committed_pending_secret # migrate job live in ci.yml; needs DATABASE_URL secret + PITR + stamp (OWNER_ACTION auto-migrate)
   signal: bootstrapping          # bootstrapping | improving | steady | churning | stuck
 ```
