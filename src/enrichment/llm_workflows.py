@@ -2,6 +2,7 @@
 import json
 from sqlalchemy.orm import Session
 
+from src.ai_coach.moderation import ContentModerator
 from src.db.models import JobPosting, PrepArtifact, User
 from src.llm import get_llm_client, chat_model
 
@@ -14,6 +15,11 @@ class LLMWorkflows:
     def __init__(self, db: Session):
         self.db = db
         self.client = get_llm_client()
+        # Same conservative safety net the AI coach uses. Apple App Review §1.2 and Google's
+        # UGC policy require apps that surface AI-generated content to moderate it; the coach
+        # already did, but prep packs / cover letters / negotiation scripts were unmoderated.
+        # We screen the model OUTPUT (the text shown to the user), never the JSON-parsing call.
+        self.moderator = ContentModerator()
 
     def _call_llm(self, system_prompt: str, user_prompt: str, json_mode: bool = False) -> str:
         """Make a call to the LLM."""
@@ -33,7 +39,19 @@ class LLMWorkflows:
             kwargs["response_format"] = {"type": "json_object"}
 
         response = self.client.chat.completions.create(**kwargs)
-        return response.choices[0].message.content
+        content = response.choices[0].message.content
+
+        # Moderate the user-facing prose (prep packs, cover letters, study plans,
+        # negotiation scripts). The structured JSON-parsing path is internal plumbing, not
+        # shown to users, so we skip it to avoid false positives on field values. The
+        # moderator is deliberately conservative — it only replaces CLEARLY unsafe output, so
+        # a normal interview-prep answer is never swallowed. A flagged generation returns the
+        # safe decline text instead of surfacing unsafe content to the user.
+        if not json_mode:
+            verdict = self.moderator.check_output(content or "")
+            if not verdict.allowed:
+                return verdict.safe_response or ""
+        return content
 
     def parse_job_description(self, job: JobPosting) -> dict:
         """Parse a job description to extract structured data."""
