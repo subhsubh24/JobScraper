@@ -43,5 +43,7 @@ next-env.d.ts
 # playwright e2e artifacts (generated; CI uploads them — not committed)
 /test-results/
 /playwright-report/
-/e2e/__screenshots__/
 /.last-run.json
+# NOTE: /e2e/__screenshots__/ is intentionally COMMITTED — the dual-axis visual
+# verification baseline (ROADMAP Track E) is judged on a vision model and gated by
+# scripts/preflight.sh, so the captured page screenshots must live in the repo.
