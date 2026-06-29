@@ -77,6 +77,21 @@ Start free today and run your search like an operator.
 - **Age rating:** 4+ / Everyone — no objectionable content. *Note:* the AI coach produces
   free-form text; keep the content-safety guardrail (audit item A1) on the roadmap.
 
+## AI & generated content (disclosure)
+> Both stores expect apps that produce AI-generated content to disclose it, and Apple's
+> UGC guidelines (§1.2) expect a content-safety mechanism. State this in the listing and
+> near the relevant features:
+> *Career Operator uses generative AI (Google Gemini) to produce interview prep packs and
+> career-coach replies, and to compute resume↔job fit. AI output can be imperfect — treat it
+> as guidance, not professional, legal, or financial advice. Generated content is filtered by
+> an in-app safety guardrail (audit item A1: self-harm input returns crisis resources;
+> disallowed categories are blocked), and the AI Coach is for career topics only.*
+
+This is code-accurate: Gemini powers prep packs (`src/enrichment/llm_workflows.py`), the coach
+(`src/ai_coach/career_coach.py`), and fit embeddings; the `ContentModerator` guardrail runs on
+coach input AND output. When no Gemini key is configured the app degrades honestly (truthful
+"needs configuration"), so no fabricated AI output is ever shown.
+
 ## Owner notes (Human-Core)
 - Final character-limit trim happens in the console at submission (limits drift).
 - Rendered screenshots + feature graphic require a signed build — not buildable in-repo yet.
