@@ -55,3 +55,53 @@ def test_generate_prep_pack_persists_artifact(db_session):
     # It is actually persisted (queryable on the same session), exactly once.
     rows = db_session.query(PrepArtifact).filter(PrepArtifact.job_id == job.id).all()
     assert len(rows) == 1 and rows[0].artifact_type == "prep_pack"
+
+
+# A realistic, complete prep pack matching the 7-section contract the generator prompts for.
+_GOLDEN_PREP = """## 1. Company Research Summary
+Acme builds developer tooling. Recently raised a Series B.
+
+## 2. Role Analysis
+Owns the backend platform; must-have Python, nice-to-have Go.
+
+## 3. Your Fit Story
+Lead with your FastAPI + Postgres experience; address the Kubernetes gap.
+
+## 4. Technical Interview Questions (10 questions)
+1. Explain DB indexing. 2. Design a rate limiter. ... 10. Debug a deadlock.
+
+## 5. Behavioral Interview Questions (8 questions)
+1. Tell me about a conflict. ... 8. A time you failed.
+
+## 6. Questions to Ask Them (5 questions)
+1. What does success look like in 90 days? ... 5. How is on-call handled?
+
+## 7. 48-Hour Study Plan
+Day 1: systems design. Day 2: behavioral + company research.
+"""
+
+
+def test_generate_prep_pack_content_has_all_seven_sections(db_session):
+    """Golden CONTENT eval (not just persistence): a complete prep pack must contain every
+    one of the 7 prompted sections. Guards a regression where the artifact persists but the
+    content is truncated/missing sections — the structure the monetized feature promises."""
+    user, job = _seed(db_session)
+    wf = LLMWorkflows(db_session)
+    wf.client = _FakeLLM(_GOLDEN_PREP)
+
+    artifact = wf.generate_prep_pack(job, user)
+
+    required_sections = [
+        "Company Research Summary",
+        "Role Analysis",
+        "Your Fit Story",
+        "Technical Interview Questions",
+        "Behavioral Interview Questions",
+        "Questions to Ask Them",
+        "48-Hour Study Plan",
+    ]
+    for section in required_sections:
+        assert section in artifact.content, f"prep pack missing section: {section}"
+    # All seven numbered markdown headers are present (## 1. .. ## 7.).
+    for n in range(1, 8):
+        assert f"## {n}." in artifact.content
