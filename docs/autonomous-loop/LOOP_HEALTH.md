@@ -29,6 +29,6 @@ LOOP_HEALTH:
     recurring_failures: []
     harness_proposals_open: 0     # #57 RESOLVED 2026-06-28 — gates now enforced as required checks
   enforced_in_ci: true           # required checks on main (preflight + web E2E), enforce_admins=ON, --auto merge
-  auto_migrate_on_deploy: job_committed_pending_secret # migrate job live in ci.yml; needs DATABASE_URL secret + PITR + stamp (OWNER_ACTION auto-migrate)
+  auto_migrate_on_deploy: enabled # 2026-06-29: secret set + Neon PITR on + DB stamped at head & VERIFIED (schema==models); future migrations self-apply on merge
   signal: improving              # bootstrapping | improving | steady | churning | stuck — 4 shipped, 0 abandoned, every reviewer find resolved in <=1 cycle
 ```
