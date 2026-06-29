@@ -88,23 +88,45 @@ app = FastAPI(
 # file — so the SAME endpoint matches whether or not the prefix arrives. This mirrors how
 # /health and /api/health already both work.
 
-# CORS. Auth is Bearer-token (no cookies), so when no explicit allowlist is configured
-# we allow any origin WITHOUT credentials — this lets the web app call the API from its
-# own Vercel domain out of the box. Set ALLOWED_ORIGINS (comma-separated) to lock it
-# down to specific origins (which also re-enables credentials).
+# CORS. Auth is Bearer-token (no cookies). We NEVER fall back to a wide-open ``*`` policy:
+# the unified Vercel deploy is SAME-ORIGIN (the web app calls ``/api`` on its own domain) and
+# the mobile app is NATIVE (CORS is a browser-only mechanism), so neither client needs a
+# permissive cross-origin policy. Locking the default closes the wide-open-CORS hardening gap
+# (Quality #94) without breaking any real client.
+_LOCAL_DEV_ORIGINS = ["http://localhost:3000", "http://127.0.0.1:3000"]
+
+
+def resolve_cors_origins(explicit: List[str], is_vercel: bool) -> List[str]:
+    """Resolve the CORS allow-list. Returns explicit origins when configured; otherwise a
+    SAFE default that is never ``*``:
+
+    - explicit ``ALLOWED_ORIGINS`` set -> use exactly those (credentials are re-enabled by the
+      caller, keyed on this being non-empty);
+    - production (Vercel) with none set -> ``[]`` (same-origin web + native mobile both still
+      work; no cross-origin browser reads are permitted — the hardened default);
+    - local/dev with none set -> the localhost Next dev-server origins so ``next dev`` (and the
+      cross-port E2E run) can call a locally-running API.
+    """
+    if explicit:
+        return explicit
+    return [] if is_vercel else list(_LOCAL_DEV_ORIGINS)
+
+
 _explicit_origins = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", "").split(",") if o.strip()]
+_cors_origins = resolve_cors_origins(_explicit_origins, bool(os.getenv("VERCEL")))
 if os.getenv("VERCEL") and not _explicit_origins:
-    # Non-fatal (the unified deploy is same-origin so the web app still works), but a wide-open
-    # CORS policy in production is a hardening gap — set ALLOWED_ORIGINS to lock it down. We warn
-    # loudly rather than fail loud so a missing var can never take the live API down.
+    # Non-fatal (same-origin web + native mobile both still work), but worth surfacing: set
+    # ALLOWED_ORIGINS to permit any ADDITIONAL browser origin (e.g. a separate marketing
+    # domain). We warn rather than fail so a missing var can never take the live API down.
     logger.warning(
-        "CORS is open to any origin in production (ALLOWED_ORIGINS unset). Set ALLOWED_ORIGINS "
-        "to the known web origins to lock it down (this also re-enables credentialed requests)."
+        "CORS is locked to same-origin in production (ALLOWED_ORIGINS unset). Set "
+        "ALLOWED_ORIGINS to allow additional browser origins (this also re-enables "
+        "credentialed requests)."
     )
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=_explicit_origins or ["*"],
-    allow_credentials=bool(_explicit_origins),  # cannot combine credentials with "*"
+    allow_origins=_cors_origins,
+    allow_credentials=bool(_explicit_origins),  # credentials only with an explicit allow-list
     allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type"],
 )
