@@ -10,8 +10,7 @@ import os
 import re
 import time
 import uuid
-from collections import defaultdict
-from datetime import datetime, date
+from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 
 from dotenv import load_dotenv
@@ -37,6 +36,7 @@ from src.db.models import (
     ATSType,
     JobPosting,
     PrepArtifact,
+    RateCounter,
     User,
     UserTier,
     Waitlist,
@@ -221,16 +221,76 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
 
 # ---------------------------------------------------------------------------
 # Rate limiting + per-user/day LLM spend ceiling.
-# NOTE: in-memory state. On Vercel serverless each invocation may run on a fresh
-# instance, so these limits are per-instance, NOT global — they slow abuse within a
-# warm instance but are not a hard cross-instance guarantee. Track F: back these with
-# a shared store (Upstash Redis / Postgres) before relying on them in production.
+# CROSS-INSTANCE (ROADMAP Track F): backed by the shared Postgres ``rate_counters`` table,
+# NOT in-process state. On Vercel serverless each invocation may run on a fresh instance, so
+# the previous in-memory dicts only slowed abuse within ONE warm instance — the LLM spend
+# ceiling in particular multiplied per instance, defeating the wallet-drain defense. The DB
+# counter makes the limit GLOBAL: every instance reads/writes the same tally.
 # ---------------------------------------------------------------------------
-_RATE_BUCKET: Dict[Tuple[str, str], List[float]] = defaultdict(list)
-_LLM_DAY_COUNT: Dict[Tuple[str, str], int] = defaultdict(int)
 
 # Per-user/day ceiling on expensive LLM operations (wallet-drain defense).
 LLM_DAILY_CEILING = int(os.getenv("LLM_DAILY_CEILING", "25"))
+
+
+def _consume_counter(
+    db: Session, subject: str, bucket: str, limit: int, window_seconds: int
+) -> bool:
+    """Atomically count one hit against a fixed window; return False if over ``limit``.
+
+    Cross-instance + durable: the tally lives in Postgres and is COMMITTED immediately, so
+    it holds across serverless instances AND is not lost if the request later errors (an
+    expensive LLM attempt still counts — no fake under-count). Runs on the request's own
+    session (so it transparently uses the test DB under dependency overrides); the early
+    commit only persists the counter row (and any already-valid pending write), which is
+    safe because limiter checks run before the endpoint does its real work.
+
+    Concurrency: ``SELECT ... FOR UPDATE`` serializes concurrent increments on Postgres
+    (a no-op on SQLite, which serializes writes itself); a first-insert race surfaces as an
+    IntegrityError on the unique window key and is retried as an update.
+    """
+    window_key = int(time.time() // window_seconds)
+
+    # Prune stale windows for this subject+bucket so the table stays bounded. (On the rare
+    # insert-race retry below this prune is rolled back with the failed INSERT and simply
+    # runs again on the next call — harmless; the table is still bounded over time.)
+    db.query(RateCounter).filter(
+        RateCounter.subject == subject,
+        RateCounter.bucket == bucket,
+        RateCounter.window_key < window_key,
+    ).delete(synchronize_session=False)
+
+    for _attempt in (1, 2):
+        row = (
+            db.query(RateCounter)
+            .filter(
+                RateCounter.subject == subject,
+                RateCounter.bucket == bucket,
+                RateCounter.window_key == window_key,
+            )
+            .with_for_update()
+            .first()
+        )
+        if row is None:
+            db.add(
+                RateCounter(
+                    subject=subject, bucket=bucket, window_key=window_key, count=1
+                )
+            )
+            try:
+                db.commit()
+            except IntegrityError:
+                # A concurrent request inserted the same window first — retry as update.
+                db.rollback()
+                continue
+            return 1 <= limit
+        if row.count >= limit:
+            db.commit()  # commit the stale-window prune + release the row lock; count unchanged
+            return False
+        row.count += 1
+        db.commit()
+        return True
+    return False
+
 
 # Per-ACCOUNT login lockout (defends one account against a distributed password
 # brute-force that spreads across IPs, which the per-IP rate limit alone misses). In-memory
@@ -290,29 +350,23 @@ _RATE_LIMIT_DISABLED = bool(os.getenv("E2E_DISABLE_RATE_LIMIT")) and not os.gete
 
 
 def rate_limit(bucket: str, limit: int, window_seconds: int = 60):
-    """Fixed-window limiter dependency factory, keyed by client + bucket."""
-    def _dep(request: Request) -> None:
+    """Fixed-window limiter dependency factory, keyed by client + bucket (cross-instance)."""
+    def _dep(request: Request, db: Session = Depends(get_db)) -> None:
         if _RATE_LIMIT_DISABLED:
             return
         client = get_client_ip(request)
-        key = (client, bucket)
-        now = time.time()
-        hits = [t for t in _RATE_BUCKET[key] if now - t < window_seconds]
-        if len(hits) >= limit:
+        if not _consume_counter(db, client, bucket, limit, window_seconds):
             raise HTTPException(status_code=429, detail="Too many requests. Slow down.")
-        hits.append(now)
-        _RATE_BUCKET[key] = hits
     return _dep
 
 
-def check_llm_ceiling(user: User) -> None:
-    key = (user.id, date.today().isoformat())
-    if _LLM_DAY_COUNT[key] >= LLM_DAILY_CEILING:
+def check_llm_ceiling(user: User, db: Session) -> None:
+    # 86400s window keyed by user id — a per-user/day ceiling that holds across instances.
+    if not _consume_counter(db, user.id, "llm_daily", LLM_DAILY_CEILING, 86400):
         raise HTTPException(
             status_code=429,
             detail="Daily AI usage limit reached. Try again tomorrow.",
         )
-    _LLM_DAY_COUNT[key] += 1
 
 
 # ---------------------------------------------------------------------------
@@ -905,7 +959,7 @@ def generate_prep_pack(
             detail="AI prep packs require the server's GEMINI_API_KEY to be configured.",
         )
 
-    check_llm_ceiling(user)
+    check_llm_ceiling(user, db)
     try:
         artifact: PrepArtifact = LLMWorkflows(db).generate_prep_pack(job, user)
     except Exception:
@@ -945,7 +999,7 @@ def coach_chat(
             detail="The AI Coach requires the server's GEMINI_API_KEY to be configured.",
         )
 
-    check_llm_ceiling(user)
+    check_llm_ceiling(user, db)
     job = None
     if data.job_id:
         job = (

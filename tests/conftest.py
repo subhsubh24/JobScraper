@@ -23,12 +23,11 @@ from src.db.models import Base  # noqa: E402
 
 @pytest.fixture(autouse=True)
 def _reset_rate_limit_state():
-    """The rate-limit + LLM-ceiling buckets are process-global, in-memory dicts. Without
-    a reset they accumulate across every test in the run, so a later test trips the limit
-    and gets a spurious 429 (flaky, order-dependent). Clear them before each test so the
-    journey suite stays deterministic as more tests are added."""
-    asgi._RATE_BUCKET.clear()
-    asgi._LLM_DAY_COUNT.clear()
+    """The rate-limit + LLM-ceiling counters are now in the shared ``rate_counters`` table,
+    which is recreated empty per test by the function-scoped ``_engine`` fixture — so no
+    reset is needed for those. The per-account login lockout is still a process-global
+    in-memory dict; clear it before each test so an earlier failed-login test can't leak a
+    lockout into a later one (flaky, order-dependent)."""
     asgi._LOGIN_FAILURES.clear()
     yield
 
