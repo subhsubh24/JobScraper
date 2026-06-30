@@ -14,13 +14,13 @@ from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 
 from dotenv import load_dotenv
-from fastapi import Depends, FastAPI, Header, HTTPException, Request
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from src.api.errors import error_body
@@ -783,13 +783,31 @@ def create_job(
 
 
 @app.get("/api/jobs")
-def list_jobs(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    jobs = (
+def list_jobs(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    limit: Optional[int] = Query(None, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+):
+    # Eager-load the relationships ``job_public`` reads (application/score/company) so the
+    # serializer never lazy-loads per row: one query per relationship instead of 3N+1.
+    # ``limit`` is OPTIONAL and additive — omitting it preserves the original "return all"
+    # contract (no client truncation); supplying it lets a client page an unbounded list.
+    query = (
         db.query(JobPosting)
         .filter(JobPosting.user_id == user.id)
+        .options(
+            selectinload(JobPosting.application),
+            selectinload(JobPosting.score),
+            selectinload(JobPosting.company),
+        )
         .order_by(JobPosting.created_at.desc())
-        .all()
     )
+    if offset:
+        query = query.offset(offset)
+    if limit is not None:
+        query = query.limit(limit)
+    jobs = query.all()
     return {"success": True, "jobs": [job_public(j) for j in jobs]}
 
 
@@ -1036,7 +1054,17 @@ def coach_suggestions(
 # ---------------------------------------------------------------------------
 @app.get("/api/analytics/pipeline")
 def pipeline_stats(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    jobs = db.query(JobPosting).filter(JobPosting.user_id == user.id).all()
+    # Eager-load application + score so the aggregate loop (and the top-5 sort, which both
+    # read job.score) never lazy-loads per row: 2 queries instead of 2N+1.
+    jobs = (
+        db.query(JobPosting)
+        .filter(JobPosting.user_id == user.id)
+        .options(
+            selectinload(JobPosting.application),
+            selectinload(JobPosting.score),
+        )
+        .all()
+    )
     status_counts: Dict[str, int] = {}
     scores = []
     for job in jobs:
