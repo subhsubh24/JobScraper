@@ -89,7 +89,12 @@ describe('SettingsScreen', () => {
     await del!.onPress!();
 
     expect(api.deleteAccount).toHaveBeenCalledTimes(1);
-    expect(mockSignOut).toHaveBeenCalledTimes(1); // session cleared only AFTER the server delete
+    expect(mockSignOut).toHaveBeenCalledTimes(1);
+    // Pin the ORDER: the server delete must resolve BEFORE the session is cleared, so we never
+    // sign out (and report success) on a delete that hasn't actually happened.
+    const deleteOrder = (api.deleteAccount as jest.Mock).mock.invocationCallOrder[0];
+    const signOutOrder = mockSignOut.mock.invocationCallOrder[0];
+    expect(deleteOrder).toBeLessThan(signOutOrder);
     alertSpy.mockRestore();
   });
 
