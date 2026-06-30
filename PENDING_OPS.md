@@ -10,7 +10,7 @@ submission. Everything else the factory builds.
 ```yaml
 OWNER_ACTIONS:
   project: jobscraper
-  as_of: 2026-06-29
+  as_of: 2026-06-30
   items:
     - id: site-gate
       title: "Pre-launch SITE GATE: set SITE_GATE_PASSWORD=deepster now; unset at launch"

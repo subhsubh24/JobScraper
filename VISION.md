@@ -99,13 +99,18 @@ the handler is wired" is **not** done — every flow must be validated at runtim
 user, asserting the intended outcome. See ROADMAP.md → *Definition of Done* and
 *Standing Standards* for the full, binding rules.
 
-## Honest current state (bootstrap)
+## Honest current state (pre-launch)
 
-As of the bootstrap run: the Python backend is an **architectural blueprint that does
-not yet fully work** — `api.py` references service methods that do not exist in
-`src/` with those signatures, so only `/health` is functionally real. The mobile app
-is being re-platformed from a Flutter prototype to Expo/React Native. There is **no
-revenue, no users, no live billing, and no store submission.** The business case is
+The product is **built and runs end-to-end** — the FastAPI backend (`asgi.py`,
+against real `src/` services) is deployed on Vercel and passes the functional
+journey suite in required CI (signup → working dashboard → add job → fit score →
+detail); the legacy Flask `api.py` was retired (PR #70). The mobile app is a real
+Expo/React Native app (the Flutter re-platform is done; screens render real API data
+under jest-expo, `tsc`/lint gated in CI). What remains is **pre-launch**, not
+broken: **no revenue, no users, no live billing keys, and no store submission yet**
+— those are owner Human-Core (see PENDING_OPS). The honest business case is still
 **below the $100K floor** today; we say so plainly and list the buildable levers.
 This file and the apparatus around it are the machine that converges the product
-toward the vision over scheduled factory runs.
+toward the vision over scheduled factory runs. *(Keep this snapshot honest as state
+changes — it is a dated reality check, not a stable anchor; the vision + quality bar
+above it are.)*
