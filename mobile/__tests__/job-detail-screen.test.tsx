@@ -110,4 +110,22 @@ describe('JobDetailScreen', () => {
     render(<JobDetailScreen />);
     expect(await screen.findByText('Could not load this job.')).toBeTruthy();
   });
+
+  it('exposes the pipeline status chips as a radio group with the current status selected', async () => {
+    render(<JobDetailScreen />);
+    await screen.findByText('Senior Backend Engineer');
+
+    // All 7 pipeline statuses are operable as radio options (VoiceOver/TalkBack), not just
+    // unlabeled tappable text — the core job-tracking loop is accessible.
+    const options = screen.getAllByRole('radio');
+    expect(options).toHaveLength(7);
+
+    // The current status ('saved') is announced as the selected option.
+    const selected = screen.getByRole('radio', { name: 'Set status to Saved', selected: true });
+    expect(selected).toBeTruthy();
+    // A non-current status is NOT selected.
+    expect(
+      screen.getByRole('radio', { name: 'Set status to Applied', selected: false }),
+    ).toBeTruthy();
+  });
 });

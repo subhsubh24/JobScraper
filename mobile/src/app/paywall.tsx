@@ -46,8 +46,14 @@ export default function PaywallScreen() {
 
         <Card>
           {FEATURES.map((f) => (
-            <View key={f} style={styles.featureRow}>
-              <Ionicons name="checkmark-circle" size={18} color={colors.success} />
+            <View key={f} style={styles.featureRow} accessible accessibilityLabel={f}>
+              <Ionicons
+                name="checkmark-circle"
+                size={18}
+                color={colors.success}
+                accessibilityElementsHidden
+                importantForAccessibility="no"
+              />
               <Text style={styles.feature}>{f}</Text>
             </View>
           ))}
@@ -87,12 +93,20 @@ export default function PaywallScreen() {
       </Card>
 
       <View style={styles.plans}>
-        <View style={[styles.plan, styles.planHighlight]}>
+        <View
+          style={[styles.plan, styles.planHighlight]}
+          accessible
+          accessibilityLabel="Annual plan, $96 per year. Save about 33%, best value."
+        >
           <Text style={styles.planName}>Annual</Text>
           <Text style={styles.planPrice}>$96<Text style={styles.per}>/yr</Text></Text>
           <Text style={styles.planNote}>Save ~33% · best value</Text>
         </View>
-        <View style={styles.plan}>
+        <View
+          style={styles.plan}
+          accessible
+          accessibilityLabel="Monthly plan, $12 per month. Cancel anytime."
+        >
           <Text style={styles.planName}>Monthly</Text>
           <Text style={styles.planPrice}>$12<Text style={styles.per}>/mo</Text></Text>
           <Text style={styles.planNote}>Cancel anytime</Text>
