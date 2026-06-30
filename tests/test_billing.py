@@ -324,3 +324,88 @@ def test_period_end_returns_none_on_bad_input(value):
 
 def test_period_end_parses_valid_unix_timestamp():
     assert _period_end({"current_period_end": 1700000000}) == datetime.utcfromtimestamp(1700000000)
+
+
+# --------------------------------------------------------------------------- lifecycle status
+# These pin the entitlement decision on subscription STATUS, which production Stripe events
+# exercise but the existing tests never did: a trial grants access, a non-active status
+# revokes it, and a $0/trial checkout (no_payment_required) still grants. A regression that
+# narrowed _ACTIVE_STATUSES or the checkout payment-status allow-list would silently break a
+# real paying/trialing user — these fail LOUD if that happens.
+
+
+def test_webhook_trialing_subscription_grants_premium(client, monkeypatch, db_session):
+    """A ``customer.subscription.updated`` with status="trialing" must grant Premium —
+    Stripe trials are entitled access, and "trialing" is in _ACTIVE_STATUSES."""
+    monkeypatch.setenv("STRIPE_WEBHOOK_SECRET", WHSEC)
+    user_id, _ = _register(client, email="trial@example.com")
+    payload = _event(
+        "customer.subscription.updated",
+        {
+            "id": "sub_trial",
+            "customer": "cus_trial",
+            "status": "trialing",
+            "metadata": {"user_id": user_id, "plan": "pro_monthly"},
+        },
+    )
+    r = client.post(
+        "/api/billing/webhook", content=payload, headers={"stripe-signature": _sign(payload)}
+    )
+    assert r.status_code == 200, r.text
+    db_session.expire_all()
+    user = db_session.query(User).filter(User.id == user_id).first()
+    assert user.tier == UserTier.PREMIUM
+    sub = db_session.query(Subscription).filter(Subscription.user_id == user_id).first()
+    assert sub is not None and sub.status == "trialing"
+
+
+def test_webhook_inactive_status_revokes_premium(client, monkeypatch, db_session):
+    """A subscription that goes ``past_due`` (or any non-active status) via .updated must
+    drop the user back to FREE — the else-branch of the entitlement decision."""
+    monkeypatch.setenv("STRIPE_WEBHOOK_SECRET", WHSEC)
+    user_id, _ = _register(client, email="pastdue@example.com")
+    # Grant first via an active subscription.
+    grant = _event(
+        "customer.subscription.updated",
+        {"id": "sub_pd", "customer": "cus_pd", "status": "active",
+         "metadata": {"user_id": user_id, "plan": "pro_monthly"}},
+    )
+    client.post("/api/billing/webhook", content=grant, headers={"stripe-signature": _sign(grant)})
+    db_session.expire_all()
+    assert db_session.query(User).filter(User.id == user_id).first().tier == UserTier.PREMIUM
+    # Now it goes past_due -> revoke (without a delete event).
+    lapse = _event(
+        "customer.subscription.updated",
+        {"id": "sub_pd", "customer": "cus_pd", "status": "past_due",
+         "metadata": {"user_id": user_id, "plan": "pro_monthly"}},
+    )
+    r = client.post(
+        "/api/billing/webhook", content=lapse, headers={"stripe-signature": _sign(lapse)}
+    )
+    assert r.status_code == 200, r.text
+    db_session.expire_all()
+    assert db_session.query(User).filter(User.id == user_id).first().tier == UserTier.FREE
+
+
+def test_webhook_no_payment_required_checkout_grants_premium(client, monkeypatch, db_session):
+    """A trial/$0 checkout completes with payment_status="no_payment_required" — money was
+    never owed, so it MUST grant (it's in the checkout allow-list), unlike "unpaid"."""
+    monkeypatch.setenv("STRIPE_WEBHOOK_SECRET", WHSEC)
+    user_id, _ = _register(client, email="freetrial@example.com")
+    payload = _event(
+        "checkout.session.completed",
+        {
+            "id": "cs_npr",
+            "client_reference_id": user_id,
+            "customer": "cus_npr",
+            "subscription": "sub_npr",
+            "payment_status": "no_payment_required",
+            "metadata": {"user_id": user_id, "plan": "pro_monthly"},
+        },
+    )
+    r = client.post(
+        "/api/billing/webhook", content=payload, headers={"stripe-signature": _sign(payload)}
+    )
+    assert r.status_code == 200, r.text
+    db_session.expire_all()
+    assert db_session.query(User).filter(User.id == user_id).first().tier == UserTier.PREMIUM
