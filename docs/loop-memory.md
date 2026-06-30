@@ -4,6 +4,25 @@ Durable lessons for the factory loop. Append dated entries. Keep it honest and s
 
 ---
 
+### 2026-06-30 — Authenticated journey tier enforced in CI (BUILDS!=WORKS for the logged-in product)
+The web E2E already covered signup->dashboard->core loop, but the logged-in tier was thin (the
+2nd test only checked the login PAGE renders, not a real sign-in; no account/paywall). Added
+web/e2e/authed-journey.spec.ts (runs in the required `functional journeys (web E2E)` check vs the
+REAL FastAPI+JWT backend on a seeded throwaway DB): (1) real SIGN-IN — seed a confirmed user via
+the register service path, then log in through the UI -> dashboard renders real content; (2)
+ACCOUNT — /app/settings shows real email + plan, not an error boundary; (3) PAYWALL -> checkout
+HONEST — free user clicks Go Premium; with no Stripe key it must show an honest notice (never a
+fake upgrade, never a crash) and settings still shows Free. EVIDENCE-ON-FAILURE pattern: each flow
+attaches page.on('console')+page.on('pageerror') and, if sign-in misses the dashboard, reads the
+login error text and throws with both — debug from evidence, never a guess. Caught the ACCOUNT
+failure that way: strict-mode violation (email renders in BOTH the header nav AND settings) -> a
+SELECTOR fix (.first()), not a product bug. CSP NOTE: the directive's connect-src trap does NOT
+apply here — asgi.py sets only `Content-Security-Policy: frame-ancestors 'none'` (no connect-src),
+and the web app sets no connect-src CSP, so the cross-origin local-backend fetch was never blocked
+(that's why E2E worked from the start). required_status_checks unchanged: the authed tier is folded
+into the existing required `functional journeys (web E2E)`. Proved green (9/9) before relying on it.
+
+
 ### 2026-06-30 (run 6) — Maximal run: 3 PRs (referral invite loop, LLM fail-loud, mobile design polish) + 8-scout sweep
 Ran the full 8-scout sweep (business-case / security / design-taste / functional-reality /
 store / mobile / marketing-growth / tests-perf-freshness) which doubled as the ~daily DEEP
