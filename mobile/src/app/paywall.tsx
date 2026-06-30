@@ -85,8 +85,14 @@ export default function PaywallScreen() {
 
       <Card>
         {FEATURES.map((f) => (
-          <View key={f} style={styles.featureRow}>
-            <Ionicons name="checkmark-circle" size={18} color={colors.success} />
+          <View key={f} style={styles.featureRow} accessible accessibilityLabel={f}>
+            <Ionicons
+              name="checkmark-circle"
+              size={18}
+              color={colors.success}
+              accessibilityElementsHidden
+              importantForAccessibility="no"
+            />
             <Text style={styles.feature}>{f}</Text>
           </View>
         ))}
