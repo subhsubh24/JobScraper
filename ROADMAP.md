@@ -160,6 +160,12 @@ the guard tests, and **`FACTORY_STANDARD.md`**.
 - [x] ASO / store copy (title, subtitle, keywords, descriptions) — `docs/store/ASO_COPY.md`
       (title/subtitle/keywords within char limits, descriptions honest to shipped features,
       auto-renew + restore-purchases disclosure) (PR #43).
+- [ ] **User-report / flag affordance for AI-generated content** (2026 Apple App Review + Google
+      Play GenAI/UGC guidelines, surfaced by the run-8 store scout via WebSearch): the app
+      moderates LLM output server-side (`src/moderation`) but has no USER-FACING "report this
+      response" control on the AI coach + prep-pack surfaces. Loop-buildable (a `report` endpoint
+      + a small UI affordance on web + mobile) but sprawls asgi.py + web + mobile → a dedicated
+      coherent run, not bundled. Verify against the live guidelines at submission.
 - [ ] `docs/store/ACCEPTANCE_AUDIT.md` vs CURRENT Apple/Google guidelines, **ZERO open FAILs**
 
 ### E — World-class quality

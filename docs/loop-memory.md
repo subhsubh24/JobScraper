@@ -4,6 +4,73 @@ Durable lessons for the factory loop. Append dated entries. Keep it honest and s
 
 ---
 
+### 2026-06-30 (run 8) — Maximal run: 3 PRs (perf N+1 eager-load, scorer coverage, mobile a11y) + 8-scout sweep
+Ran the full 8-scout sweep (security / functional-reality / business-case / performance /
+mobile+TrackE / store / tests-quality-reconcile / growth-PMF) doubling as the ~daily DEEP
+AUDIT. Functional-reality found NO ship-critical bug (core web+mobile loops + side-effects
+sound). `asgi.py` was the single contended backend file → owned by exactly ONE PR (the perf
+N+1, the scorecard's NAMED performance top-gap). Shipped 3 file-disjoint PRs through 2 Sonnet
+reviewers each + the CI gate, all merged:
+- **#121 perf N+1 eager-load** (performance B → drives toward A): `job_public` + the
+  pipeline-analytics loop lazy-loaded each job's application/score/company → 3N+1 on /api/jobs,
+  2N+1 on /api/analytics/pipeline (unbounded for unlimited-tier). Added selectinload on both
+  endpoints (NO migration — JobScore.job_id/Application.job_id are unique=True, already indexed)
+  + an OPTIONAL additive limit/offset on /api/jobs (default returns all → no client truncation).
+  `tests/test_perf_n1.py` asserts a CONSTANT query count as job count grows. Reviewer A
+  (REQUEST_CHANGES, 1 cycle): pipeline_stats missed selectinload(company) (job_public reads it
+  on the top-5 slice) AND the guard had a blind spot — every seeded job shared company_name="Acme"
+  so job.company was never dereferenced. Fixed both: distinct companies + company_name=None makes
+  the guard tight (verified it FAILS without the company eager-load, passes with it).
+- **#122 scorer batch-helper coverage** (tests): `score_all_jobs` + `get_top_jobs` had ZERO
+  coverage (the "score everything new" entry point + the ranked-pipeline query).
+  `tests/test_scorer_workflow.py`: unscored-only filter + idempotency, DESC ordering + limit,
+  per-user isolation. Reviewer B (REQUEST_CHANGES): the endpoint free-tier-cap test I bundled
+  was a DUPLICATE of the journey suite's test_free_tier_job_limit_enforced (same HTTP layer) →
+  removed it; PR is now scorer-only (both reviewers approved that file).
+- **#123 mobile a11y** (Track B / store review): job-detail pipeline status chips → radio group
+  (accessibilityRole=radio + selected state + label) so the core job-tracking loop is
+  screen-reader-operable; paywall plan cards + feature rows announce as single descriptive
+  elements (decorative checkmark hidden). jest-expo asserts the roles/labels. BOTH reviewers
+  (REQUEST_CHANGES, 1 cycle): my replace_all feature-row edit matched only the PREMIUM branch's
+  10-space indent, missing the free-tier branch's 8-space indent (the high-traffic path) — and
+  it was untested. Applied the fix to the free-tier block + added a free-tier test.
+LESSONS: (1) **BRANCH CONTAMINATION via a stale index — caught by a reviewer, recovered cleanly.**
+After committing the perf change on its branch, the scorer-test branch's amend somehow captured
+asgi.py + test_perf_n1.py (the perf files) into its single commit — Reviewer B's re-review (which
+reads the DIFF, not my claim) flagged that the "scorer-only" branch carried the entire perf change.
+FIX/RULE: when a branch diff doesn't match what you believe you committed, TRUST the diff — I
+hard-reset the branch to origin/main and re-applied ONLY the intended file (git reset --hard
+origin/main; restore the one file; add explicit path; commit; force-with-lease). Verified the
+remote diff was a single file before relying on it. The perf change was safe on its own PR the
+whole time. maker≠checker caught a real merge-hygiene defect a self-review would have missed.
+(2) **replace_all is indentation-sensitive** — two "identical" JSX blocks at DIFFERENT nesting
+depths are NOT identical strings, so replace_all hit only one. BOTH reviewers independently caught
+the half-applied a11y fix. When a value appears in two render branches, edit/verify EACH explicitly.
+(3) **A scout's "untested" can be wrong** — the test scout called the free-tier job cap "only
+unit-tested," but the journey suite already covered it at the HTTP layer (Reviewer B's catch).
+Verify a claimed gap against ALL test dirs (tests/journeys too), not just the obvious unit file.
+(4) **Greenhouse departments[0] is a FALSE positive** — a bonus scout flagged "departments[0]
+crashes on []" but the code is `departments[0]["name"] if departments else None` (guarded);
+skepticism over the scout, no churn fix.
+DEFERRED (named, buildable — next clean-asgi.py run): privacy-safe analytics instrumentation
+(the PMF measurement foundation, deferred 5+ runs; NEXT-RUN DESIGN: AggregateEvent table keyed by
+event_type+cohort_date+window_date, NO PII/raw events; best-effort record_event() at signup/job-add/
+fit-score; a read endpoint GATED behind an env shared-secret bearer token — NOT any-authed-user — to
+avoid leaking aggregate user counts; 503 when the secret is unset; wants asgi.py + 1 migration).
+CAPTCHA (owner Turnstile/hCaptcha keys; multi-surface web+mobile+asgi). Career+ ($24) tier — the
+"genuine exclusive feature" problem is REAL (PREMIUM is already unlimited-everything incl. salary
+negotiation), so a real Career+ entitlement needs metering PREMIUM down OR a new exclusive — a
+multi-run design, NOT a clean one-PR change; do NOT rush it. TEAM/B2B2C tier (the floor-flip lever;
+2-3 PRs + owner GTM). NEW 2026 STORE-COMPLIANCE FINDINGS (store scout, WebSearch): Apple App Review
++ Google Play now require a USER-REPORT/FLAGGING affordance for AI-generated content (GenAI/UGC
+guidelines) — the app moderates output but has no user-facing "report this response" — added to
+ROADMAP Track D (loop-buildable: report endpoint + coach/prep UI, but sprawls asgi.py+web+mobile →
+dedicated run). Texas SB2420 age-assurance (effective 2026-06-04) → owner legal decision (build age
+verification / rate-gate 17+ / defer) — added to PENDING_OPS. OWNER-BLOCKED: store asset IMAGES +
+brand icon; mobile Track-E snapshot PIXELS (jest serializes trees, not pixels) + prep-pack vision
+verdict (needs LLM key).
+
+
 ### 2026-06-30 (run 7) — Maximal run: 6 PRs (cross-instance limiter, client timeout, coach N+1, mobile screen tests, backend coverage, README honesty) + 8-scout sweep
 Ran the full 8-scout sweep (security / functional-reality / business-case / mobile+TrackE /
 performance / store / tests-freshness / growth) doubling as the ~daily DEEP AUDIT. `asgi.py`
