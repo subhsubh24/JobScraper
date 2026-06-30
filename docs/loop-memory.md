@@ -16,10 +16,19 @@ Wired into preflight (per-PR in the required `ci` gate; --readiness in the full 
 Proved green on the pre-launch feed (all []/null/none) BEFORE relying on it; verified the
 tripwire fires on a fabricated funnel.signups=142, and --readiness fails honestly with no
 scorecard. Enforced via the existing required `preflight` check (not a separate required check).
-NOTE: JobScraper has no GTM Auditor routine yet, so a GTM_SCORECARD is absent — the per-PR gate
-is green; the --readiness GTM_SCORECARD requirement is a future need (a GTM auditor) consistent
-with the full gate being pre-launch-red. Discipline recorded in ROADMAP + ANALYSIS_PLAYBOOK so
-the Growth Agent keeps metrics 0/null until sourced.
+CORRECTION (2026-06-30): an earlier note here wrongly said "no GTM Auditor yet" — it relied on a
+stale routine list. A GTM AUDITOR routine DOES exist (trig_0151oAtyorpyqZ3z6s38rrL8, created
+2026-06-30 02:45, cron 30 18 */2, enabled): an independent adversarial grader (maker!=checker)
+that owns docs/growth/GTM_RUBRIC.md + GTM_SCORECARD.md + GTM_AUDIT_MEMORY.md and writes a fenced
+GTM_SCORECARD block (per-dim grades + ship_gate_met). The former "Growth Agent" routine
+(trig_01Pntig) is now the "GTM FACTORY" (maker) — restructured AFTER the Gmail-prefix fix, which
+SURVIVED (still mcp__claude_ai_Gmail__*). So the GTM architecture mirrors the Quality side:
+GTM Factory (maker → GROWTH_STATUS) + GTM Auditor (checker → GTM_SCORECARD) + validate_gtm.py
+(deterministic hard gate, consumes both, never writes the scorecard). The GTM_SCORECARD isn't in
+the repo YET (the auditor hasn't run/merged) — when it lands, validate_gtm parses+grade-checks it
+and --readiness becomes satisfiable (no new auditor to build; it already exists). Always re-list
+routines before asserting one doesn't exist — they change between turns. Discipline in ROADMAP +
+ANALYSIS_PLAYBOOK so the GTM Factory keeps metrics 0/null until sourced.
 
 
 ### 2026-06-29 — Self-validation gate: convergence addendum (modes + surfacing + honesty)
