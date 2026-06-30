@@ -10,6 +10,12 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL ?? '';
 
 const TOKEN_KEY = 'career_operator_token';
 
+// Hard timeout on every request. `fetch` has NO default timeout, so without this a slow or
+// unreachable API hangs the call forever — on app launch that strands the user on a stuck
+// "Loading…" screen with no error and no way forward (session restore awaits `api.me()`).
+// An AbortController bounds every request; a timeout surfaces as an honest, retryable error.
+const REQUEST_TIMEOUT_MS = 20_000;
+
 export class ApiError extends Error {
   status: number;
   constructor(status: number, message: string) {
@@ -41,15 +47,23 @@ async function request<T>(path: string, opts: ReqOptions = {}): Promise<T> {
     const token = getToken();
     if (token) headers.Authorization = `Bearer ${token}`;
   }
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   let res: Response;
   try {
     res = await fetch(`${API_URL}${path}`, {
       method: opts.method ?? 'GET',
       headers,
       body: opts.body ? JSON.stringify(opts.body) : undefined,
+      signal: controller.signal,
     });
-  } catch {
+  } catch (err) {
+    if (err instanceof Error && err.name === 'AbortError') {
+      throw new ApiError(0, 'Request timed out — please try again.');
+    }
     throw new ApiError(0, 'Network error — check your connection.');
+  } finally {
+    clearTimeout(timer);
   }
   const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
   if (!res.ok) {

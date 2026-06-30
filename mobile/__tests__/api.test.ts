@@ -100,6 +100,36 @@ describe('api client', () => {
     expect(err.message).toMatch(/network/i);
   });
 
+  it('bounds every request with an AbortSignal', async () => {
+    const fetchMock = mockFetch(200, { jobs: [] });
+    await api.listJobs();
+    const [, init] = fetchMock.mock.calls[0];
+    // No signal == a request that can hang forever (stuck loading on launch). Pin it.
+    expect(init.signal).toBeDefined();
+  });
+
+  it('maps a hung request (timeout/abort) to a retryable ApiError(0)', async () => {
+    jest.useFakeTimers();
+    // A fetch that never resolves until its signal aborts — i.e. the timer kills it.
+    globalThis.fetch = jest.fn(
+      (_url: string, init: { signal: AbortSignal }) =>
+        new Promise((_resolve, reject) => {
+          init.signal.addEventListener('abort', () =>
+            reject(Object.assign(new Error('Aborted'), { name: 'AbortError' })),
+          );
+        }),
+    ) as unknown as typeof fetch;
+
+    const pending = api.listJobs().catch((e) => e);
+    await jest.advanceTimersByTimeAsync(20_000); // past REQUEST_TIMEOUT_MS
+    const err = await pending;
+    expect(err).toBeInstanceOf(ApiError);
+    expect(err.status).toBe(0);
+    // Distinct from the offline message so a screen can say "try again", not "check connection".
+    expect(err.message).toMatch(/timed out/i);
+    jest.useRealTimers();
+  });
+
   it('generatePrepPack posts the job_id and unwraps prep_pack (happy path)', async () => {
     const fetchMock = mockFetch(200, { prep_pack: { title: 'Interview Prep: Eng', content: '## X' } });
     const pack = await api.generatePrepPack('j1');
