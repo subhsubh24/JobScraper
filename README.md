@@ -43,7 +43,7 @@ Subscription, good-better-best + annual (annual ≈ 2 months free). See
 | **Pro** (Premium) | $12 | $96 | Active seeker | Unlimited jobs, 10 prep packs/mo, AI coach (100 msg/mo) |
 | **Career+** _(planned)_ | $24 | $192 | Senior / urgent | Everything unlimited, salary negotiation, outreach, priority |
 
-> **Shipped today:** the tier model is binary — **Free** and **Premium** (the "Pro" price).
+> **Current state:** the tier model is binary — **Free** and **Premium** (the "Pro" price).
 > **Career+** is a *planned* tier, not yet a purchasable entitlement (the `careerplus_*`
 > price envs exist but the tier enum is FREE/PREMIUM); it's a named business-case lever, not
 > a live product. See [docs/BUSINESS_CASE.md](./docs/BUSINESS_CASE.md).
