@@ -4,6 +4,73 @@ Durable lessons for the factory loop. Append dated entries. Keep it honest and s
 
 ---
 
+### 2026-06-30 (run 9) — Maximal run: 5 PRs (input-bounds wallet-drain, billing + mobile-billing money-path tests, web + mobile coach a11y) + 8-scout sweep
+Ran the full 8-scout sweep (functional-reality / security / performance / backend-tests /
+web-frontend / mobile / store+artifact-freshness / business-case+PMF) doubling as the ~daily
+DEEP AUDIT. Functional-reality found NO ship-critical bug (job_public is None-guarded, the
+LLM-ceiling consume-before-call is the documented wallet-drain design, delete_user already
+purges referrals first — all three "findings" were verified false positives). `asgi.py` was
+the single contended backend file → owned by exactly ONE PR (the input-bounds hardening).
+Shipped 5 file-disjoint PRs through 2 Sonnet reviewers each + the CI gate, all merged:
+- **#126 input-bounds wallet-drain hardening** (security §12, the asgi.py owner): `resume_text`/
+  `description`/`requirements` feed LLM prompts VERBATIM but the per-day ceiling is a CALL count,
+  not a token budget — an unbounded field let one account drive the per-call token bill arbitrarily
+  high (real money risk, spend caps still owner-pending). Added max_length (50k/20k/20k) + salary
+  `ge=0/le=10M` + a `min<=max` model_validator + `job_id<=64` + `location/url` bounded to DB column
+  widths (422 at the edge vs a 500 at the DB write). New `tests/test_input_bounds.py` (8): each
+  bound rejects AND a within-bounds value still succeeds. BOTH reviewers APPROVE first pass
+  (independently verified the vuln against llm_workflows.py + that bounds match DB widths).
+- **#127 billing money-path tests** (test coverage, src/billing.py): the webhook decides entitlement
+  on subscription STATUS but the suite only ever used active/paid — added trialing→GRANT,
+  past_due-via-.updated→REVOKE (the else-branch), no_payment_required checkout→GRANT. Reviewer B
+  MUTATION-TESTED each (broke the branch, only the matching test failed) — proven load-bearing, not
+  padding. BOTH APPROVE first pass.
+- **#128 mobile-billing event-set tests** (coverage, src/mobile_billing.py): parametrized over the
+  ACTUAL `_GRANT_EVENTS`/`_REVOKE_EVENTS` (4 grant events had ZERO direct coverage) + a multi-alias
+  resolution test (primary + first alias unknown, a later alias matches — a distinct loop-continuation
+  branch). Reviewer A mutation-tested: a `return None`-on-first-miss bug passes the old single-alias
+  test but fails the new one. BOTH APPROVE.
+- **#129 web coach a11y + auto-scroll** (web/app/app/coach/page.tsx): aria-label on the input,
+  role=alert on the error, a bottom-anchor + scrollIntoView on [messages,sending] (was: manual scroll
+  on every reply), "…"→"Sending…". BOTH APPROVE first pass.
+- **#130 mobile a11y** (mobile coach.tsx + the shared Field component): bound `accessibilityLabel` on
+  Field (labels all ~10 login/register/new-job inputs that announced as bare "text field") + made the
+  coach chat screen-reader operable (input label, Send role/name/state, suggestion buttons, error
+  alert role). New jest assertion; reviewer A reproduced 51/51 + tsc + lint clean. BOTH APPROVE.
+LESSONS: (1) **maker≠checker confirmed the work but, unusually, drew ZERO REQUEST_CHANGES this run —
+all 10 reviewers APPROVED first pass.** Not a free pass: the verification was rigorous (two reviewers
+ran MUTATION tests in isolated worktrees to prove the new money-path tests aren't tautological; two
+independently re-ran the mobile gate; one re-verified the wallet-drain vuln against llm_workflows.py).
+The clean sweep reflects tightly-scoped, single-concern, pre-verified PRs — not lax review. (2)
+**SKEPTICISM rejected three functional-reality false positives** before building: job_public's
+"lazy-load crash" (it's None-guarded), the LLM-ceiling "consume before call" (documented wallet-drain
+design — an expensive ATTEMPT must count), and the delete_user "referral FK 500" (it purges referrals
+FIRST). Verified each against the code, built none. (3) **BRANCH CONTAMINATION via a reviewer's local
+checkout (recovered):** a PR-128 reviewer transiently applied the diff to the SHARED working tree to
+mutation-test, leaving `tests/test_mobile_billing.py` dirty on my local `main`; I caught it via
+`git status` and `git reset --hard origin/main`. The remote PR branches were never affected (all merges
+used the GitHub API, not the local tree). RULE: reviewers that need a local checkout should use an
+isolated worktree (one did); when the local tree is dirty with work you didn't author, trust origin and
+reset. (4) **CHOSE security-input-bounds over analytics-instrumentation for the single asgi.py slot:**
+both are real, but the wallet-drain bounds defend live money the moment any traffic hits (spend caps
+owner-unset), while PMF analytics produces NO signal pre-launch (0 users) — instrumenting now vs next
+run changes nothing measurable. Analytics deferred again, honestly (see below).
+ARTIFACT FRESHNESS: fixed VISION.md's stale "Honest current state (bootstrap)" section (claimed the
+backend "does not yet fully work — api.py … only /health is real" + mobile "being re-platformed" — both
+false now: asgi.py is deployed + passing E2E, Flask api.py retired #70, Expo re-platform done). Bumped
+PENDING_OPS as_of. NOTE: docs/quality/QUALITY_SCORECARD.md is STALE (as_of 2026-06-29) — its named gaps
+CORS (fixed #96), perf N+1 (#121), referral loop (#109), cross-instance limiter (#114) are CLOSED; the
+independent Quality Auditor should re-grade (consumed as data, NOT self-edited — maker≠checker).
+DEFERRED (named, buildable — next clean-asgi.py run): privacy-safe analytics instrumentation (PMF
+foundation, deferred 6+ runs now; same design as before — AggregateEvent table keyed by
+event_type+cohort_date+window_date, NO PII, best-effort record_event() at signup/job-add/fit-score, read
+endpoint behind an env shared-secret bearer, 503 when unset; wants asgi.py + 1 migration). CAPTCHA
+(owner Turnstile/hCaptcha keys; multi-surface). Career+ ($24) + TEAM/B2B2C tiers (business-case levers;
+multi-run). GenAI user-report affordance (Track D; sprawls asgi.py+web+mobile → dedicated run). Prompt-
+injection delimiter-escaping of resume_text in the coach prompt (career_coach.py; deferred — weak
+without an eval + risks shifting LLM output; the max_length bound already caps the token-drain half).
+
+
 ### 2026-06-30 (run 8) — Maximal run: 3 PRs (perf N+1 eager-load, scorer coverage, mobile a11y) + 8-scout sweep
 Ran the full 8-scout sweep (security / functional-reality / business-case / performance /
 mobile+TrackE / store / tests-quality-reconcile / growth-PMF) doubling as the ~daily DEEP
