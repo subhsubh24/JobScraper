@@ -12,6 +12,13 @@ jest.mock('expo-router', () => ({
   router: { push: (...a: unknown[]) => mockPush(...a) },
 }));
 
+// jest-expo stubs the NATIVE bridge but not the JS layer of safe-area-context; mock it to a
+// plain View (mirrors pipeline-screen.test.tsx) so the screen renders deterministically.
+jest.mock('react-native-safe-area-context', () => {
+  const { View } = require('react-native');
+  return { SafeAreaView: View, useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 0, left: 0 }) };
+});
+
 let mockTier: 'free' | 'premium' = 'premium';
 jest.mock('@/contexts/auth', () => ({
   useAuth: () => ({ user: { id: 'u1', tier: mockTier } }),
@@ -40,12 +47,15 @@ afterEach(() => {
 });
 
 describe('CoachScreen', () => {
-  it('shows a free user an honest Premium lock that routes to the paywall (no dead end)', () => {
+  it('shows a free user an honest Premium lock that routes to the paywall (no dead end)', async () => {
     mockTier = 'free';
     render(<CoachScreen />);
     expect(screen.getByText('Your AI Career Coach')).toBeTruthy();
     fireEvent.press(screen.getByText('Upgrade to unlock'));
     expect(mockPush).toHaveBeenCalledWith('/paywall');
+    // The screen loads suggestions on mount unconditionally; settle that async state inside
+    // act() so it can't leak a post-test update.
+    await waitFor(() => expect(api.coachSuggestions).toHaveBeenCalled());
   });
 
   it('lets a premium user pick a suggestion and renders the real coach reply', async () => {
@@ -61,6 +71,7 @@ describe('CoachScreen', () => {
     mockTier = 'premium';
     (api.coachChat as jest.Mock).mockRejectedValueOnce(new Error('boom'));
     render(<CoachScreen />);
+    await waitFor(() => expect(api.coachSuggestions).toHaveBeenCalled()); // settle the load first
     fireEvent.changeText(screen.getByPlaceholderText('Type a message…'), 'hello');
     fireEvent.press(screen.getByText('Send'));
     await waitFor(() => expect(screen.getByText(/unavailable right now/i)).toBeTruthy());

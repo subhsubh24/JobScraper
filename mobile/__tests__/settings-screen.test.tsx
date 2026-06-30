@@ -12,6 +12,13 @@ jest.mock('expo-router', () => ({
   router: { push: jest.fn(), replace: (...a: unknown[]) => mockReplace(...a) },
 }));
 
+// jest-expo stubs the NATIVE bridge but not the JS layer of safe-area-context; mock it to a
+// plain View (mirrors pipeline-screen.test.tsx) so the screen renders deterministically.
+jest.mock('react-native-safe-area-context', () => {
+  const { View } = require('react-native');
+  return { SafeAreaView: View, useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 0, left: 0 }) };
+});
+
 const mockSignOut = jest.fn(async (..._a: unknown[]) => {});
 let mockUser: Record<string, unknown> = {
   id: 'u1',
