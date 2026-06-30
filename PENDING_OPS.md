@@ -72,6 +72,12 @@ OWNER_ACTIONS:
       status: in_progress
       why: "Neon project 'JobScraper' is provisioned and the schema is created + verified (full journey ran green against it). Remaining: set server-side env vars in Vercel and deploy."
       how: "DONE: Neon DB + 9 tables via pooled endpoint. TODO: in Vercel set DATABASE_URL (Neon pooled string), JWT_SECRET (openssl rand -hex 32), optional GEMINI_API_KEY + ALLOWED_ORIGINS; deploy; verify GET /api/health. See docs/DEPLOY_VERCEL.md. Never commit .env. ENFORCED (rule b): the API now REFUSES to start on Vercel if JWT_SECRET is unset or the dev default — set a strong JWT_SECRET BEFORE the next deploy or /api will fail loud (by design; auth tokens would be forgeable otherwise)."
+    - id: texas-age-assurance
+      title: "DECISION: Texas SB 2420 age-assurance (effective 2026-06-04) — build / rate-gate 17+ / defer"
+      priority: normal
+      status: open
+      why: "Surfaced by the run-8 store scout (WebSearch of current 2026 Apple/Google policy). Apple states new accounts in Texas are subject to age assurance + parental-consent for minors under 18; the app currently collects no age at signup. This is a legal/positioning decision the loop must NOT make: (a) build age verification (birthday + a verification partner), (b) rate the app 17+ (sidesteps minor consent, narrows the market), or (c) defer/accept the risk for a non-TX or post-launch launch. Not a hard code blocker today, but a real store-acceptance + legal exposure to decide before a US launch."
+      how: "Decide a/b/c with counsel. If (a): the loop can build the signup age field + integrate a verification provider (e.g. Veriff) behind an env flag + a round-trip test — open it as ROADMAP work. If (b): set the age rating in App Store Connect / Play Console + update ASO. If (c): document the accepted risk + the non-TX scope. Re-evaluate as Apple/Google age-rating questionnaires update through 2026."
     - id: legal-review
       title: "Have counsel review Privacy Policy + ToS; provision the contact inboxes"
       priority: normal
