@@ -91,7 +91,15 @@ the guard tests, and **`FACTORY_STANDARD.md`**.
       (no fake "purchase complete" — no charge, plan unchanged; entitlement only flips
       server-side from a verified RevenueCat webhook). jest-expo test asserts both states +
       refresh-on-open + honest purchase (PR #88, 2 Sonnet reviewers).
-- [ ] Polished design-bar UI; real empty/loading/error states; not a thin wrapper
+- [x] Polished design-bar UI; real empty/loading/error states; not a thin wrapper —
+      native screens (FlatList + pull-to-refresh, SafeAreaView, KeyboardAvoidingView chat,
+      paywall, settings) with real loading/empty/error states; PR #111 added a consistent
+      `ErrorBanner` with in-place **Retry** on the pipeline + job-detail load-failure paths
+      (recoverable, not a dead end), accessibility labels (job rows + Button), a markdown
+      overflow fix, and converged the brand accent (`#6366F1`) with web; PR #109 added a
+      native "Refer a friend" share surface. tsc + expo lint + jest-expo (34) green; 2
+      Sonnet reviewers incl. design APPROVED. (On-device run + committed mobile screenshots
+      remain Track E / human-CI.)
 - [x] Component/integration tests green; typecheck-clean (native device run = human/CI) —
       jest-expo suite now covers the API client + Pipeline + Job-detail screens + the prep
       markdown renderer (21 tests green), `tsc --noEmit` + `expo lint` clean, all gated in CI

@@ -45,7 +45,13 @@ These are *named, buildable* items (the only valid weak-case loop-back triggers)
    dossiers as a Career+ wedge raising upgrade rate.
 4. **Mobile ASO + app-store discovery** — the new Expo app opens an acquisition channel
    the web alone doesn't have (organic store traffic).
-5. **Referral loop** — "share a prep pack" invite mechanic to lower CAC.
+5. **Referral loop** — "share a prep pack" invite mechanic to lower CAC. **BUILT (PR #109):**
+   every user gets a referral code; a referred signup grants BOTH sides a real bonus prep
+   pack (raises the actual free-tier allowance — no fake billing promise), surfaced on web +
+   mobile Settings. This is a CAC/organic-pull lever; its ARR impact stays **unquantified
+   until real funnel data exists** (pre-launch) — we do NOT credit it to the projection yet
+   (anti-gaming). Floor still **not met**; the remaining named levers are the **Career+**
+   ($24) entitlement tier and the **team/B2B2C** tier.
 
 When any lever is built and the honest median crosses $100K, re-run the readiness gate.
 Until then, readiness is **rejected** on business-case grounds (per ROADMAP standards),
