@@ -39,7 +39,19 @@ class LLMWorkflows:
             kwargs["response_format"] = {"type": "json_object"}
 
         response = self.client.chat.completions.create(**kwargs)
-        content = response.choices[0].message.content
+        try:
+            content = response.choices[0].message.content
+        except (IndexError, AttributeError):
+            # A malformed/empty completion (no choices, no message) must FAIL LOUD here so
+            # the caller surfaces an honest error — never silently produce a blank artifact.
+            raise RuntimeError("LLM returned a malformed response (no message content).")
+
+        # An empty/None completion is NOT a success. Returning it would either crash the
+        # JSON parser (`json.loads(None)` in parse_job_description) or persist a blank
+        # prep pack / cover letter and report it to the user as "generated" — a fake-success
+        # side effect (FACTORY_STANDARD §6). Fail loud so the endpoint returns an honest 502.
+        if not content or not content.strip():
+            raise RuntimeError("LLM returned an empty response.")
 
         # Moderate the user-facing prose (prep packs, cover letters, study plans,
         # negotiation scripts). The structured JSON-parsing path is internal plumbing, not
@@ -48,7 +60,7 @@ class LLMWorkflows:
         # a normal interview-prep answer is never swallowed. A flagged generation returns the
         # safe decline text instead of surfacing unsafe content to the user.
         if not json_mode:
-            verdict = self.moderator.check_output(content or "")
+            verdict = self.moderator.check_output(content)
             if not verdict.allowed:
                 return verdict.safe_response or ""
         return content
