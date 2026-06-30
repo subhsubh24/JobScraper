@@ -27,6 +27,8 @@ export function Button({
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled: !!(disabled || loading), busy: !!loading }}
       onPress={onPress}
       disabled={disabled || loading}
       style={({ pressed }) => [
@@ -72,6 +74,27 @@ export function EmptyState({ title, subtitle }: { title: string; subtitle?: stri
   );
 }
 
+// A consistent, unmistakable error treatment (vs. bare muted-looking text) with an optional
+// Retry so a failed load is recoverable in place — not a dead end (Track B: real error states,
+// not a thin wrapper). Announced to screen readers as an alert.
+export function ErrorBanner({ message, onRetry }: { message: string; onRetry?: () => void }) {
+  return (
+    <View accessibilityRole="alert" style={styles.errorBanner}>
+      <Text style={styles.errorBannerText}>{message}</Text>
+      {onRetry ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Retry"
+          onPress={onRetry}
+          style={({ pressed }) => [styles.errorRetry, pressed && styles.buttonPressed]}
+        >
+          <Text style={styles.errorRetryText}>Retry</Text>
+        </Pressable>
+      ) : null}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   button: {
     backgroundColor: colors.primary,
@@ -111,4 +134,25 @@ const styles = StyleSheet.create({
   empty: { alignItems: 'center', paddingVertical: spacing.xl, gap: spacing.xs },
   emptyTitle: { color: colors.text, fontSize: 16, fontWeight: '600' },
   emptySubtitle: { color: colors.textMuted, textAlign: 'center', paddingHorizontal: spacing.lg },
+  errorBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+    backgroundColor: 'rgba(248,113,113,0.12)',
+    borderLeftWidth: 3,
+    borderLeftColor: colors.danger,
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  errorBannerText: { color: colors.danger, fontWeight: '600', flex: 1 },
+  errorRetry: {
+    borderWidth: 1,
+    borderColor: colors.danger,
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+  },
+  errorRetryText: { color: colors.danger, fontWeight: '700', fontSize: 13 },
 });

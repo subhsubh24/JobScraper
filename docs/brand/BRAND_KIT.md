@@ -36,8 +36,8 @@ or store-readiness.
 
 Dark-first. Tokens live in `mobile/src/theme.ts` (`colors`) and `web/app/globals.css`
 (CSS vars + Tailwind `slate`/`indigo`). The shared surface/text values are identical
-across web + mobile; the **accent differs slightly** between the two and should converge
-(see the consistency note).
+across web + mobile, and the **accent is now converged** on a single canonical value
+(`#6366F1`) across both platforms.
 
 | Role | Hex | Where | Use |
 |---|---|---|---|
@@ -47,8 +47,7 @@ across web + mobile; the **accent differs slightly** between the two and should 
 | Border | `#2A3554` | mobile `border` (web: `slate-700/800`) | Hairlines, dividers |
 | Text | `#F4F6FB` | mobile `text` / web `--foreground` | Primary text |
 | Text (muted) | `#9AA6C2` | mobile `textMuted` (web: `slate-400/500`) | Secondary text, labels |
-| **Accent (mobile)** | `#5B8CFF` | mobile `primary` | Primary actions, links |
-| **Accent (web)** | `#6366F1` | `web/components/ui.tsx` `bg-indigo-500` (Tailwind `indigo-500`) | Primary actions, links, focus ring |
+| **Accent (canonical)** | `#6366F1` | mobile `primary` + web `web/components/ui.tsx` `bg-indigo-500` (Tailwind `indigo-500`) | Primary actions, links, focus ring |
 | Success | `#34D399` | mobile `success` (web: `emerald`) | Good fit, positive state |
 | Warning | `#FBBF24` | mobile `warning` (web: `amber`) | Moderate fit, caution |
 | Danger | `#F87171` | mobile `danger` (web: `red-4xx/6xx`) | Weak fit, destructive, errors |
@@ -92,9 +91,10 @@ targets (clear hierarchy, consistent whitespace from the scale, accent restraint
 content-first layouts, calm motion). One line: *simplicity without blandness; functionality
 without visual clutter.*
 
-## Known consistency item (not invented — flagged honestly)
+## Consistency items (flagged honestly)
 
-The primary **accent differs** between platforms: mobile `#5B8CFF` vs web `indigo-500`
-(`#6366F1`). Both are blue and on-brand, but they are not the same hex. Converging on one
-value (and recording it here as the canonical accent) is a small, real follow-up; until
-then, this kit documents the actual per-platform values rather than a fabricated single one.
+The primary **accent is now converged**: mobile `primary` was changed from `#5B8CFF` to
+`#6366F1` (`mobile/src/theme.ts`) to match the web `indigo-500`, so both platforms use the
+one canonical accent above. The remaining cross-platform gap is the **app icon/splash**,
+which are still the Expo template assets — a bespoke brand mark is owner/designer work (the
+loop must not auto-generate one, which would read as generic-AI slop).
