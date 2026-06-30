@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button, Card, ErrorText, Field } from '@/components/ui';
 import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
@@ -17,6 +17,14 @@ function postSignupPath(): string {
   return '/app';
 }
 
+// A referral code arrives as ?ref=CODE on a shared invite link. Captured here and sent with
+// signup so the inviter gets credited; a missing/invalid code is harmless (server no-ops it).
+function referralCode(): string | undefined {
+  if (typeof window === 'undefined') return undefined;
+  const ref = new URLSearchParams(window.location.search).get('ref');
+  return ref ? ref.trim().slice(0, 32) : undefined;
+}
+
 export default function RegisterPage() {
   const router = useRouter();
   const { setUser } = useAuth();
@@ -26,6 +34,13 @@ export default function RegisterPage() {
   const [resume, setResume] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  // Read the referral code once at mount (not at submit) so we can both acknowledge the
+  // invite in the copy AND send it with signup — and so the URL can't change underneath us.
+  // The value is window-only, so it must be read after mount (avoids an SSR hydration
+  // mismatch); the post-mount setState is intentional.
+  const [ref, setRef] = useState<string | undefined>(undefined);
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => setRef(referralCode()), []);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -42,6 +57,7 @@ export default function RegisterPage() {
           password,
           full_name: fullName.trim() || undefined,
           resume_text: resume.trim() || undefined,
+          referral_code: ref,
         }),
       );
       router.push(postSignupPath());
@@ -55,7 +71,14 @@ export default function RegisterPage() {
   return (
     <main className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center px-6 py-16">
       <h1 className="mb-1 text-3xl font-extrabold">Create your account</h1>
-      <p className="mb-6 text-slate-400">Free to start — 5 tracked jobs and a prep pack on us.</p>
+      {ref ? (
+        <p className="mb-6 text-slate-300">
+          A friend invited you — sign up and you <span className="font-semibold text-slate-100">both</span> get
+          a bonus interview prep pack.
+        </p>
+      ) : (
+        <p className="mb-6 text-slate-400">Free to start — 5 tracked jobs and a prep pack on us.</p>
+      )}
       <Card>
         <form onSubmit={onSubmit} className="space-y-4">
           <Field label="Full name" value={fullName} onChange={(e) => setFullName(e.target.value)} />

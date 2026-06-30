@@ -161,6 +161,11 @@ class AuthService:
         cascade="all, delete-orphan", and JobPosting cascades to its score, application, and
         prep_artifacts, so deleting the user removes the whole object graph. Caller commits.
         """
+        # Referral rows reference users by FK without an ORM cascade — clear them first so
+        # the delete isn't blocked by a Postgres FK constraint (account-deletion must leave
+        # ZERO rows owned by or referencing the user).
+        from src import referrals
+        referrals.purge_user_referrals(self.db, user)
         self.db.delete(user)
         self.db.flush()
 
@@ -196,11 +201,14 @@ class AuthService:
                 "prep_packs_remaining": "unlimited",
             }
 
+        # Referral reward: earned bonus prep packs raise the real free-tier prep allowance.
+        prep_limit = FREE_PREP_PACKS_LIMIT + (user.bonus_prep_packs or 0)
+
         return {
             "can_add_job": user.jobs_added_this_month < FREE_JOBS_LIMIT,
-            "can_generate_prep": user.prep_packs_this_month < FREE_PREP_PACKS_LIMIT,
+            "can_generate_prep": user.prep_packs_this_month < prep_limit,
             "jobs_remaining": max(0, FREE_JOBS_LIMIT - user.jobs_added_this_month),
-            "prep_packs_remaining": max(0, FREE_PREP_PACKS_LIMIT - user.prep_packs_this_month),
+            "prep_packs_remaining": max(0, prep_limit - user.prep_packs_this_month),
         }
 
     def increment_job_usage(self, user: User):

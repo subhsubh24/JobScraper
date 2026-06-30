@@ -65,6 +65,12 @@ interface AuthResponse {
   user: User;
 }
 
+export interface ReferralStats {
+  code: string;
+  total_referred: number;
+  bonus_prep_packs: number;
+}
+
 export const api = {
   apiUrl: API_URL,
 
@@ -73,6 +79,7 @@ export const api = {
     password: string;
     full_name?: string;
     resume_text?: string;
+    referral_code?: string;
   }): Promise<User> {
     const r = await request<AuthResponse>('/api/auth/register', {
       method: 'POST',
@@ -95,6 +102,10 @@ export const api = {
 
   async me(): Promise<User> {
     return (await request<{ user: User }>('/api/auth/me')).user;
+  },
+
+  async referralStats(): Promise<ReferralStats> {
+    return (await request<{ referral: ReferralStats }>('/api/referrals/me')).referral;
   },
 
   logout(): void {

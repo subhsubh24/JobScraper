@@ -51,3 +51,9 @@ export interface PipelineStats {
   average_score: number;
   top_jobs: Job[];
 }
+
+export interface ReferralStats {
+  code: string;
+  total_referred: number;
+  bonus_prep_packs: number;
+}
