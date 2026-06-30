@@ -226,7 +226,15 @@ the guard tests, and **`FACTORY_STANDARD.md`**.
       nosniff, Referrer-Policy, frame-ancestors CSP, Permissions-Policy) already ship on every
       response. `tests/test_cors.py` pins all modes never return `*` (PR #96, 2 Sonnet reviewers).
 - [x] Per-user/day spend ceiling on scrape + LLM (wallet-drain defense)
-- [ ] Make rate-limit + spend-ceiling **cross-instance** (Upstash Redis/Postgres) — current in-memory state is per-instance on Vercel serverless
+- [x] Make rate-limit + spend-ceiling **cross-instance** (Postgres) — the rate limiter and
+      per-user/day LLM spend ceiling are now backed by the shared `rate_counters` table
+      (`RateCounter` + Alembic `993d75032689`, drift-gated/auto-applied); `_consume_counter()`
+      does an atomic fixed-window count committed immediately, so the limit holds GLOBALLY
+      across serverless instances (the LLM wallet-drain ceiling no longer multiplies per
+      instance). `tests/test_rate_counter.py` proves a second session sees the first's
+      increments + the ceiling blocks at the HTTP layer (PR #114, 2 Sonnet reviewers). Login
+      lockout intentionally stays in-memory (a shared store doesn't fix its targeted-DoS;
+      CAPTCHA does). Chose Postgres over Upstash: the DB is already wired, no owner key needed.
 - [x] Secrets server-side only — never in the mobile app, never committed
 - [ ] **F4.1 — Side-effect round-trip (enforced):** the journey suite proves every claimed
       side-effect actually occurs, never just that the UI showed success. NOW: verify-purchase
