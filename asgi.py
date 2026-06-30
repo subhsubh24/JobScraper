@@ -250,7 +250,9 @@ def _consume_counter(
     """
     window_key = int(time.time() // window_seconds)
 
-    # Prune stale windows for this subject+bucket so the table stays bounded.
+    # Prune stale windows for this subject+bucket so the table stays bounded. (On the rare
+    # insert-race retry below this prune is rolled back with the failed INSERT and simply
+    # runs again on the next call — harmless; the table is still bounded over time.)
     db.query(RateCounter).filter(
         RateCounter.subject == subject,
         RateCounter.bucket == bucket,
@@ -282,7 +284,7 @@ def _consume_counter(
                 continue
             return 1 <= limit
         if row.count >= limit:
-            db.commit()  # release the row lock; no change
+            db.commit()  # commit the stale-window prune + release the row lock; count unchanged
             return False
         row.count += 1
         db.commit()

@@ -385,9 +385,10 @@ class RateCounter(Base):
     count = Column(Integer, nullable=False, default=0)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
+    # The unique constraint already creates the B-tree index that serves the only query
+    # pattern (exact match on all three columns), so no separate Index is needed.
     __table_args__ = (
         UniqueConstraint("subject", "bucket", "window_key", name="uq_rate_counter_window"),
-        Index("ix_rate_counter_lookup", "subject", "bucket", "window_key"),
     )
 
 
