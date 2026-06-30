@@ -4,8 +4,8 @@ from datetime import datetime
 from enum import Enum as PyEnum
 
 from sqlalchemy import (
-    Column, String, Integer, Float, Text, Boolean, DateTime,
-    ForeignKey, Enum, JSON, Index
+    Column, String, Integer, BigInteger, Float, Text, Boolean, DateTime,
+    ForeignKey, Enum, JSON, Index, UniqueConstraint
 )
 from sqlalchemy.orm import declarative_base, relationship
 
@@ -360,6 +360,35 @@ class Contact(Base):
     # Relationships
     company = relationship("Company", back_populates="contacts")
     outreach_sequences = relationship("OutreachSequence", back_populates="contact")
+
+
+class RateCounter(Base):
+    """Cross-instance fixed-window abuse counter (rate limit + per-user/day LLM spend
+    ceiling). On Vercel serverless each request may run on a fresh instance, so the old
+    in-process dicts only slowed abuse within ONE warm instance — the LLM spend ceiling
+    in particular multiplied per instance, defeating the wallet-drain defense. Persisting
+    the counter to the shared Postgres makes the limit GLOBAL (ROADMAP Track F).
+
+    A row is one (subject, bucket, window) tally. ``subject`` is the client IP (rate limit)
+    or the user id (spend ceiling); ``window_key`` is ``floor(epoch / window_seconds)`` so
+    each fixed window gets its own row. Stale windows are pruned opportunistically on write,
+    so the table stays bounded to roughly the number of currently-active (subject, bucket)
+    pairs rather than growing forever.
+    """
+
+    __tablename__ = "rate_counters"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    subject = Column(String(255), nullable=False)
+    bucket = Column(String(64), nullable=False)
+    window_key = Column(BigInteger, nullable=False)
+    count = Column(Integer, nullable=False, default=0)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("subject", "bucket", "window_key", name="uq_rate_counter_window"),
+        Index("ix_rate_counter_lookup", "subject", "bucket", "window_key"),
+    )
 
 
 class OutreachSequence(Base):

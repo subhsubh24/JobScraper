@@ -28,8 +28,10 @@ def test_404_has_envelope_and_keeps_detail():
     assert r.headers["X-Request-ID"] == body["error"]["request_id"]
 
 
-def test_validation_error_uses_envelope():
+def test_validation_error_uses_envelope(client):
     # Missing required fields -> RequestValidationError -> 422 in the same envelope.
+    # Uses the seeded in-memory DB fixture (register's cross-instance rate-limit dependency
+    # now touches the DB before body validation, so the rate_counters table must exist).
     r = client.post("/api/auth/register", json={"email": "x@example.com"})
     assert r.status_code == 422
     body = r.json()
