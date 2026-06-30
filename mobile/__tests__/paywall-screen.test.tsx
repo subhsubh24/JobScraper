@@ -55,6 +55,28 @@ describe('PaywallScreen', () => {
     expect(mockRefresh).toHaveBeenCalledTimes(1);
   });
 
+  it('plan cards expose a single descriptive accessibility label (price read as one unit)', () => {
+    mockTier = 'free';
+    render(<PaywallScreen />);
+    // A screen reader otherwise reads "Annual" "$96" "/yr" "Save ~33%" as disjoint fragments.
+    // Each plan card is one accessible element with the price + terms in its label.
+    expect(
+      screen.getByLabelText('Annual plan, $96 per year. Save about 33%, best value.'),
+    ).toBeTruthy();
+    expect(
+      screen.getByLabelText('Monthly plan, $12 per month. Cancel anytime.'),
+    ).toBeTruthy();
+  });
+
+  it('feature rows are accessible (one announced element) on the free-tier upgrade screen', () => {
+    // The free-tier path is what most users hit; its feature rows must group the text into one
+    // a11y element (the decorative checkmark is hidden), same as the premium-confirmation path.
+    mockTier = 'free';
+    render(<PaywallScreen />);
+    expect(screen.getByLabelText('Unlimited tracked jobs')).toBeTruthy();
+    expect(screen.getByLabelText('AI Career Coach')).toBeTruthy();
+  });
+
   it('purchase is honest — no fake success, no navigation', () => {
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     mockTier = 'free';

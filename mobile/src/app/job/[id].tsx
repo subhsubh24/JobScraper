@@ -121,13 +121,19 @@ export default function JobDetailScreen() {
       </Card>
 
       <Text style={styles.section}>Pipeline status</Text>
-      <View style={styles.statusGrid}>
+      <View style={styles.statusGrid} accessibilityRole="radiogroup" accessibilityLabel="Pipeline status">
         {STATUS_ORDER.map((s) => {
           const active = job.status === s;
           return (
             <Pressable
               key={s}
               onPress={() => setStatus(s)}
+              // A screen reader otherwise just announces "Saved" with no hint that it's a
+              // selectable status or which one is current. Expose it as a radio option so the
+              // pipeline tracker — the core loop — is operable with VoiceOver/TalkBack.
+              accessibilityRole="radio"
+              accessibilityState={{ selected: active }}
+              accessibilityLabel={`Set status to ${STATUS_LABELS[s]}`}
               style={[styles.statusChip, active && styles.statusChipActive]}
             >
               <Text style={[styles.statusChipText, active && styles.statusChipTextActive]}>
