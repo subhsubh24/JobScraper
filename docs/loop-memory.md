@@ -4,6 +4,55 @@ Durable lessons for the factory loop. Append dated entries. Keep it honest and s
 
 ---
 
+### 2026-06-30 (run 6) — Maximal run: 3 PRs (referral invite loop, LLM fail-loud, mobile design polish) + 8-scout sweep
+Ran the full 8-scout sweep (business-case / security / design-taste / functional-reality /
+store / mobile / marketing-growth / tests-perf-freshness) which doubled as the ~daily DEEP
+AUDIT. Functional-reality found NO ship-critical crash in the live loops but surfaced a real
+latent bug (empty/None LLM completion). Selected a maximal file-disjoint set; `asgi.py` was
+the single contended backend file → owned by exactly ONE PR (the referral loop). Shipped 3
+through 2 Sonnet reviewers each + the CI gate:
+- **#109 referral invite loop** (business-case-strength #1 named lever, the LOWEST ship-critical
+  grade C): every user gets a `referral_code`; a referred signup grants BOTH sides a real bonus
+  prep pack (raises the actual free-tier allowance via `check_usage_limits` — NOT a fake billing
+  promise, DECISION COROLLARY). New `src/referrals.py` + `users.referral_code/bonus_prep_packs`
+  + `referrals` table + Alembic migration `c3f2a9b41d77` (drift-gated, auto-applies) + `GET
+  /api/referrals/me` + web register `?ref=` + web/mobile Settings share cards. Reviewers
+  REQUEST_CHANGES (BOTH, then 1 re-review) — every find was REAL: (A) referral processing could
+  500 a signup on a code-collision IntegrityError → fixed by committing the user FIRST and
+  running referral best-effort in its own tx + a SAVEPOINT retry in `ensure_code`; (B) register
+  copy was blind to `?ref` (and inaccurate — referred users get 2 prep packs) + mobile had NO
+  referral surface → added the invite-aware subtitle + the mobile "Refer a friend" card;
+  (re-review) the mobile share link used the **API** origin but `/register` is on the **web**
+  frontend → use `EXPO_PUBLIC_WEB_URL` (fallback to API origin for the unified deploy). All
+  resolved within the 2-cycle cap.
+- **#110 LLM fail-loud** (correctness / SIDE-EFFECT INTEGRITY): an empty/None/no-choices
+  completion flowed through the shared `_call_llm` chokepoint → crashed `json.loads(None)` in
+  `parse_job_description` OR persisted a BLANK prep pack reported as "generated" (fake success).
+  Now raises `RuntimeError` (→ honest 502, no blank artifact). Added the missing
+  persistence-contract tests for the 3 previously-untested generators (study_plan/cover_letter/
+  salary_negotiation) + empty/None/no-choices cases. Clean first pass both reviewers.
+- **#111 mobile design polish** (Track B line 94 → TICKED + design-taste B→A work): converged the
+  brand accent (mobile `#5B8CFF`→`#6366F1` = web indigo-500); reusable `ErrorBanner` with in-place
+  **Retry** wired into pipeline + job-detail load failures (recoverable, not a dead end); a11y
+  labels; markdown overflow fix. tsc + expo lint + jest-expo 34/34 green. Clean first pass.
+LESSONS: (1) **maker≠checker earned its keep HARD** — the two most dangerous bugs this run were
+reviewer finds, not maker finds: a referral path that could break a stranger's signup (concurrent
+code collision → unhandled IntegrityError → 500), and a mobile invite link that would 404 every
+share. Both shipped fixed. (2) **A best-effort sub-operation inside a signup must not be able to
+poison the signup**: commit the critical thing FIRST, then run the optional thing in its own tx
+(swallow failures) + use a SAVEPOINT (`begin_nested`) for any unique-constraint race so the outer
+tx survives. (3) **MERGE MECHANICS**: `enable_pr_auto_merge` (MCP) refuses when `mergeable_state`
+is `unstable` — which it is whenever the non-required **Vercel preview** is pending/failed, even
+with the required checks green. `merge_pull_request` (squash) is still branch-protection-gated (it
+returned 405 "2 of 2 required status checks in progress" until preflight+journeys went green), so
+it merges through the SAME gate without `--admin` — use it when auto-merge is blocked only by the
+non-required Vercel status. (4) **Bash cwd persists across calls** (again): a stale `cd web`/`cd
+mobile` silently ran a later `git add`/`npm install` from the wrong dir — use absolute paths.
+DEFERRED (named, buildable — next clean-asgi.py run): cross-instance rate-limit/spend-ceiling
+(Postgres-backable, no owner key), CAPTCHA (owner Turnstile/hCaptcha keys + web+mobile+asgi),
+N+1 eager-load on /api/jobs + /api/analytics/pipeline, privacy-safe analytics instrumentation
+(PMF measurement foundation), Career+ tier + team/B2B2C tier (the remaining business-case levers).
+
 ### 2026-06-29 — validate-gtm honesty gate (GTM rigor parity with validate-capabilities)
 Built the GTM analog of the capability gate: scripts/validate_gtm.py (Python port of
 AptDesignerAI's validate-gtm.mjs; my stack is python+bash, no root node, so I ported it and

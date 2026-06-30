@@ -59,7 +59,7 @@ OWNER_ACTIONS:
       priority: high
       status: open
       why: "eas.json profiles + app.config.ts exist and are validated, but the actual signed cloud build and store submission are Human-Core (signing, store accounts, project creation)."
-      how: "cd mobile; `eas init` (writes/sets EAS_PROJECT_ID); set submit secrets (APPLE_ID/ASC_APP_ID/APPLE_TEAM_ID, google-play-service-account.json); set EXPO_PUBLIC_API_URL to the live deployment in eas.json production env; `eas build --profile production` then `eas submit --profile production`."
+      how: "cd mobile; `eas init` (writes/sets EAS_PROJECT_ID); set submit secrets (APPLE_ID/ASC_APP_ID/APPLE_TEAM_ID, google-play-service-account.json); set EXPO_PUBLIC_API_URL to the live API deployment AND EXPO_PUBLIC_WEB_URL to the live web-app origin (used by the mobile 'Refer a friend' share link so /register resolves; falls back to the API origin, correct only for the unified Vercel deploy) in eas.json production env; `eas build --profile production` then `eas submit --profile production`."
     - id: connect-marketing
       title: "Connect + authorize marketing channels (email provider, analytics) to enable execute-mode"
       priority: normal
