@@ -18,7 +18,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -375,8 +375,13 @@ def check_llm_ceiling(user: User, db: Session) -> None:
 class UserCreate(BaseModel):
     email: str
     password: str = Field(min_length=8, max_length=128)
-    full_name: Optional[str] = None
-    resume_text: Optional[str] = None
+    full_name: Optional[str] = Field(default=None, max_length=255)
+    # Bounded server-side: ``resume_text`` is embedded verbatim into LLM prompts (the coach
+    # system prompt + prep-pack generation). With only a per-day CALL ceiling, an unbounded
+    # field lets one account drive the PER-CALL token cost (and bill) arbitrarily high — a
+    # wallet-drain vector, especially while provider spend caps are owner-pending. 50k chars
+    # (~8k words) is generous for any real resume while killing multi-MB abuse.
+    resume_text: Optional[str] = Field(default=None, max_length=50000)
     referral_code: Optional[str] = Field(default=None, max_length=32)
 
 
@@ -388,12 +393,27 @@ class UserLogin(BaseModel):
 class JobCreate(BaseModel):
     title: str = Field(min_length=1, max_length=255)
     company_name: str = Field(min_length=1, max_length=255)
-    location: Optional[str] = None
-    salary_min: Optional[int] = None
-    salary_max: Optional[int] = None
-    description: Optional[str] = None
-    requirements: Optional[str] = None
-    url: Optional[str] = None
+    location: Optional[str] = Field(default=None, max_length=255)
+    # Salary bounds: reject negatives and absurd values (data integrity — a negative or
+    # MAX_INT salary corrupts pipeline analytics and fit-score math). 10M is a generous ceiling.
+    salary_min: Optional[int] = Field(default=None, ge=0, le=10_000_000)
+    salary_max: Optional[int] = Field(default=None, ge=0, le=10_000_000)
+    # ``description``/``requirements`` feed LLM prep-pack prompts verbatim — bounded for the
+    # same wallet-drain reason as ``resume_text`` above. 20k chars (~3k words) covers any real
+    # job description while capping the per-call token cost an attacker can force.
+    description: Optional[str] = Field(default=None, max_length=20000)
+    requirements: Optional[str] = Field(default=None, max_length=20000)
+    url: Optional[str] = Field(default=None, max_length=500)
+
+    @model_validator(mode="after")
+    def _check_salary_range(self) -> "JobCreate":
+        if (
+            self.salary_min is not None
+            and self.salary_max is not None
+            and self.salary_min > self.salary_max
+        ):
+            raise ValueError("salary_min must not exceed salary_max")
+        return self
 
 
 class JobUpdate(BaseModel):
@@ -401,7 +421,9 @@ class JobUpdate(BaseModel):
 
 
 class PrepPackRequest(BaseModel):
-    job_id: str
+    # A user job id (UUID, 36 chars). Bounded so a pathologically long string can't be sent
+    # to the DB query / string ops; the endpoint additionally scopes the lookup to the caller.
+    job_id: str = Field(min_length=1, max_length=64)
 
 
 class ChatRequest(BaseModel):
