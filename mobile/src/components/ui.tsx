@@ -48,11 +48,15 @@ export function Button({
 }
 
 export function Field(props: TextInputProps & { label: string }) {
-  const { label, style, ...rest } = props;
+  const { label, style, accessibilityLabel, ...rest } = props;
   return (
     <View style={styles.fieldWrap}>
       <Text style={styles.fieldLabel}>{label}</Text>
       <TextInput
+        // The visible label is a sibling Text, not natively linked to the input, so screen
+        // readers announce a bare "text field". Bind the label (caller may override) so every
+        // form input (login, register, new-job) is identifiable to assistive tech.
+        accessibilityLabel={accessibilityLabel ?? label}
         placeholderTextColor={colors.textMuted}
         style={[styles.input, style]}
         {...rest}

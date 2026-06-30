@@ -85,7 +85,13 @@ export default function CoachScreen() {
             <View style={styles.suggestWrap}>
               <Text style={styles.suggestTitle}>Ask me anything about your search:</Text>
               {suggestions.map((s) => (
-                <Pressable key={s} style={styles.suggest} onPress={() => send(s)}>
+                <Pressable
+                  key={s}
+                  style={styles.suggest}
+                  onPress={() => send(s)}
+                  accessibilityRole="button"
+                  accessibilityLabel={s}
+                >
                   <Text style={styles.suggestText}>{s}</Text>
                 </Pressable>
               ))}
@@ -97,18 +103,34 @@ export default function CoachScreen() {
             </View>
           )}
         />
-        {error ? <Text style={styles.error}>{error}</Text> : null}
+        {error ? (
+          <Text
+            style={styles.error}
+            accessibilityRole="alert"
+            accessibilityLiveRegion="polite"
+          >
+            {error}
+          </Text>
+        ) : null}
         {sending ? <ActivityIndicator color={colors.primary} style={{ marginBottom: spacing.sm }} /> : null}
         <View style={styles.inputRow}>
           <TextInput
             style={styles.input}
             value={input}
             onChangeText={setInput}
+            accessibilityLabel="Message to your AI career coach"
             placeholder="Type a message…"
             placeholderTextColor={colors.textMuted}
             multiline
           />
-          <Pressable style={styles.sendBtn} onPress={() => send(input)} disabled={sending}>
+          <Pressable
+            style={styles.sendBtn}
+            onPress={() => send(input)}
+            disabled={sending}
+            accessibilityRole="button"
+            accessibilityLabel="Send message"
+            accessibilityState={{ disabled: sending }}
+          >
             <Text style={styles.sendText}>Send</Text>
           </Pressable>
         </View>
