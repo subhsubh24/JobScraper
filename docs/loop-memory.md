@@ -4,6 +4,70 @@ Durable lessons for the factory loop. Append dated entries. Keep it honest and s
 
 ---
 
+### 2026-06-30 (run 7) — Maximal run: 6 PRs (cross-instance limiter, client timeout, coach N+1, mobile screen tests, backend coverage, README honesty) + 8-scout sweep
+Ran the full 8-scout sweep (security / functional-reality / business-case / mobile+TrackE /
+performance / store / tests-freshness / growth) doubling as the ~daily DEEP AUDIT. `asgi.py`
+was the single contended backend file → owned by exactly ONE PR (the cross-instance limiter,
+the security ship-critical + lowest-incomplete Track F item). Shipped 6 file-disjoint PRs
+through 2 Sonnet reviewers each + the CI gate, all merged:
+- **#114 cross-instance rate-limit + LLM spend-ceiling** (Track F line 229 → TICKED; security
+  ship-critical, wallet-drain). In-memory `_RATE_BUCKET`/`_LLM_DAY_COUNT` were per-instance on
+  Vercel → the LLM spend ceiling MULTIPLIED per instance (real money risk). New `RateCounter`
+  table + Alembic `993d75032689` (drift-gated) + `_consume_counter()`: atomic fixed-window
+  count, committed immediately so it's cross-instance-durable AND survives a later request
+  error (an expensive LLM attempt still counts — no fake under-count). Login lockout LEFT
+  in-memory on purpose (scope = line 229; a shared store doesn't fix its targeted-DoS, CAPTCHA
+  does). Reviewers (1 REQUEST_CHANGES): redundant index (UniqueConstraint already creates it)
+  → dropped from model+migration; comment clarity. Both confirmed the early-commit-on-shared-
+  session is CORRECT.
+- **#115 client fetch timeout** (functional-reality ship-critical). BOTH web + mobile fetch
+  clients had NO timeout → a hung API on launch stranded the user on a stuck "Loading…"/spinner
+  forever (session restore awaits `api.me()`). Added an AbortController bound. Reviewer B flagged
+  20s would prematurely abort legit slow AI calls (server LLM timeout 45s, Vercel budget 60s) →
+  bumped to 60s (tied to maxDuration so it NEVER false-aborts a legit response, only a true hang).
+  Reviewer A: wrap the fake-timers test in try/finally so it can't poison the suite.
+- **#116 coach-context N+1** (performance). `_get_user_context` did one `JobPosting.get()` per
+  recent application on every coach message → selectinload. Query-count regression test (2 vs 5
+  apps → CONSTANT). Both APPROVE. (Honest: the scorecard's NAMED perf top-gaps are /api/jobs +
+  /api/analytics/pipeline — still open; this is an ADDITIONAL N+1, bounded at 5.)
+- **#119 mobile screen tests** (Track B coverage). jest-expo component tests for the untested
+  Coach/Settings/NewJob screens (premium gating; HONEST account deletion — real DELETE then
+  signOut, ORDER pinned; validation; honest error paths). Reviewer A: mock
+  `react-native-safe-area-context` (jest-expo stubs only the native bridge) + settle coach's
+  unconditional suggestion load inside act(). Reviewer B: pin delete→signOut order.
+- **#117 backend coverage** (tests-evals). check_usage_limits monthly reset/non-reset/premium +
+  greenhouse fetch_jobs unreachable-vs-empty honesty. BOTH reviewers: cut a referral-bonus test
+  that DUPLICATED test_referral.py (already on main) + trim a parse test overlapping the
+  detail-fetch test → did both.
+- **#118 README Career+ honesty** (artifact freshness §14). The pricing table listed Career+ as a
+  live tier, but tiers are binary FREE/PREMIUM (careerplus_* = dead config). Marked "(planned)".
+  Both APPROVE.
+LESSONS: (1) **FastAPI caches `Depends(get_db)` per request** — so the `rate_limit` dependency
+and the endpoint body share the SAME session; the limiter's early commit persists only the
+counter row (nothing else pending before the body runs). Both reviewers independently confirmed
+this; it's why the shared-session early-commit design is correct (and why there's ONE connection,
+not two). (2) **A module-level `TestClient` against the default on-disk DB is fragile**:
+test_error_envelope used `TestClient(asgi.app)` (no fixture/override), so when `rate_limit` newly
+started touching the DB, its `register` test 500'd on a missing `rate_counters` table — fixed by
+switching that one test to the seeded `client` fixture. A dependency that NEWLY touches the DB can
+break any test using a non-fixture client against a schema-stale DB. (3) **Skepticism beat a false
+bug**: the security scout flagged an "off-by-one monthly-reset overage" then admitted the code was
+"semantically correct" — verified it's a legitimate rolling 30-day reset, NOT a bug, and did not
+build the "fix" (would have been churn). (4) **maker≠checker earned its keep**: 5 of 6 PRs drew a
+REQUEST_CHANGES, every one a REAL improvement (redundant index, fake-timer suite-poisoning,
+duplicate test, mobile mock/act-leak), all resolved within ONE cycle. (5) **Reviewer disagreement
+is a signal to refine, not to pick a side**: on the greenhouse parse test (A: keep as non-dup; B:
+cut as overlapping) I trimmed it to a distinct populated-board smoke that satisfied both.
+DEFERRED (named, buildable — next clean-asgi.py run): N+1 on /api/jobs + /api/analytics/pipeline
+(scorecard's named perf top-gap; wants asgi.py — the limiter owned it + the single migration slot);
+privacy-safe analytics instrumentation (PMF foundation; wants asgi.py + a 2nd migration); Career+
+($24) + TEAM/B2B2C tiers (the remaining business-case levers for the floor-flip); CAPTCHA (owner
+Turnstile/hCaptcha keys, multi-surface). OWNER-BLOCKED/not-loop: store assets + brand icon; mobile
+Track-E snapshot IMAGES (can't render headlessly — jest-expo serializes trees, not pixels) + the
+prep-pack vision verdict (needs an LLM key). Email-provider abstraction stays deferred (speculative
+— no consumer until double-opt-in lands).
+
+
 ### 2026-06-30 — Authenticated journey tier enforced in CI (BUILDS!=WORKS for the logged-in product)
 The web E2E already covered signup->dashboard->core loop, but the logged-in tier was thin (the
 2nd test only checked the login PAGE renders, not a real sign-in; no account/paywall). Added
