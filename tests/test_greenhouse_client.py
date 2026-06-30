@@ -58,6 +58,54 @@ def test_fetch_job_details_returns_none_on_http_error():
     assert client.last_error == "boom"
 
 
+def test_fetch_jobs_unreachable_sets_last_error_distinct_from_empty():
+    """A board that errors (network/HTTP) must return [] AND set last_error, so the caller
+    can tell "board unreachable" from "open board with zero roles" — reporting an outage as
+    "no jobs" is a real honesty bug the import-preview endpoint depends on avoiding."""
+    import requests
+
+    client = GreenhouseClient("acme")
+    with patch(
+        "src.ingestion.greenhouse.requests.get",
+        side_effect=requests.RequestException("503 Service Unavailable"),
+    ):
+        jobs = client.fetch_jobs()
+    assert jobs == []
+    assert client.last_error == "503 Service Unavailable"
+
+
+def test_fetch_jobs_empty_board_returns_empty_with_no_error():
+    """A reachable board with zero open roles returns [] and leaves last_error None — the
+    truthful "no jobs" state, distinct from the unreachable case above."""
+    client = GreenhouseClient("acme")
+    with patch("src.ingestion.greenhouse.requests.get", return_value=_Resp({"jobs": []})):
+        jobs = client.fetch_jobs()
+    assert jobs == []
+    assert client.last_error is None
+
+
+def test_fetch_jobs_parses_listings():
+    """The happy path: a populated board yields parsed JobListings with id/title/url."""
+    payload = {
+        "jobs": [
+            {
+                "id": 7,
+                "title": "Staff Engineer",
+                "location": {"name": "Remote"},
+                "absolute_url": "https://example.com/jobs/7",
+                "updated_at": "2026-01-01T00:00:00Z",
+            }
+        ]
+    }
+    client = GreenhouseClient("acme")
+    with patch("src.ingestion.greenhouse.requests.get", return_value=_Resp(payload)):
+        jobs = client.fetch_jobs()
+    assert len(jobs) == 1
+    assert jobs[0].external_id == "7"
+    assert jobs[0].title == "Staff Engineer"
+    assert client.last_error is None
+
+
 def test_fetch_all_with_details_skips_failed_details_not_raises():
     """A detail fetch that fails for one job must NOT blow up the whole batch — the bad
     job is silently skipped and the good ones are still returned."""
