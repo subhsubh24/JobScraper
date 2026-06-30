@@ -118,3 +118,31 @@ def test_account_deletion_purges_referral_rows(client, db_session):
     r = client.delete("/api/auth/me", headers=_auth(invited["token"]))
     assert r.status_code in (200, 204)
     assert db_session.query(Referral).count() == 0
+
+
+def test_account_deletion_purges_rows_when_the_inviter_is_deleted(client, db_session):
+    inviter = _register(client, "del2-inviter@example.com")
+    code = client.get("/api/referrals/me", headers=_auth(inviter["token"])).json()["referral"]["code"]
+    _register(client, "del2-invited@example.com", ref=code)
+    assert db_session.query(Referral).count() == 1
+
+    # Deleting the INVITER (the other side of the FK) must also clear the row, not leave a
+    # dangling referrer_id — guards against a future one-sided purge regression.
+    r = client.delete("/api/auth/me", headers=_auth(inviter["token"]))
+    assert r.status_code in (200, 204)
+    assert db_session.query(Referral).count() == 0
+
+
+def test_signup_never_breaks_even_if_the_code_assignment_collides(client, db_session, monkeypatch):
+    # Force generate_code to always collide with an existing code: signup must STILL succeed
+    # (referral is best-effort), the user just may not get a code on this request.
+    from src import referrals
+
+    existing = _register(client, "taken@example.com")
+    taken_code = client.get(
+        "/api/referrals/me", headers=_auth(existing["token"])
+    ).json()["referral"]["code"]
+    monkeypatch.setattr(referrals, "generate_code", lambda: taken_code)
+
+    r = client.post("/api/auth/register", json={"email": "racer@example.com", "password": "password123"})
+    assert r.status_code == 200, r.text  # signup is durable regardless of referral outcome

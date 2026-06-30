@@ -3,7 +3,7 @@
 import Constants from 'expo-constants';
 
 import * as storage from '@/services/storage';
-import type { Job, PipelineStats, User } from '@/types';
+import type { Job, PipelineStats, ReferralStats, User } from '@/types';
 
 const TOKEN_KEY = 'career_operator_token';
 
@@ -103,6 +103,11 @@ export const api = {
   async me(): Promise<User> {
     const r = await request<{ user: User }>('/api/auth/me');
     return r.user;
+  },
+
+  async referralStats(): Promise<ReferralStats> {
+    const r = await request<{ referral: ReferralStats }>('/api/referrals/me');
+    return r.referral;
   },
 
   async logout(): Promise<void> {

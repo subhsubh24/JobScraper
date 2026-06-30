@@ -464,13 +464,21 @@ def register(data: UserCreate, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="Could not register with those details")
     if data.resume_text:
         user.resume_text = data.resume_text
-    # Give every new user a shareable code, and (if they arrived via someone's link) attribute
-    # the referral + grant both sides the real bonus. A bad/blank code is a silent no-op — it
-    # NEVER blocks signup (the new user still lands in the working app).
-    referrals.ensure_code(db, user)
-    referrals.apply_referral(db, data.referral_code, user)
+    # Commit the signup FIRST so it is durable no matter what the referral step does.
     db.commit()
     db.refresh(user)
+    # Referral handling is STRICTLY best-effort: give the new user a shareable code and (if
+    # they arrived via someone's link) attribute the referral + grant both sides the real
+    # bonus. It runs in its own transaction and ANY failure (e.g. a rare code-collision race)
+    # is swallowed so it can NEVER block or fail a signup — the user is already in the app.
+    try:
+        referrals.ensure_code(db, user)
+        referrals.apply_referral(db, data.referral_code, user)
+        db.commit()
+    except Exception:  # noqa: BLE001 — referral is non-critical; never surface to signup
+        db.rollback()
+        logger.warning("referral processing failed during signup; continuing", exc_info=True)
+        db.refresh(user)
     return {"success": True, "token": token, "user": user_public(user, db)}
 
 

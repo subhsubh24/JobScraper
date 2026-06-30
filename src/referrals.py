@@ -15,6 +15,7 @@ Honesty / safety rules baked in (FACTORY_STANDARD §6 + §12):
 import secrets
 from typing import Optional
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from src.db.models import Referral, User
@@ -32,14 +33,25 @@ def generate_code() -> str:
 
 
 def ensure_code(db: Session, user: User) -> str:
-    """Return the user's referral code, generating a unique one on first use."""
-    if not user.referral_code:
-        for _ in range(8):
-            candidate = generate_code()
-            if not db.query(User).filter(User.referral_code == candidate).first():
-                user.referral_code = candidate
+    """Return the user's referral code, generating a unique one on first use.
+
+    Resilient to the (astronomically rare) TOCTOU race where two concurrent signups pick the
+    same candidate: the flush runs inside a SAVEPOINT so a unique-constraint IntegrityError
+    rolls back ONLY that attempt (not the surrounding transaction) and we retry.
+    """
+    if user.referral_code:
+        return user.referral_code
+    for _ in range(8):
+        candidate = generate_code()
+        if db.query(User).filter(User.referral_code == candidate).first():
+            continue
+        user.referral_code = candidate
+        try:
+            with db.begin_nested():
                 db.flush()
-                break
+            break
+        except IntegrityError:
+            user.referral_code = None  # lost the race — pick another and retry
     return user.referral_code
 
 

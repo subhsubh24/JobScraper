@@ -1,11 +1,67 @@
 import { router } from 'expo-router';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Alert, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button, Card } from '@/components/ui';
 import { useAuth } from '@/contexts/auth';
 import { api } from '@/services/api';
 import { colors, spacing } from '@/theme';
+import type { ReferralStats } from '@/types';
+
+// Mobile parity with the web "Refer a friend" card: shows the user's invite stats and opens
+// the native share sheet. The reward (a bonus prep pack for both sides) is granted
+// server-side from a verified signup — this is just the share surface.
+function ReferAFriendCard() {
+  const [stats, setStats] = useState<ReferralStats | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    api
+      .referralStats()
+      .then((s) => active && setStats(s))
+      .catch(() => active && setFailed(true));
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  async function share() {
+    if (!stats) return;
+    const link = `${api.apiUrl}/register?ref=${stats.code}`;
+    try {
+      await Share.share({
+        message: `Join me on Career Operator — we both get a bonus interview prep pack: ${link}`,
+      });
+    } catch {
+      // User dismissed the share sheet, or it's unavailable — nothing to surface.
+    }
+  }
+
+  if (failed) return null;
+
+  return (
+    <Card>
+      <Text style={styles.referTitle}>Refer a friend</Text>
+      <Text style={styles.referBody}>
+        Share your link. When a friend signs up, you both get a free interview prep pack.
+      </Text>
+      {stats ? (
+        <>
+          <Button label="Share invite link" variant="secondary" onPress={share} />
+          <Text style={styles.referStats}>
+            {stats.total_referred} {stats.total_referred === 1 ? 'friend has' : 'friends have'}{' '}
+            joined · {stats.bonus_prep_packs} bonus prep{' '}
+            {stats.bonus_prep_packs === 1 ? 'pack' : 'packs'} earned
+          </Text>
+        </>
+      ) : (
+        <Text style={styles.referStats}>Loading your invite link…</Text>
+      )}
+    </Card>
+  );
+}
 
 export default function SettingsScreen() {
   const { user, signOut } = useAuth();
@@ -74,6 +130,8 @@ export default function SettingsScreen() {
           <Button label="Upgrade to Premium" onPress={() => router.push('/paywall')} />
         ) : null}
 
+        <ReferAFriendCard />
+
         <View style={styles.meta}>
           <Text style={styles.metaText}>API: {api.apiUrl}</Text>
         </View>
@@ -99,6 +157,9 @@ const styles = StyleSheet.create({
   tierLabel: { color: colors.textMuted },
   tierValue: { color: colors.text, fontWeight: '700' },
   usage: { color: colors.textMuted, marginTop: spacing.sm, fontSize: 13 },
+  referTitle: { color: colors.text, fontSize: 16, fontWeight: '700' },
+  referBody: { color: colors.textMuted, marginTop: spacing.xs, marginBottom: spacing.md, fontSize: 13 },
+  referStats: { color: colors.textMuted, marginTop: spacing.sm, fontSize: 13 },
   meta: { alignItems: 'center' },
   metaText: { color: colors.textMuted, fontSize: 12 },
   deleteBtn: { paddingVertical: 14, alignItems: 'center', marginTop: spacing.sm },
