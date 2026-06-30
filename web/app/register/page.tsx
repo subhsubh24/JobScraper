@@ -17,6 +17,14 @@ function postSignupPath(): string {
   return '/app';
 }
 
+// A referral code arrives as ?ref=CODE on a shared invite link. Captured here and sent with
+// signup so the inviter gets credited; a missing/invalid code is harmless (server no-ops it).
+function referralCode(): string | undefined {
+  if (typeof window === 'undefined') return undefined;
+  const ref = new URLSearchParams(window.location.search).get('ref');
+  return ref ? ref.trim().slice(0, 32) : undefined;
+}
+
 export default function RegisterPage() {
   const router = useRouter();
   const { setUser } = useAuth();
@@ -42,6 +50,7 @@ export default function RegisterPage() {
           password,
           full_name: fullName.trim() || undefined,
           resume_text: resume.trim() || undefined,
+          referral_code: referralCode(),
         }),
       );
       router.push(postSignupPath());

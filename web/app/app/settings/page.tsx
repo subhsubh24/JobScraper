@@ -1,10 +1,80 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button, Card, ErrorText, LinkButton } from '@/components/ui';
-import { api, ApiError } from '@/lib/api';
+import { api, ApiError, type ReferralStats } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
+
+function ReferAFriendCard() {
+  const [stats, setStats] = useState<ReferralStats | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    api
+      .referralStats()
+      .then((s) => active && setStats(s))
+      .catch(() => active && setFailed(true));
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const link =
+    stats && typeof window !== 'undefined'
+      ? `${window.location.origin}/register?ref=${stats.code}`
+      : '';
+
+  async function copy() {
+    if (!link) return;
+    try {
+      await navigator.clipboard.writeText(link);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setCopied(false);
+    }
+  }
+
+  return (
+    <Card>
+      <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">Refer a friend</h2>
+      <p className="mt-2 text-sm text-slate-300">
+        Share your link. When a friend signs up, you <span className="font-semibold">both</span> get a
+        free interview prep pack on us.
+      </p>
+
+      {failed ? (
+        <p className="mt-4 text-sm text-slate-500">Your invite link is unavailable right now.</p>
+      ) : !stats ? (
+        <div className="mt-4 h-10 animate-pulse rounded-lg bg-slate-800/60" aria-hidden="true" />
+      ) : (
+        <>
+          <div className="mt-4 flex gap-2">
+            <input
+              readOnly
+              value={link}
+              aria-label="Your referral link"
+              onFocus={(e) => e.target.select()}
+              className="w-full rounded-lg border border-slate-700 bg-slate-800/60 px-3 py-2.5 text-sm text-slate-200 outline-none focus:border-indigo-500"
+            />
+            <Button variant="secondary" onClick={copy}>
+              {copied ? 'Copied' : 'Copy'}
+            </Button>
+          </div>
+          <p className="mt-3 text-sm text-slate-400">
+            <span className="font-semibold text-slate-200">{stats.total_referred}</span>{' '}
+            {stats.total_referred === 1 ? 'friend has' : 'friends have'} joined ·{' '}
+            <span className="font-semibold text-slate-200">{stats.bonus_prep_packs}</span> bonus prep
+            {stats.bonus_prep_packs === 1 ? ' pack' : ' packs'} earned
+          </p>
+        </>
+      )}
+    </Card>
+  );
+}
 
 export default function SettingsPage() {
   const { user, signOut } = useAuth();
@@ -91,6 +161,8 @@ export default function SettingsPage() {
           </p>
         )}
       </Card>
+
+      <ReferAFriendCard />
 
       <Card className="border-red-900/60">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-red-400">Danger zone</h2>

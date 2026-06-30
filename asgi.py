@@ -46,6 +46,7 @@ from src.llm import llm_available
 from src.ranking.scorer import JobScorer
 from src import billing
 from src import mobile_billing
+from src import referrals
 
 load_dotenv()
 setup_logging()
@@ -322,6 +323,7 @@ class UserCreate(BaseModel):
     password: str = Field(min_length=8, max_length=128)
     full_name: Optional[str] = None
     resume_text: Optional[str] = None
+    referral_code: Optional[str] = Field(default=None, max_length=32)
 
 
 class UserLogin(BaseModel):
@@ -462,6 +464,11 @@ def register(data: UserCreate, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="Could not register with those details")
     if data.resume_text:
         user.resume_text = data.resume_text
+    # Give every new user a shareable code, and (if they arrived via someone's link) attribute
+    # the referral + grant both sides the real bonus. A bad/blank code is a silent no-op — it
+    # NEVER blocks signup (the new user still lands in the working app).
+    referrals.ensure_code(db, user)
+    referrals.apply_referral(db, data.referral_code, user)
     db.commit()
     db.refresh(user)
     return {"success": True, "token": token, "user": user_public(user, db)}
@@ -491,6 +498,14 @@ def login(data: UserLogin, db: Session = Depends(get_db)):
 @app.get("/api/auth/me")
 def me(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     return {"success": True, "user": user_public(user, db)}
+
+
+@app.get("/api/referrals/me")
+def referrals_me(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """The caller's referral code, how many friends joined with it, and bonus earned."""
+    stats = referrals.referral_stats(db, user)
+    db.commit()  # ensure_code may have lazily assigned a code on first read
+    return {"success": True, "referral": stats}
 
 
 @app.delete("/api/auth/me", dependencies=[Depends(rate_limit("auth", 10))])

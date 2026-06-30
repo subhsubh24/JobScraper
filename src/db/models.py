@@ -54,6 +54,13 @@ class User(Base):
     prep_packs_this_month = Column(Integer, default=0)
     usage_reset_date = Column(DateTime, default=datetime.utcnow)
 
+    # Referral invite loop (Track G/H — lowest-CAC growth lever). ``referral_code`` is the
+    # user's unique shareable code; ``bonus_prep_packs`` is the REAL, grantable-now reward
+    # (extra free-tier prep packs) earned when someone signs up with the code — no fake
+    # billing promise, so it never dead-ends on an unbuilt grant (DECISION COROLLARY).
+    referral_code = Column(String(16), unique=True, index=True, nullable=True)
+    bonus_prep_packs = Column(Integer, nullable=False, server_default="0", default=0)
+
     # Profile
     full_name = Column(String(255))
     resume_text = Column(Text)
@@ -100,6 +107,29 @@ class Subscription(Base):
 
     # Relationships
     user = relationship("User", back_populates="subscription")
+
+
+# ============ REFERRALS (invite loop — growth) ============
+
+class Referral(Base):
+    """One row per successful referral attribution (Track G/H invite loop).
+
+    Created when a NEW user signs up with another user's ``referral_code``. ``referred_id``
+    is UNIQUE so a user can be attributed to at most one referrer (idempotent — a second
+    attempt is a no-op). Both sides receive a real ``bonus_prep_packs`` grant at creation,
+    so the reward is immediate and verifiable, never a promise against unbuilt billing. A
+    NEW table (not new columns on an existing one) is AUTO_CREATE_TABLES-safe; the column
+    adds on ``users`` ride the Alembic migration (auto-applied on deploy, drift-gated).
+    """
+    __tablename__ = "referrals"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    referrer_id = Column(String(36), ForeignKey("users.id"), nullable=False, index=True)
+    referred_id = Column(
+        String(36), ForeignKey("users.id"), nullable=False, unique=True, index=True
+    )
+    code = Column(String(16), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
 
 
 # ============ WAITLIST (pre-launch growth) ============
