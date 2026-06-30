@@ -11,7 +11,10 @@ const TOKEN_KEY = 'career_operator_token';
 // unreachable API hangs the call forever — on app launch that strands the user on a stuck
 // loading spinner with no error and no way forward (session restore awaits `api.me()`).
 // An AbortController bounds every request; a timeout surfaces as an honest, retryable error.
-const REQUEST_TIMEOUT_MS = 20_000;
+// Set to the serverless function budget (vercel.json maxDuration=60s) so it NEVER aborts a
+// legitimately slow response — incl. AI prep/coach calls (server LLM timeout 45s) — and only
+// trips on a true hang (connection open, no response).
+const REQUEST_TIMEOUT_MS = 60_000;
 
 // Resolution order: build-time env (EXPO_PUBLIC_API_URL) -> app.json extra.apiUrl ->
 // localhost. Set EXPO_PUBLIC_API_URL in the Vercel web project to your live API.

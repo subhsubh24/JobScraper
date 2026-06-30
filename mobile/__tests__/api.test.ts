@@ -121,7 +121,7 @@ describe('api client', () => {
     ) as unknown as typeof fetch;
 
     const pending = api.listJobs().catch((e) => e);
-    await jest.advanceTimersByTimeAsync(20_000); // past REQUEST_TIMEOUT_MS
+    await jest.advanceTimersByTimeAsync(60_000); // past REQUEST_TIMEOUT_MS
     const err = await pending;
     expect(err).toBeInstanceOf(ApiError);
     expect(err.status).toBe(0);
