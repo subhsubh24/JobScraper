@@ -78,4 +78,14 @@ describe('CoachScreen', () => {
     // The failed turn must NOT leave a fake assistant message claiming success.
     expect(screen.queryByText('Lead with your strongest signal.')).toBeNull();
   });
+
+  it('exposes accessible names so a screen reader can operate the chat', async () => {
+    mockTier = 'premium';
+    render(<CoachScreen />);
+    await waitFor(() => expect(api.coachSuggestions).toHaveBeenCalled());
+    // The message input is labeled (was placeholder-only before) and the send control is a
+    // named button — both required for VoiceOver/TalkBack users to use the core coach loop.
+    expect(screen.getByLabelText('Message to your AI career coach')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Send message' })).toBeTruthy();
+  });
 });
