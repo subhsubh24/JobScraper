@@ -1055,13 +1055,16 @@ def coach_suggestions(
 @app.get("/api/analytics/pipeline")
 def pipeline_stats(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     # Eager-load application + score so the aggregate loop (and the top-5 sort, which both
-    # read job.score) never lazy-loads per row: 2 queries instead of 2N+1.
+    # read job.score) never lazy-loads per row; also company, which job_public() reads when
+    # building the top_jobs payload (company_name may be empty for ATS-scraped jobs). Fully
+    # batched: 3 queries instead of 2N+1.
     jobs = (
         db.query(JobPosting)
         .filter(JobPosting.user_id == user.id)
         .options(
             selectinload(JobPosting.application),
             selectinload(JobPosting.score),
+            selectinload(JobPosting.company),
         )
         .all()
     )

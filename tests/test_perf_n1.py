@@ -24,20 +24,25 @@ from src.db.models import (
 
 
 def _seed_user_with_jobs(db, n: int, email: str) -> User:
-    """A user with ``n`` jobs, each carrying an application + score + company so every
-    relationship ``job_public`` touches is populated (the worst case for an N+1)."""
+    """A user with ``n`` jobs, each carrying an application + score + a DISTINCT company.
+
+    Crucially every job has ``company_name=None`` so ``job_public`` must dereference the
+    ``company`` relationship (it short-circuits on a truthy ``company_name``). Distinct
+    companies defeat the identity-map cache, so a missing ``selectinload(company)`` shows up
+    as one extra lazy-load PER job — i.e. the query-count guard actually exercises the
+    company path instead of silently skipping it."""
     user = User(email=email, password_hash="x", tier=UserTier.PREMIUM, full_name="Perf User")
     db.add(user)
     db.flush()
-    company = Company(name="Acme")
-    db.add(company)
-    db.flush()
     for i in range(n):
+        company = Company(name=f"Acme {i}")
+        db.add(company)
+        db.flush()
         job = JobPosting(
             user_id=user.id,
             company_id=company.id,
             title=f"Engineer {i}",
-            company_name="Acme",
+            company_name=None,
         )
         db.add(job)
         db.flush()
@@ -65,7 +70,7 @@ def _count_queries(db, fn):
 def test_list_jobs_is_not_n_plus_one(db_session):
     user2 = _seed_user_with_jobs(db_session, 2, "perf-jobs-a@example.com")
     db_session.expire_all()  # force fresh loads so the count reflects real fetches
-    q2, res2 = _count_queries(db_session, lambda: asgi.list_jobs(user=user2, db=db_session, limit=None, offset=0))
+    q2, _ = _count_queries(db_session, lambda: asgi.list_jobs(user=user2, db=db_session, limit=None, offset=0))
 
     user5 = _seed_user_with_jobs(db_session, 5, "perf-jobs-b@example.com")
     db_session.expire_all()
