@@ -22,10 +22,17 @@ export default function CoachPage() {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const counter = useRef(0);
+  const endRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     api.coachSuggestions().then(setSuggestions).catch(() => setSuggestions([]));
   }, []);
+
+  // Keep the latest message / typing indicator in view as the conversation grows — without
+  // this the user has to manually scroll to see each new reply (broken chat UX on long threads).
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+  }, [messages, sending]);
 
   async function send(text: string) {
     const trimmed = text.trim();
@@ -100,8 +107,13 @@ export default function CoachPage() {
             </span>
           </div>
         )}
+        <div ref={endRef} />
       </div>
-      {error && <p className="text-sm text-red-400">{error}</p>}
+      {error && (
+        <p className="text-sm text-red-400" role="alert">
+          {error}
+        </p>
+      )}
       <form
         onSubmit={(e) => { e.preventDefault(); send(input); }}
         className="flex gap-2"
@@ -110,10 +122,11 @@ export default function CoachPage() {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           disabled={sending}
+          aria-label="Message to your AI career coach"
           placeholder="Type a message…"
           className="flex-1 rounded-lg border border-slate-700 bg-slate-800/60 px-3 py-2.5 outline-none focus:border-indigo-500 disabled:opacity-50"
         />
-        <Button type="submit" disabled={sending}>{sending ? '…' : 'Send'}</Button>
+        <Button type="submit" disabled={sending}>{sending ? 'Sending…' : 'Send'}</Button>
       </form>
     </div>
   );
