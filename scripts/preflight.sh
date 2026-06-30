@@ -125,6 +125,9 @@ $PY scripts/check_quality.py parse || fail "QUALITY_SCORECARD malformed"
 sect "self-validation manifest (every external dep declared + validatable)"
 $PY scripts/check_validation.py || fail "self-validation gate failed (see docs/ci/VALIDATION.md)"
 
+sect "GTM honesty gate (no GROWTH_STATUS metric without a connected source)"
+$PY scripts/validate_gtm.py || fail "validate-gtm failed (a GTM metric has no source, or GTM_SCORECARD invalid)"
+
 if [ "$MODE" = "ci" ]; then
   echo ""; echo "PREFLIGHT(ci): mechanical gate GREEN"; exit 0
 fi
@@ -134,6 +137,9 @@ fi
 # ---------------------------------------------------------------------------
 sect "self-validation READINESS (no unvalidated capability may ship)"
 $PY scripts/check_validation.py --readiness || fail "unvalidated capability (see docs/ci/VALIDATION.md + OWNER_ACTIONs)"
+
+sect "GTM READINESS (graded GTM_SCORECARD, ship-critical dims >= A)"
+$PY scripts/validate_gtm.py --readiness || fail "GTM not ready (needs a graded docs/growth/GTM_SCORECARD.md)"
 
 sect "machine-readable YAML blocks"
 BLOCK_OUT="$($PY scripts/check_blocks.py)" || fail "YAML block validation failed"

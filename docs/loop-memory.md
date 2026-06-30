@@ -4,6 +4,24 @@ Durable lessons for the factory loop. Append dated entries. Keep it honest and s
 
 ---
 
+### 2026-06-29 — validate-gtm honesty gate (GTM rigor parity with validate-capabilities)
+Built the GTM analog of the capability gate: scripts/validate_gtm.py (Python port of
+AptDesignerAI's validate-gtm.mjs; my stack is python+bash, no root node, so I ported it and
+reused the declared pyyaml). Fails CLOSED on: (a) METRIC-WITHOUT-A-SOURCE — any non-zero
+GROWTH_STATUS funnel/acquisition/pmf/channels metric while channels_connected is falsy AND no
+sources/validation entry is connected/available (a real number with no source = fabrication
+risk); (b) a GTM_SCORECARD (when present) that doesn't parse / has invalid grades / lacks
+ship_gate_met. --readiness additionally requires a graded GTM_SCORECARD (ship-critical >= A).
+Wired into preflight (per-PR in the required `ci` gate; --readiness in the full ship gate).
+Proved green on the pre-launch feed (all []/null/none) BEFORE relying on it; verified the
+tripwire fires on a fabricated funnel.signups=142, and --readiness fails honestly with no
+scorecard. Enforced via the existing required `preflight` check (not a separate required check).
+NOTE: JobScraper has no GTM Auditor routine yet, so a GTM_SCORECARD is absent — the per-PR gate
+is green; the --readiness GTM_SCORECARD requirement is a future need (a GTM auditor) consistent
+with the full gate being pre-launch-red. Discipline recorded in ROADMAP + ANALYSIS_PLAYBOOK so
+the Growth Agent keeps metrics 0/null until sourced.
+
+
 ### 2026-06-29 — Self-validation gate: convergence addendum (modes + surfacing + honesty)
 Aligned the gate to the cross-factory addendum. SURFACING (A): unmet capabilities now live in
 BOTH the dashboard channels — an URGENT OWNER_ACTION `validation-capability-<service>` in
