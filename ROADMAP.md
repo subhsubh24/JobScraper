@@ -326,6 +326,16 @@ gaps stay `false`. Current gap: `ai` (Gemini) is `degraded_only` in CI — addin
 `GEMINI_API_KEY` (OWNER_ACTION `validate-ai-ci`) auto-upgrades it to `real` via
 `tests/test_llm_live.py`. (Could be promoted to FACTORY_STANDARD for sibling parity.)
 
+### GTM honesty gate (no reported growth number without a source)
+The GTM analog of the self-validation gate. `scripts/validate_gtm.py` (required, in `preflight`)
+fails CLOSED if (a) any `GROWTH_STATUS` funnel/acquisition/pmf/channels metric is non-zero while
+NO connected source is declared (`channels_connected` falsy AND no `sources`/`validation` entry
+marked connected/available) — a real number with no source is a fabrication risk; or (b) a
+`docs/growth/GTM_SCORECARD.md` (when present) doesn't parse / has invalid grades / lacks
+`ship_gate_met`. `--readiness` additionally requires a graded GTM_SCORECARD with ship-critical
+dims ≥ A. Green on pre-launch feeds (all 0/null). The Growth Agent must set a metric to 0/null
+until its source is connected, or declare the connected source + a `gtm-connect-*` OWNER_ACTION.
+
 ### Readiness audit gate (two gates; maker ≠ checker)
 The box-ticker is **not** the sole certifier. Submission-readiness requires BOTH:
 1. `scripts/preflight.sh` exits **0**; and
