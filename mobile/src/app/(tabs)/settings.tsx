@@ -29,7 +29,11 @@ function ReferAFriendCard() {
 
   async function share() {
     if (!stats) return;
-    const link = `${api.apiUrl}/register?ref=${stats.code}`;
+    // The /register page lives on the WEB frontend, which is a different origin from the
+    // API in a split deploy. Prefer an explicit web URL; fall back to the API origin (correct
+    // for the unified Vercel deploy where web + /api share one origin).
+    const webBase = process.env.EXPO_PUBLIC_WEB_URL ?? api.apiUrl;
+    const link = `${webBase}/register?ref=${stats.code}`;
     try {
       await Share.share({
         message: `Join me on Career Operator — we both get a bonus interview prep pack: ${link}`,
