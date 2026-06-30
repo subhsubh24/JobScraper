@@ -1,7 +1,7 @@
 """AI Career Coach - Chat interface for career guidance."""
 import uuid
 from typing import List, Optional
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from src.ai_coach.moderation import ContentModerator
 from src.db.models import ChatMessage, User, JobPosting, Application
@@ -60,15 +60,22 @@ burnout) supportively is in scope; generating harmful content is not."""
             resume_preview = user.resume_text[:1500]
             context_parts.append(f"Resume Summary:\n{resume_preview}")
 
-        # Recent applications
-        applications = self.db.query(Application).filter(
-            Application.user_id == user.id
-        ).order_by(Application.created_at.desc()).limit(5).all()
+        # Recent applications. Eager-load each application's job in the SAME query
+        # (selectinload) instead of issuing one `JobPosting.get(...)` per row — the old
+        # loop was an N+1 (1 query for the apps + 1 per app) on every coach message.
+        applications = (
+            self.db.query(Application)
+            .filter(Application.user_id == user.id)
+            .options(selectinload(Application.job))
+            .order_by(Application.created_at.desc())
+            .limit(5)
+            .all()
+        )
 
         if applications:
             context_parts.append("\nRecent Applications:")
             for app in applications:
-                job = self.db.query(JobPosting).get(app.job_id)
+                job = app.job
                 if job:
                     context_parts.append(
                         f"- {job.title} at {job.company_name} ({app.status.value})"
