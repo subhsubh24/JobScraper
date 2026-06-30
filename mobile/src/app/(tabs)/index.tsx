@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Button, EmptyState } from '@/components/ui';
+import { Button, EmptyState, ErrorBanner } from '@/components/ui';
 import { useAuth } from '@/contexts/auth';
 import { api, ApiError } from '@/services/api';
 import { colors, radius, scoreColor, spacing } from '@/theme';
@@ -83,7 +83,17 @@ export default function PipelineScreen() {
                 <Stat label="Active" value={String(activeCount(stats))} />
               </View>
             ) : null}
-            {error ? <Text style={styles.error}>{error}</Text> : null}
+            {error ? (
+              <View style={styles.errorWrap}>
+                <ErrorBanner
+                  message={error}
+                  onRetry={() => {
+                    setLoading(true);
+                    load();
+                  }}
+                />
+              </View>
+            ) : null}
             <View style={styles.addBtn}>
               <Button label="+ Add a job" onPress={() => router.push('/job/new')} />
             </View>
@@ -118,6 +128,10 @@ function Stat({ label, value }: { label: string; value: string }) {
 function JobRow({ job }: { job: Job }) {
   return (
     <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${job.title} at ${job.company ?? 'unknown company'}, fit score ${
+        job.score == null ? 'not scored' : Math.round(job.score)
+      }`}
       style={({ pressed }) => [styles.row, pressed && { opacity: 0.85 }]}
       onPress={() => router.push(`/job/${job.id}`)}
     >
@@ -163,7 +177,7 @@ const styles = StyleSheet.create({
   statValue: { color: colors.text, fontSize: 22, fontWeight: '800' },
   statLabel: { color: colors.textMuted, fontSize: 12, marginTop: 2 },
   addBtn: { marginBottom: spacing.md },
-  error: { color: colors.danger, marginBottom: spacing.sm },
+  errorWrap: { marginBottom: spacing.sm },
   row: {
     flexDirection: 'row',
     alignItems: 'center',

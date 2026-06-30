@@ -7,7 +7,9 @@ export const colors = {
   border: '#2A3554',
   text: '#F4F6FB',
   textMuted: '#9AA6C2',
-  primary: '#5B8CFF',
+  // Brand accent, converged with the web app's indigo-500 (web/components/ui.tsx) so the
+  // product reads as ONE brand across platforms (closes the BRAND_KIT accent-divergence gap).
+  primary: '#6366F1',
   primaryText: '#FFFFFF',
   success: '#34D399',
   warning: '#FBBF24',

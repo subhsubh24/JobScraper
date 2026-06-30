@@ -110,5 +110,7 @@ const styles = StyleSheet.create({
   p: { color: colors.text, fontSize: 14, lineHeight: 21 },
   liRow: { flexDirection: 'row', gap: spacing.sm, paddingRight: spacing.sm },
   liMarker: { color: colors.primary, fontSize: 14, lineHeight: 21, minWidth: 24 },
-  liText: { color: colors.text, fontSize: 14, lineHeight: 21, flex: 1 },
+  // flexShrink keeps long bullet text wrapping inside the row instead of overflowing and
+  // pushing the marker off-screen on narrow (390px) phones.
+  liText: { color: colors.text, fontSize: 14, lineHeight: 21, flex: 1, flexShrink: 1 },
 });

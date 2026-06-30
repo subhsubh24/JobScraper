@@ -2,7 +2,7 @@ import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { Button, Card } from '@/components/ui';
+import { Button, Card, ErrorBanner } from '@/components/ui';
 import { Markdown } from '@/components/markdown';
 import { useAuth } from '@/contexts/auth';
 import { api, ApiError } from '@/services/api';
@@ -87,7 +87,16 @@ export default function JobDetailScreen() {
   if (error || !job) {
     return (
       <View style={styles.center}>
-        <Text style={styles.error}>{error ?? 'Job not found.'}</Text>
+        <View style={styles.errorWrap}>
+          <ErrorBanner
+            message={error ?? 'Job not found.'}
+            onRetry={() => {
+              setError(null);
+              setLoading(true);
+              load();
+            }}
+          />
+        </View>
         <Button label="Go back" variant="secondary" onPress={() => router.back()} />
       </View>
     );
@@ -176,7 +185,7 @@ const styles = StyleSheet.create({
   statusChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   statusChipText: { color: colors.textMuted, fontWeight: '600' },
   statusChipTextActive: { color: colors.primaryText },
-  error: { color: colors.danger },
+  errorWrap: { alignSelf: 'stretch' },
   prepMsg: { color: colors.danger, fontSize: 13, marginTop: spacing.sm },
   prepCard: { marginTop: spacing.md, gap: spacing.sm },
   prepTitle: { color: colors.text, fontSize: 16, fontWeight: '700' },
