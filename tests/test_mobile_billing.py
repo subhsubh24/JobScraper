@@ -7,8 +7,10 @@ header we verify; a forged / missing / unconfigured secret grants NOTHING. The e
 """
 import json
 
+import pytest
+
 from src.db.models import User, UserTier
-from src.mobile_billing import apply_event
+from src.mobile_billing import _GRANT_EVENTS, _REVOKE_EVENTS, apply_event
 
 RC_SECRET = "rc_webhook_shared_secret_test"
 
@@ -136,12 +138,61 @@ def test_webhook_test_event_changes_nothing(client, monkeypatch, db_session):
     assert _tier(db_session, uid) == UserTier.FREE
 
 
+# ------------------------------------------------------------- entitlement-set membership
+# The full _GRANT_EVENTS / _REVOKE_EVENTS sets encode money decisions, but only
+# INITIAL_PURCHASE/RENEWAL (grant) and EXPIRATION/PAUSED (revoke) were exercised above —
+# the other grant events (UNCANCELLATION, PRODUCT_CHANGE, NON_RENEWING_PURCHASE,
+# SUBSCRIPTION_EXTENDED) had ZERO coverage, so silently dropping one from the set would lose
+# a real paying user's access behind a green build. Parametrizing over the ACTUAL sets keeps
+# this guard in sync if the sets change and proves EVERY declared event has its intended
+# effect.
+
+
+@pytest.mark.parametrize("etype", sorted(_GRANT_EVENTS))
+def test_every_declared_grant_event_grants_premium(client, monkeypatch, db_session, etype):
+    monkeypatch.setenv("REVENUECAT_WEBHOOK_AUTH", RC_SECRET)
+    uid, _ = _register(client, email=f"grant-{etype.lower()}@example.com")
+    r = _post(client, _rc_body(etype, uid))
+    assert r.status_code == 200, r.text
+    assert _tier(db_session, uid) == UserTier.PREMIUM, f"{etype} should grant Premium"
+
+
+@pytest.mark.parametrize("etype", sorted(_REVOKE_EVENTS))
+def test_every_declared_revoke_event_revokes_premium(client, monkeypatch, db_session, etype):
+    monkeypatch.setenv("REVENUECAT_WEBHOOK_AUTH", RC_SECRET)
+    uid, _ = _register(client, email=f"revoke-{etype.lower()}@example.com")
+    _post(client, _rc_body("INITIAL_PURCHASE", uid))
+    assert _tier(db_session, uid) == UserTier.PREMIUM
+    r = _post(client, _rc_body(etype, uid))
+    assert r.status_code == 200, r.text
+    assert _tier(db_session, uid) == UserTier.FREE, f"{etype} should revoke Premium"
+
+
 # --------------------------------------------------------------------- unit: resolver/aliases
 def test_apply_event_resolves_user_via_alias(db_session):
     user = User(email="alias@example.com", password_hash="x", tier=UserTier.FREE)
     db_session.add(user)
     db_session.flush()
     payload = {"event": {"type": "RENEWAL", "app_user_id": "anon-123", "aliases": [user.id]}}
+    affected = apply_event(payload, db_session)
+    assert affected == user.id
+    assert user.tier == UserTier.PREMIUM
+
+
+def test_apply_event_resolves_user_via_second_alias(db_session):
+    """RevenueCat can send several aliases (anon ids before login). When the primary
+    app_user_id AND the first alias don't match a user, resolution must keep scanning the
+    remaining aliases — otherwise an anon->auth-linked user silently never gets entitled."""
+    user = User(email="multi-alias@example.com", password_hash="x", tier=UserTier.FREE)
+    db_session.add(user)
+    db_session.flush()
+    payload = {
+        "event": {
+            "type": "INITIAL_PURCHASE",
+            "app_user_id": "anon-unknown",
+            "aliases": ["another-anon-unknown", user.id],
+        }
+    }
     affected = apply_event(payload, db_session)
     assert affected == user.id
     assert user.tier == UserTier.PREMIUM
