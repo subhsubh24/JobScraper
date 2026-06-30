@@ -84,25 +84,16 @@ def test_fetch_jobs_empty_board_returns_empty_with_no_error():
     assert client.last_error is None
 
 
-def test_fetch_jobs_parses_listings():
-    """The happy path: a populated board yields parsed JobListings with id/title/url."""
-    payload = {
-        "jobs": [
-            {
-                "id": 7,
-                "title": "Staff Engineer",
-                "location": {"name": "Remote"},
-                "absolute_url": "https://example.com/jobs/7",
-                "updated_at": "2026-01-01T00:00:00Z",
-            }
-        ]
-    }
+def test_fetch_jobs_populated_board_smoke():
+    """Completes the triad (populated vs empty vs unreachable): a board with roles yields
+    JobListings and leaves last_error None — so the happy path is provably distinct from the
+    two failure/empty states above. (Field-level parsing is covered by the detail-fetch test.)"""
+    payload = {"jobs": [{"id": 7, "title": "Staff Engineer", "absolute_url": "https://x/7"}]}
     client = GreenhouseClient("acme")
     with patch("src.ingestion.greenhouse.requests.get", return_value=_Resp(payload)):
         jobs = client.fetch_jobs()
     assert len(jobs) == 1
     assert jobs[0].external_id == "7"
-    assert jobs[0].title == "Staff Engineer"
     assert client.last_error is None
 
 

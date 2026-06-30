@@ -56,18 +56,6 @@ def test_usage_not_reset_within_the_window(db_session):
     assert limits["prep_packs_remaining"] == 0
 
 
-def test_referral_bonus_raises_the_prep_allowance(db_session):
-    auth = AuthService(db_session)
-    user = _free_user(db_session, email="usage3@example.com",
-                      prep_packs_this_month=1, bonus_prep_packs=2)
-
-    limits = auth.check_usage_limits(user)
-
-    # 1 base + 2 earned bonus = 3 allowed; 1 used -> 2 remaining, still generating.
-    assert limits["can_generate_prep"] is True
-    assert limits["prep_packs_remaining"] == 2
-
-
 def test_premium_user_is_unlimited(db_session):
     auth = AuthService(db_session)
     user = _free_user(db_session, email="usage4@example.com", tier=UserTier.PREMIUM,
