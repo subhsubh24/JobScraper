@@ -7,6 +7,15 @@ import type { Job, PipelineStats, ReferralStats, User } from '@/types';
 
 const TOKEN_KEY = 'career_operator_token';
 
+// Hard timeout on every request. `fetch` has NO default timeout, so without this a slow or
+// unreachable API hangs the call forever — on app launch that strands the user on a stuck
+// loading spinner with no error and no way forward (session restore awaits `api.me()`).
+// An AbortController bounds every request; a timeout surfaces as an honest, retryable error.
+// Set to the serverless function budget (vercel.json maxDuration=60s) so it NEVER aborts a
+// legitimately slow response — incl. AI prep/coach calls (server LLM timeout 45s) — and only
+// trips on a true hang (connection open, no response).
+const REQUEST_TIMEOUT_MS = 60_000;
+
 // Resolution order: build-time env (EXPO_PUBLIC_API_URL) -> app.json extra.apiUrl ->
 // localhost. Set EXPO_PUBLIC_API_URL in the Vercel web project to your live API.
 const API_URL: string =
@@ -48,15 +57,23 @@ async function request<T>(path: string, opts: ReqOptions = {}): Promise<T> {
     const token = await getToken();
     if (token) headers.Authorization = `Bearer ${token}`;
   }
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   let res: Response;
   try {
     res = await fetch(`${API_URL}${path}`, {
       method: opts.method ?? 'GET',
       headers,
       body: opts.body ? JSON.stringify(opts.body) : undefined,
+      signal: controller.signal,
     });
-  } catch {
+  } catch (err) {
+    if (err instanceof Error && err.name === 'AbortError') {
+      throw new ApiError(0, 'Request timed out — please try again.');
+    }
     throw new ApiError(0, 'Network error — check your connection.');
+  } finally {
+    clearTimeout(timer);
   }
   const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
   if (!res.ok) {
