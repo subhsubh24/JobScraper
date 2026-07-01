@@ -43,7 +43,10 @@ export function LegalPage({
 
       <footer className="mt-16 border-t border-slate-800 pt-6 text-sm text-slate-500">
         © {updated.split(' ').pop()} Career Operator.{' '}
-        <Link href="/" className="hover:text-slate-300">
+        <Link
+          href="/"
+          className="rounded hover:text-slate-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
+        >
           Back to home
         </Link>
       </footer>
