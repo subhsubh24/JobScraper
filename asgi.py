@@ -11,7 +11,7 @@ import re
 import time
 import uuid
 from datetime import datetime
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Literal, Optional, Tuple
 
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
@@ -34,6 +34,7 @@ from src.db.models import (
     Application,
     ApplicationStatus,
     ATSType,
+    ContentReport,
     JobPosting,
     PrepArtifact,
     RateCounter,
@@ -436,6 +437,23 @@ class ChatRequest(BaseModel):
     # is the honest failure.
     job_id: Optional[str] = Field(default=None, max_length=64)
     session_id: Optional[str] = Field(default=None, max_length=36)
+
+
+class ReportRequest(BaseModel):
+    """A user report/flag of AI-generated content (store GenAI/UGC requirement).
+
+    ``content_type``/``reason`` are constrained to known values (a 422 at the boundary, not a
+    silent bad row). The free-text fields are bounded so a report can't be used as an
+    unbounded write (they are stored verbatim, never fed back into an LLM prompt).
+    """
+
+    content_type: Literal["coach", "prep_pack"]
+    reason: Literal["harmful", "inaccurate", "offensive", "other"]
+    # Optional client reference to the specific item; equality/audit only, never a write key.
+    content_ref: Optional[str] = Field(default=None, max_length=64)
+    # A snapshot of the reported text so a moderator can review it (bounded).
+    content_excerpt: Optional[str] = Field(default=None, max_length=5000)
+    detail: Optional[str] = Field(default=None, max_length=1000)
 
 
 class AppPurchase(BaseModel):
@@ -1077,6 +1095,35 @@ def coach_suggestions(
     # Works without an LLM key — deterministic, context-aware suggestions.
     suggestions = CareerCoach(db).get_suggested_questions(user)
     return {"success": True, "suggestions": suggestions}
+
+
+# ---------------------------------------------------------------------------
+# Report AI-generated content (Apple/Google 2026 GenAI/UGC requirement)
+# ---------------------------------------------------------------------------
+@app.post("/api/report", dependencies=[Depends(rate_limit("report", 20))])
+def report_content(
+    data: ReportRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Record a signed-in user's report of an AI-generated coach reply or prep pack.
+
+    SIDE-EFFECT INTEGRITY: the only success we report is the one we can back — a committed
+    row a moderator can review. We commit FIRST, then return success; there is NO claim of
+    any downstream notification (no email/alert pipeline is wired, so we don't pretend one
+    is — DECISION COROLLARY). Rate-limited so the endpoint can't be used to flood the table.
+    """
+    report = ContentReport(
+        user_id=user.id,
+        content_type=data.content_type,
+        reason=data.reason,
+        content_ref=data.content_ref,
+        content_excerpt=data.content_excerpt,
+        detail=data.detail,
+    )
+    db.add(report)
+    db.commit()
+    return {"success": True, "message": "Thanks — this response has been flagged for review."}
 
 
 # ---------------------------------------------------------------------------

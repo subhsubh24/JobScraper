@@ -14,6 +14,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/ui';
+import { ReportButton } from '@/components/report-button';
 import { useAuth } from '@/contexts/auth';
 import { api, ApiError } from '@/services/api';
 import { colors, radius, spacing } from '@/theme';
@@ -45,8 +46,9 @@ export default function CoachScreen() {
   const [error, setError] = useState<string | null>(null);
   const counter = useRef(0);
   // One stable session id for this conversation so the coach threads multi-turn context.
-  // Created once and never regenerated on re-render (ref, not state).
-  const sessionId = useRef<string>(newSessionId());
+  // Lazily initialised once (never regenerated on re-render) and safe to read during render
+  // (unlike a ref) — the report control needs it as the reference for a flagged reply.
+  const [sessionId] = useState<string>(newSessionId);
 
   useEffect(() => {
     api.coachSuggestions().then(setSuggestions).catch(() => setSuggestions([]));
@@ -62,7 +64,7 @@ export default function CoachScreen() {
       setMessages((m) => [...m, userMsg]);
       setSending(true);
       try {
-        const reply = await api.coachChat(trimmed, sessionId.current);
+        const reply = await api.coachChat(trimmed, sessionId);
         setMessages((m) => [...m, { id: `a${counter.current++}`, role: 'assistant', content: reply }]);
       } catch (e) {
         setError(e instanceof ApiError ? e.message : 'Coach is unavailable right now.');
@@ -70,7 +72,7 @@ export default function CoachScreen() {
         setSending(false);
       }
     },
-    [sending],
+    [sending, sessionId],
   );
 
   if (!isPremium) {
@@ -112,6 +114,9 @@ export default function CoachScreen() {
           renderItem={({ item }) => (
             <View style={[styles.bubble, item.role === 'user' ? styles.userBubble : styles.aiBubble]}>
               <Text style={styles.bubbleText}>{item.content}</Text>
+              {item.role === 'assistant' ? (
+                <ReportButton contentType="coach" contentRef={sessionId} contentExcerpt={item.content} />
+              ) : null}
             </View>
           )}
         />

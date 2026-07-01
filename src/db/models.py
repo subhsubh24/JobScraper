@@ -74,6 +74,9 @@ class User(Base):
     jobs = relationship("JobPosting", back_populates="user", cascade="all, delete-orphan")
     applications = relationship("Application", back_populates="user", cascade="all, delete-orphan")
     chat_messages = relationship("ChatMessage", back_populates="user", cascade="all, delete-orphan")
+    content_reports = relationship(
+        "ContentReport", back_populates="user", cascade="all, delete-orphan"
+    )
     subscription = relationship(
         "Subscription", back_populates="user", uselist=False, cascade="all, delete-orphan"
     )
@@ -336,6 +339,42 @@ class ChatMessage(Base):
 
     # Relationships
     user = relationship("User", back_populates="chat_messages")
+
+
+class ContentReport(Base):
+    """A user's report/flag of AI-generated content (Apple App Review + Google Play 2026
+    GenAI/UGC requirement: apps that surface generative-AI output must give users a way to
+    report a specific response).
+
+    The app already moderates LLM output server-side; this is the *user-facing* half. A
+    report is a REAL side-effect — a persisted row a moderator reviews — so the UI never
+    claims anything it can't back (it says "flagged for review", not "our team has been
+    notified"), and it introduces NO dependency on an unbuilt notification/email pipeline
+    (DECISION COROLLARY). ``content_excerpt`` snapshots the reported text so a moderator can
+    still review it even if the source message/artifact is later deleted.
+    """
+
+    __tablename__ = "content_reports"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    user_id = Column(String(36), ForeignKey("users.id"), nullable=False, index=True)
+
+    # Which AI surface produced the reported content.
+    content_type = Column(String(20), nullable=False)  # coach | prep_pack
+    # Optional client-supplied reference to the specific item (e.g. an artifact/message id).
+    content_ref = Column(String(64), nullable=True)
+    # Moderator-review snapshot of the reported text (bounded; survives source deletion).
+    content_excerpt = Column(Text, nullable=True)
+
+    reason = Column(String(30), nullable=False)  # harmful | inaccurate | offensive | other
+    detail = Column(Text, nullable=True)  # optional free-text note from the reporter
+
+    status = Column(String(20), nullable=False, server_default="open", default="open")
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    user = relationship("User", back_populates="content_reports")
 
 
 # ============ CONTACTS (CRM) ============

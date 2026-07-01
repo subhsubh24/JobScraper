@@ -86,7 +86,9 @@ Start free today and run your search like an operator.
 > career-coach replies, and to compute resume↔job fit. AI output can be imperfect — treat it
 > as guidance, not professional, legal, or financial advice. Generated content is filtered by
 > an in-app safety guardrail (audit item A1: self-harm input returns crisis resources;
-> disallowed categories are blocked), and the AI Coach is for career topics only.*
+> disallowed categories are blocked), the AI Coach is for career topics only, and you can
+> report any AI response for review with the "Report this response" control on every coach
+> reply and prep pack.*
 
 This is code-accurate: Gemini powers prep packs (`src/enrichment/llm_workflows.py`), the coach
 (`src/ai_coach/career_coach.py`), and fit embeddings; the `ContentModerator` guardrail runs on

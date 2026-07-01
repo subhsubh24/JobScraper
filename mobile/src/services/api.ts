@@ -194,4 +194,20 @@ export const api = {
     );
     return r.prep_pack;
   },
+
+  // Report/flag an AI-generated response for moderator review (store GenAI/UGC requirement).
+  // Awaits the REAL POST /api/report and throws ApiError on failure so the caller can surface
+  // it honestly — the success state is only shown once the server records the row.
+  async reportContent(input: {
+    content_type: 'coach' | 'prep_pack';
+    reason: 'harmful' | 'inaccurate' | 'offensive' | 'other';
+    content_ref?: string;
+    content_excerpt?: string;
+    detail?: string;
+  }): Promise<void> {
+    await request<{ success: boolean; message: string }>('/api/report', {
+      method: 'POST',
+      body: input,
+    });
+  },
 };

@@ -190,6 +190,22 @@ export const api = {
     ).prep_pack;
   },
 
+  // Report/flag an AI-generated response (coach reply or prep pack) for moderator review.
+  // Awaits the REAL POST /api/report and throws ApiError on failure so the caller can
+  // surface it honestly — the success state is only shown once the server records the row.
+  async reportContent(input: {
+    content_type: 'coach' | 'prep_pack';
+    reason: 'harmful' | 'inaccurate' | 'offensive' | 'other';
+    content_ref?: string;
+    content_excerpt?: string;
+    detail?: string;
+  }): Promise<void> {
+    await request<{ success: boolean; message: string }>('/api/report', {
+      method: 'POST',
+      body: input,
+    });
+  },
+
   // Join the pre-launch waitlist. Public (no auth). The backend never reveals whether the
   // email is already on the list, so the caller always treats a resolved promise as success.
   async joinWaitlist(email: string, source?: string): Promise<void> {

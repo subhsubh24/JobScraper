@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { Button, Card } from '@/components/ui';
+import { ReportButton } from '@/components/report-button';
 import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 
@@ -32,8 +33,9 @@ export default function CoachPage() {
   const counter = useRef(0);
   const endRef = useRef<HTMLDivElement>(null);
   // One stable session id for this conversation so the coach can thread multi-turn context.
-  // Created once and never re-generated on re-render (ref, not state).
-  const sessionId = useRef<string>(newSessionId());
+  // Lazily initialised once (never regenerated on re-render) and safe to read during render
+  // (unlike a ref) — the report control needs it as the reference for a flagged reply.
+  const [sessionId] = useState<string>(newSessionId);
 
   useEffect(() => {
     api.coachSuggestions().then(setSuggestions).catch(() => setSuggestions([]));
@@ -53,7 +55,7 @@ export default function CoachPage() {
     setMessages((m) => [...m, { id: `u${counter.current++}`, role: 'user', content: trimmed }]);
     setSending(true);
     try {
-      const reply = await api.coachChat(trimmed, sessionId.current);
+      const reply = await api.coachChat(trimmed, sessionId);
       setMessages((m) => [...m, { id: `a${counter.current++}`, role: 'assistant', content: reply }]);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Coach is unavailable.');
@@ -103,6 +105,9 @@ export default function CoachPage() {
             }`}
           >
             <p className="whitespace-pre-wrap">{m.content}</p>
+            {m.role === 'assistant' && (
+              <ReportButton contentType="coach" contentRef={sessionId} contentExcerpt={m.content} />
+            )}
           </div>
         ))}
         {sending && (

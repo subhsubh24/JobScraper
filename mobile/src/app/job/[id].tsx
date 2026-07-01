@@ -4,6 +4,7 @@ import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View
 
 import { Button, Card, ErrorBanner } from '@/components/ui';
 import { Markdown } from '@/components/markdown';
+import { ReportButton } from '@/components/report-button';
 import { useAuth } from '@/contexts/auth';
 import { api, ApiError } from '@/services/api';
 import { colors, radius, scoreColor, spacing } from '@/theme';
@@ -165,6 +166,7 @@ export default function JobDetailScreen() {
         <Card style={styles.prepCard}>
           <Text style={styles.prepTitle}>{prep.title}</Text>
           <Markdown content={prep.content} />
+          <ReportButton contentType="prep_pack" contentRef={id} contentExcerpt={prep.content} />
         </Card>
       ) : null}
     </ScrollView>
