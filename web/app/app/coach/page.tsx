@@ -89,7 +89,7 @@ export default function CoachPage() {
             <button
               key={s}
               onClick={() => send(s)}
-              className="block w-full rounded-lg border border-slate-700 bg-slate-900/60 p-3 text-left hover:bg-slate-800"
+              className="block w-full rounded-lg border border-slate-700 bg-slate-900/60 p-3 text-left hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
             >
               {s}
             </button>
