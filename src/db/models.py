@@ -4,7 +4,7 @@ from datetime import datetime
 from enum import Enum as PyEnum
 
 from sqlalchemy import (
-    Column, String, Integer, BigInteger, Float, Text, Boolean, DateTime,
+    Column, String, Integer, BigInteger, Float, Text, Boolean, DateTime, Date,
     ForeignKey, Enum, JSON, Index, UniqueConstraint
 )
 from sqlalchemy.orm import declarative_base, relationship
@@ -428,6 +428,31 @@ class RateCounter(Base):
     # pattern (exact match on all three columns), so no separate Index is needed.
     __table_args__ = (
         UniqueConstraint("subject", "bucket", "window_key", name="uq_rate_counter_window"),
+    )
+
+
+class AggregateEvent(Base):
+    """Privacy-safe aggregate product analytics — counts ONLY, no PII, no raw per-user
+    events, no user ids. One row is a single ``(event_type, event_date)`` daily tally, so the
+    table stays tiny (a handful of event types × days) and can NEVER be used to reconstruct an
+    individual's behaviour. This is the PMF-measurement foundation (activation/retention are
+    derived from these aggregates — see ``src/analytics.py``); it deliberately stores counts
+    only. Writes are best-effort and never block a user request.
+    """
+
+    __tablename__ = "aggregate_events"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    event_type = Column(String(64), nullable=False)
+    event_date = Column(Date, nullable=False)  # UTC date bucket
+    count = Column(Integer, nullable=False, default=0)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # The unique constraint creates the B-tree index that serves the only query patterns
+    # (exact match on both columns for the upsert; group-by event_type for the summary), so
+    # no separate Index is needed.
+    __table_args__ = (
+        UniqueConstraint("event_type", "event_date", name="uq_aggregate_event_day"),
     )
 
 

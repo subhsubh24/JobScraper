@@ -79,6 +79,16 @@ VALIDATION_CAPABILITIES:
     key_in_ci: false
     blocking: false           # accepted gap for now; flip true to FORCE real-AI validation before more ships
     owner_action: validation-capability-gemini
+  - id: analytics
+    service: "Privacy-safe aggregate analytics (internal counts; shared-secret read API)"
+    env: [ANALYTICS_READ_TOKEN]
+    used_for: "PMF measurement — aggregate product-event counts (no PII); owner/growth read endpoint"
+    validation: real          # record path needs NO key; the shared-secret read path is fully
+                              # exercised in CI by setting the token in-test (503 unset / 401 wrong / 200 right)
+    covered_by: tests/test_analytics.py
+    key_in_ci: false
+    blocking: false           # non-critical: absence disables only the opt-in read endpoint; record_event no-ops safely
+    owner_action: analytics-read-token
 ```
 
 When `GEMINI_API_KEY` is present in CI, `tests/test_llm_live.py` automatically exercises a real

@@ -5,6 +5,7 @@ the core journey (auth + job tracking + scoring + pipeline analytics) works with
 Gemini key via heuristic scoring; AI features (prep packs, coach) return a truthful
 "needs configuration" response instead of crashing when the key is absent.
 """
+import hmac
 import logging
 import os
 import re
@@ -45,6 +46,7 @@ from src.db.models import (
 from src.enrichment.llm_workflows import LLMWorkflows
 from src.llm import llm_available
 from src.ranking.scorer import JobScorer
+from src import analytics
 from src import billing
 from src import mobile_billing
 from src import referrals
@@ -579,6 +581,8 @@ def register(data: UserCreate, db: Session = Depends(get_db)):
         db.rollback()
         logger.warning("referral processing failed during signup; continuing", exc_info=True)
         db.refresh(user)
+    # Privacy-safe aggregate metric (best-effort, post-commit; counts only, no PII).
+    analytics.record_event(db, "signup")
     return {"success": True, "token": token, "user": user_public(user, db)}
 
 
@@ -815,8 +819,10 @@ def create_job(
     db.flush()
 
     # Score (heuristic fallback when no Gemini key — never crashes).
+    scored = False
     try:
         JobScorer(db).score_job(job, user)
+        scored = True
     except Exception:
         logger.exception("Scoring failed for job %s; continuing unscored", job.id)
 
@@ -825,6 +831,11 @@ def create_job(
     auth.increment_job_usage(user)
     db.commit()
     db.refresh(job)
+    # Privacy-safe aggregate metrics (best-effort, post-commit; counts only, no PII). The
+    # signup→job_added→fit_score_generated funnel is the activation ("aha") leading indicator.
+    analytics.record_event(db, "job_added")
+    if scored:
+        analytics.record_event(db, "fit_score_generated")
     return {"success": True, "job": job_public(job)}
 
 
@@ -1032,6 +1043,7 @@ def generate_prep_pack(
 
     auth.increment_prep_usage(user)
     db.commit()
+    analytics.record_event(db, "prep_pack_generated")  # aggregate metric (best-effort, no PII)
     return {
         "success": True,
         "prep_pack": {
@@ -1082,6 +1094,7 @@ def coach_chat(
         logger.exception("Coach chat failed")
         raise HTTPException(status_code=502, detail="AI provider error in coach chat")
     db.commit()
+    analytics.record_event(db, "coach_message")  # aggregate metric (best-effort, no PII)
     return {"success": True, "message": reply}
 
 
@@ -1167,6 +1180,24 @@ def pipeline_stats(user: User = Depends(get_current_user), db: Session = Depends
             "top_jobs": [job_public(j) for j in top],
         },
     }
+
+
+@app.get("/api/analytics/summary")
+def analytics_summary(request: Request, db: Session = Depends(get_db)):
+    """Privacy-safe AGGREGATE product metrics for the owner's growth dashboard (counts only —
+    no PII, no per-user data). Gated by a SERVER-SIDE shared secret (``ANALYTICS_READ_TOKEN``),
+    NOT any authenticated user, so aggregate counts can never leak to end users. Returns an
+    honest 503 when the token is unset (the endpoint is opt-in ops tooling, not a product
+    feature — the app is fully functional without it).
+    """
+    token = os.getenv("ANALYTICS_READ_TOKEN")
+    if not token:
+        raise HTTPException(status_code=503, detail="Analytics read API is not configured.")
+    provided = request.headers.get("authorization", "")
+    # Constant-time compare so the token can't be recovered by timing.
+    if not hmac.compare_digest(provided, f"Bearer {token}"):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    return {"success": True, "analytics": analytics.summary(db)}
 
 
 @app.get("/")
