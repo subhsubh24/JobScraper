@@ -42,3 +42,49 @@ pre-launch.
   dual-axis visual verification (screenshots + verdict), converge accent, replace template
   icon. Zero outreach drafts this run: no traction to honestly report, site gate down,
   product not ship-ready. A quiet run with zero outreach is correct here.
+
+---
+
+### 2026-07-01 — Daily GTM review (business-case computation integrity; still pre-launch)
+- **Observed:** Phase still `pre_launch`. Checked for any connected analytics/billing/
+  email-provider MCP tool this run — **none available** (only Gmail, for the outreach
+  draft exception, and GitHub). Confirms `engine_built: false`, `channels_connected: []`
+  honestly; every funnel/pmf/acquisition metric stays 0/null (no fabrication). The
+  independent QUALITY_SCORECARD (2nd audit, dated 2026-07-01) moved **C → B overall**:
+  ship-critical dims below A dropped from 4 to **2** — security and design-taste both
+  closed to A since the last GTM read (CORS + cross-instance rate/spend limiter; 24
+  committed screenshots + bespoke icon). The two still open: **business-case-strength
+  (C)** — Career+ ($24) is now a REAL webhook-verified tier (PRs #152/#153/#155,
+  correctly left unquantified in the projection until cohort data exists — anti-gaming),
+  but the team/B2B2C seat tier and annual-first paywall remain unbuilt, so
+  `floor_met_year1` is still `false` ($57.5K < $100K) — and **store-readiness (C)** —
+  rendered store assets + mobile IAP integration still absent (4 open ACCEPTANCE_AUDIT
+  FAILs). No `docs/growth/GTM_SCORECARD.md` exists yet — a GTM Auditor routine was stood
+  up 2026-06-30 (per loop-memory) but hasn't landed its first grade; consumed as absent,
+  never fabricated. Zero PMF signal (no users exist to measure).
+- **Concluded:** No real data justifies a ROADMAP/BUSINESS_CASE/VISION steer this run —
+  0 users, 0 funnel data, nothing statistically significant to act on. Per GTM_STANDARD
+  §3 this stays a quiet run on the steering front (correct, not a gap). The named,
+  buildable levers to clear the $100K floor are unchanged from the last read (team/
+  B2B2C tier, annual-first pricing) — the factory is already tracking them in
+  BUSINESS_CASE.md's lever list, so no new RECOMMEND was needed beyond reflecting the
+  scorecard's current read into GROWTH_STATUS.
+- **Did (real, in-repo, no channel needed):** Closed a genuine FACTORY_STANDARD §22 gap
+  — the three BUSINESS_CASE.md ARR scenarios ($16.5K / $57.5K / $132K) were cited in
+  prose/table but had **zero executed-code backing** (`analysis/figures.json` was empty
+  since the gate landed in PR #156). Added `analysis/business_case_lib.py` (shared
+  scenario inputs) + `arr_conservative.py` / `arr_base.py` / `arr_optimistic.py`, and
+  registered all three in `figures.json` so `scripts/validate-computation.mjs` re-verifies
+  them every gate run going forward. Verified locally (`node scripts/validate-computation.mjs`
+  → 3/3 PASS; `flake8 analysis/` clean); no cited number changed. Independent reviewer
+  (maker≠checker, fresh Sonnet subagent) re-ran the same checks and APPROVED — see PR
+  (business-case computation-integrity branch).
+- **Recommended (to factory):** Unchanged priority order — business-case-strength
+  (team/B2B2C tier, annual-first pricing) and store-readiness (rendered assets + mobile
+  IAP) are the two remaining ship-critical gaps; both are already product-factory work,
+  not something the GTM loop can build. Zero outreach drafts this run: no new genuinely
+  strategic target surfaced, site gate still down, 2 ship-critical dims still open — a
+  quiet run with zero outreach remains correct (per OUTREACH.md). No content
+  calendar/email-sequence assets exist yet in the repo; deferred rather than built
+  speculatively — there's no connected channel or launch date to schedule them against,
+  and drafting one now would be unmoored padding, not a real asset.

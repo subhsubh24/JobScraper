@@ -18,7 +18,7 @@ All metrics below are null/0 — the honest pre-launch state. Nothing is fabrica
 ```yaml
 GROWTH_STATUS:
   project: jobscraper
-  as_of: 2026-06-29
+  as_of: 2026-07-01
   phase: pre_launch
   engine_built: false
   engine_pct: 0
@@ -66,26 +66,67 @@ GROWTH_STATUS:
     queued: 0
     published: 0
     last_published: null
+  validation:               # GTM_STANDARD s4 self-validation -- fail closed, never claim an unverified source
+    checked_as_of: 2026-07-01
+    sources:
+      - name: product_analytics
+        status: unavailable   # no analytics MCP/tool connected this run
+      - name: billing
+        status: unavailable   # no Stripe/billing MCP/tool connected this run
+      - name: email_esp
+        status: unavailable   # no email-provider MCP/tool connected this run
+      - name: gtm_scorecard
+        status: unavailable   # docs/growth/GTM_SCORECARD.md does not exist yet (auditor hasn't landed a grade)
+    note: "All funnel/acquisition/pmf metrics above are 0/null because no source is
+           connected -- this satisfies scripts/validate_gtm.py's honesty gate (a
+           non-zero metric requires a connected source). Re-checked for a connected
+           MCP tool every run; none found as of 2026-07-01."
   learnings:
-    - "2026-06-29: QUALITY_SCORECARD (independent audit) = C overall, ship gate NOT met.
-       4 ship-critical dims below A: business-case-strength C ($57.5K < $100K floor;
-       referral loop, Career+ tier, B2B2C tier all unbuilt), store-readiness C (no
-       rendered store assets, mobile IAP not integrated, 4 open ACCEPTANCE_AUDIT FAILs),
-       security B (CAPTCHA + cross-instance rate-limit missing; CORS fixed in PR #96),
-       design-taste B (no committed visual screenshots, template icon, web/mobile accent
-       divergence). Pre-PMF: binding growth constraint is PRODUCT QUALITY, not
-       acquisition. Insufficient funnel data for any PMF inference (expected pre-launch)."
+    - "2026-07-01 (GTM run): QUALITY_SCORECARD (2nd independent audit, 2026-07-01) =
+       B overall (up from C on 2026-06-29), ship gate still NOT met -- 2 of 7
+       ship-critical dims below A (down from 4): business-case-strength C ($57.5K <
+       $100K floor; Career+ is now a REAL webhook-verified tier per PRs #152/153/155,
+       correctly credited as unquantified-until-cohort-data per anti-gaming, but
+       team/B2B2C seat tier + annual-first paywall remain unbuilt so the floor is
+       still not met) and store-readiness C (rendered store assets + mobile IAP still
+       absent; 4 open ACCEPTANCE_AUDIT FAILs). Security and design-taste both closed
+       B->A since the last GTM read (CORS/cross-instance limiter; 24 committed
+       screenshots + bespoke icon). No GTM_SCORECARD.md exists yet (the independent
+       GTM Auditor routine exists per loop-memory 2026-06-30 but has not landed a
+       first grade) -- consumed as absent, not fabricated. Checked this run for any
+       connected analytics/billing/email MCP source: NONE available -- confirms
+       engine_built=false / channels_connected=[] honestly (fail-closed, no invented
+       metric). Zero funnel data exists; pre-PMF read stays 'insufficient data' by
+       design. Binding constraint is still PRODUCT (business-case floor + store
+       assets), not acquisition -- no channel to scale into yet regardless."
+    - "2026-07-01 (GTM run): closed a real FACTORY_STANDARD S22 gap on our own ledger --
+       the three BUSINESS_CASE.md ARR scenarios ($16.5K/$57.5K/$132K) were cited in
+       prose but had zero executed-code backing (analysis/figures.json was empty).
+       Registered analysis/arr_conservative.py / arr_base.py / arr_optimistic.py
+       (shared inputs in analysis/business_case_lib.py) in figures.json; re-verified
+       by scripts/validate-computation.mjs every gate run from now on. No number
+       changed -- pure computation-integrity hardening, independently reviewed
+       (maker!=checker, APPROVE)."
   next_actions:
-    - "Factory: drive 4 ship-critical quality dims to A in scorecard order (business-case
-       -> store-readiness -> security -> design-taste) before the ship gate can open."
+    - "Factory: business-case-strength is now the SOLE remaining floor-blocking gap
+       (store-readiness is a separate, parallel gap) -- named buildable lever per
+       BUSINESS_CASE.md is the team/coach/B2B2C seat tier (highest ARPA, lowest
+       CAC/seat) plus annual-first/founder pricing enforcement."
+    - "Factory: store-readiness C -> A needs committed rendered store assets (icon,
+       feature graphic, screenshots) + mobile IAP (StoreKit/RevenueCat + Play Billing
+       client) to clear the 4 open ACCEPTANCE_AUDIT FAILs."
     - "Owner: apply SITE_GATE_PASSWORD to deployed app (ROADMAP Track G) -- required
        before site_gate_up flips true and execute-mode outreach unlocks."
     - "Owner: connect an email provider + analytics (see CONNECT.md) to move engine off 0%."
-    - "Stand up waitlist capture analytics so visitor_to_signup_rate becomes measurable."
+    - "No outreach drafts this run: no traction to honestly report, site gate down,
+       2 ship-critical dims still below A -- a quiet run is correct (per OUTREACH.md)."
   owner_blockers:
-    - "QUALITY_SCORECARD C (ship gate not met): 4 ship-critical dims below A -- no launch
-       until the factory drives them to A."
-    - "SITE_GATE_PASSWORD not applied: site_gate_up remains false; execute-mode blocked."
+    - "QUALITY_SCORECARD B, ship gate NOT met: 2 ship-critical dims (business-case-
+       strength, store-readiness) still below A -- no launch until the factory drives
+       them to A. Improved from 4 dims below A on 2026-06-29; circuit breaker not yet
+       warranted (real progress each read)."
+    - "SITE_GATE_PASSWORD not applied: site_gate_up remains false; execute-mode
+       outreach stays hard-blocked regardless of channel connection."
     - "No marketing channels connected -- Growth Agent stays in prepare-mode."
   links:
     connect_runbook: docs/growth/CONNECT.md
