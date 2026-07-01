@@ -13,6 +13,12 @@
 # product is actually done — that is the correct pre-launch state.
 set -uo pipefail
 cd "$(dirname "$0")/.."
+
+# --- FACTORY_STANDARD §22: computation-integrity gate (fail-safe; vacuous until analysis/figures.json has entries) ---
+if [ -f scripts/validate-computation.mjs ] && ! node scripts/validate-computation.mjs; then
+  echo "PREFLIGHT FAIL: validate-computation (§22) — a committed figure is mis-computed or non-reproducible." >&2
+  exit 1
+fi
 MODE="${1:-full}"
 PY="${PYTHON:-python3}"
 
