@@ -65,6 +65,10 @@ describe('PipelineScreen', () => {
     expect(await screen.findByText('Senior Backend Engineer')).toBeTruthy();
     expect(screen.getByText('Staff Platform Engineer')).toBeTruthy();
     expect(screen.getByText('87')).toBeTruthy(); // j1 fit score, not a placeholder
+    // The row announces as ONE element that now INCLUDES the pipeline status — a screen
+    // reader would otherwise never hear it (the status pill Text is swallowed by the
+    // Pressable's explicit label).
+    expect(screen.getByLabelText(/Senior Backend Engineer at Acme, fit score 87, status Applied/)).toBeTruthy();
     // Aggregate stat row reflects the API payload (avg fit = 84, tracked = 2).
     expect(screen.getByText('Tracked')).toBeTruthy();
     expect(screen.getByText('Avg fit')).toBeTruthy();

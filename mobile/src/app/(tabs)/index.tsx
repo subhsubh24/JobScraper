@@ -138,7 +138,7 @@ function JobRow({ job }: { job: Job }) {
       accessibilityRole="button"
       accessibilityLabel={`${job.title} at ${job.company ?? 'unknown company'}, fit score ${
         job.score == null ? 'not scored' : Math.round(job.score)
-      }`}
+      }, status ${STATUS_LABELS[job.status]}`}
       style={({ pressed }) => [styles.row, pressed && { opacity: 0.85 }]}
       onPress={() => router.push(`/job/${job.id}`)}
     >

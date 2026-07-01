@@ -61,7 +61,12 @@ export default function LoginScreen() {
         <Button label="Log in" onPress={onSubmit} loading={loading} />
         <View style={styles.footer}>
           <Text style={styles.muted}>New here? </Text>
-          <Link href="/(auth)/register" style={styles.link}>
+          <Link
+            href="/(auth)/register"
+            style={styles.link}
+            accessibilityRole="link"
+            accessibilityLabel="Create an account"
+          >
             Create an account
           </Link>
         </View>

@@ -70,7 +70,12 @@ export default function RegisterScreen() {
         <Button label="Create account" onPress={onSubmit} loading={loading} />
         <View style={styles.footer}>
           <Text style={styles.muted}>Already have an account? </Text>
-          <Link href="/(auth)/login" style={styles.link}>
+          <Link
+            href="/(auth)/login"
+            style={styles.link}
+            accessibilityRole="link"
+            accessibilityLabel="Log in"
+          >
             Log in
           </Link>
         </View>
