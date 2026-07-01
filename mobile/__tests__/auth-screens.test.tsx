@@ -17,7 +17,11 @@ jest.mock('expo-router', () => {
   const { Text } = require('react-native');
   return {
     router: { replace: (...a: unknown[]) => mockReplace(...a) },
-    Link: ({ children }: { children: React.ReactNode }) => <Text>{children}</Text>,
+    // Forward props (href aside) so a11y attributes like accessibilityRole are testable —
+    // the real expo-router Link passes them through to its underlying element.
+    Link: ({ children, href: _href, ...rest }: { children: React.ReactNode; href?: string }) => (
+      <Text {...rest}>{children}</Text>
+    ),
   };
 });
 
@@ -53,6 +57,8 @@ describe('LoginScreen', () => {
     expect(screen.getByPlaceholderText('you@example.com')).toBeTruthy();
     expect(screen.getByPlaceholderText('••••••••')).toBeTruthy();
     expect(screen.getByText('Create an account')).toBeTruthy();
+    // Announced to assistive tech as a link (was a bare Text with no role).
+    expect(screen.getByRole('link', { name: 'Create an account' })).toBeTruthy();
   });
 
   it('blocks submit and shows an error when fields are blank (no API call)', async () => {
