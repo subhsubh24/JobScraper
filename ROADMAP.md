@@ -160,12 +160,15 @@ the guard tests, and **`FACTORY_STANDARD.md`**.
 - [x] ASO / store copy (title, subtitle, keywords, descriptions) — `docs/store/ASO_COPY.md`
       (title/subtitle/keywords within char limits, descriptions honest to shipped features,
       auto-renew + restore-purchases disclosure) (PR #43).
-- [ ] **User-report / flag affordance for AI-generated content** (2026 Apple App Review + Google
-      Play GenAI/UGC guidelines, surfaced by the run-8 store scout via WebSearch): the app
-      moderates LLM output server-side (`src/moderation`) but has no USER-FACING "report this
-      response" control on the AI coach + prep-pack surfaces. Loop-buildable (a `report` endpoint
-      + a small UI affordance on web + mobile) but sprawls asgi.py + web + mobile → a dedicated
-      coherent run, not bundled. Verify against the live guidelines at submission.
+- [x] **User-report / flag affordance for AI-generated content** (2026 Apple App Review + Google
+      Play GenAI/UGC guidelines) — SHIPPED (PR #142, 2 Sonnet reviewers). `POST /api/report`
+      records a real, moderator-reviewable `ContentReport` row (`Literal`-constrained
+      content_type/reason, bounded free-text, rate-limited `report` bucket, cascade-purged on
+      account deletion) — SIDE-EFFECT INTEGRITY: success reported only after the row commits, no
+      claim of an unbuilt notification pipeline (DECISION COROLLARY). A shared `ReportButton`
+      surfaces it on every AI coach reply + generated prep pack on web AND mobile.
+      `tests/test_content_report.py` (8) + `mobile/__tests__/report-button.test.tsx`. Re-verify
+      against the live guidelines at submission.
 - [ ] `docs/store/ACCEPTANCE_AUDIT.md` vs CURRENT Apple/Google guidelines, **ZERO open FAILs**
 
 ### E — World-class quality
