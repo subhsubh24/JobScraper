@@ -35,6 +35,12 @@ free→paid conversion 3–6% (typical freemium SaaS, conservative end), blended
 **Planning case = base = $57.5K → BELOW the $100K floor. `floor_met_year1: false`.**
 We say so honestly rather than inflating price, users, or conversion.
 
+*Computation integrity (FACTORY_STANDARD §22): each scenario's ARR is produced by executed
+code, not hand arithmetic — `analysis/arr_conservative.py` / `arr_base.py` / `arr_optimistic.py`
+(shared inputs in `analysis/business_case_lib.py`), registered in `analysis/figures.json` and
+re-verified every gate run by `scripts/validate-computation.mjs`. Update the scenario inputs
+there (never hand-edit the numbers below independently) when an assumption changes.*
+
 ## Buildable levers to clear the $100K floor (each becomes ROADMAP work)
 These are *named, buildable* items (the only valid weak-case loop-back triggers):
 
