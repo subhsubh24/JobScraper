@@ -101,3 +101,51 @@ def test_get_top_jobs_excludes_unscored_and_other_users(db_session):
     # the other user's higher-scored job is never visible — per-user isolation).
     assert len(top) == 1
     assert top[0][0].id == scored.id
+
+
+# ---------------------------------------------------------------------------
+# Embedding RELOAD path (scorer.py ensure_user_embedding / ensure_job_embedding)
+#
+# When an embedding already EXISTS it is returned without a fresh API call. The stored
+# value may be a JSON string (legacy/text storage) or a list (JSON column) — the isinstance
+# check handles both. Key-free tests never populate embeddings (get_embedding raises before
+# storing), so these defensive branches had ZERO coverage. A regression that drops the
+# isinstance guard would call json.loads() on a list (TypeError, caught → silent 0.5 score)
+# or skip parsing a stored string, silently DEGRADING scores for affected rows.
+# ---------------------------------------------------------------------------
+def test_ensure_user_embedding_parses_stored_json_string(db_session):
+    user = _user(db_session, email="embed-user-str@example.com")
+    user.resume_embedding = "[0.1, 0.2, 0.3]"  # stored as a JSON string
+    db_session.flush()
+
+    emb = JobScorer(db_session).ensure_user_embedding(user)
+    assert emb == [0.1, 0.2, 0.3]  # parsed back to a list, no fresh embedding call
+
+
+def test_ensure_user_embedding_returns_stored_list_as_is(db_session):
+    user = _user(db_session, email="embed-user-list@example.com")
+    user.resume_embedding = [0.4, 0.5]  # already a list (JSON column)
+    db_session.flush()
+
+    emb = JobScorer(db_session).ensure_user_embedding(user)
+    assert emb == [0.4, 0.5]  # returned as-is — never json.loads()'d into a crash
+
+
+def test_ensure_job_embedding_parses_stored_json_string(db_session):
+    user = _user(db_session, email="embed-job-str@example.com")
+    job = _job(db_session, user, "Backend", "python aws")
+    job.jd_embedding = "[0.6, 0.7]"  # stored as a JSON string
+    db_session.flush()
+
+    emb = JobScorer(db_session).ensure_job_embedding(job)
+    assert emb == [0.6, 0.7]
+
+
+def test_ensure_job_embedding_returns_stored_list_as_is(db_session):
+    user = _user(db_session, email="embed-job-list@example.com")
+    job = _job(db_session, user, "Backend", "python aws")
+    job.jd_embedding = [0.8, 0.9]  # already a list
+    db_session.flush()
+
+    emb = JobScorer(db_session).ensure_job_embedding(job)
+    assert emb == [0.8, 0.9]
