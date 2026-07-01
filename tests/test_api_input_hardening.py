@@ -27,18 +27,29 @@ def test_chat_request_rejects_overlong_ids(client, db_session):
     db_session.query(User).update({User.tier: UserTier.PREMIUM})
     db_session.commit()
 
-    over = "x" * 65  # bound is 64
+    # job_id bound is 64; session_id is tighter (36) because it is INSERTED into a
+    # String(36) column — a 37..64-char value must be rejected at the boundary, not raise a
+    # DB truncation 502 downstream.
     r = client.post(
         "/api/coach/chat",
         headers=_auth(token),
-        json={"message": "hi", "session_id": over},
+        json={"message": "hi", "job_id": "x" * 65},
     )
     assert r.status_code == 422, r.text
 
     r = client.post(
         "/api/coach/chat",
         headers=_auth(token),
-        json={"message": "hi", "job_id": over},
+        json={"message": "hi", "session_id": "x" * 65},
+    )
+    assert r.status_code == 422, r.text
+
+    # A 40-char session_id is within the old 64 bound but over the DB column width — it must
+    # 422 (locks the tightened 36-char bound so it can't silently regress to 64).
+    r = client.post(
+        "/api/coach/chat",
+        headers=_auth(token),
+        json={"message": "hi", "session_id": "x" * 40},
     )
     assert r.status_code == 422, r.text
 

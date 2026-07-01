@@ -428,12 +428,14 @@ class PrepPackRequest(BaseModel):
 
 class ChatRequest(BaseModel):
     message: str = Field(min_length=1, max_length=4000)
-    # Bounded like PrepPackRequest.job_id: these are client-supplied ids (a UUID is 36 chars)
-    # used in DB filters / string ops. Without a bound a pathologically long value could be
-    # sent to the query layer; 64 chars covers any real id. The endpoint additionally scopes
-    # the job lookup to the caller, and the session id only groups the caller's own messages.
+    # Bounded client-supplied ids (a UUID is 36 chars). job_id is only ever an equality
+    # filter (JobPosting.id, String(36)) — an over-length value just misses, so the generous
+    # 64 mirrors PrepPackRequest.job_id. session_id is INSERTED into ChatMessage.session_id
+    # (String(36)), so it is bound to exactly 36: a 37–64-char value would pass Pydantic but
+    # raise a DB string-truncation error surfaced as a misleading 502. 422 at the boundary
+    # is the honest failure.
     job_id: Optional[str] = Field(default=None, max_length=64)
-    session_id: Optional[str] = Field(default=None, max_length=64)
+    session_id: Optional[str] = Field(default=None, max_length=36)
 
 
 class AppPurchase(BaseModel):
