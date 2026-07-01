@@ -4,6 +4,72 @@ Durable lessons for the factory loop. Append dated entries. Keep it honest and s
 
 ---
 
+### 2026-07-01 (run 12) — Maximal run: the long-deferred PMF analytics foundation (Track G+H) + web coach a11y + scorer coverage + 8-scout sweep
+Ran the full 8-scout sweep (functional-reality / security / backend-tests / web-design /
+mobile-design / store+artifact-freshness / business-case+PMF / performance) doubling as the
+~daily DEEP AUDIT. Security found NOTHING new; functional-reality found NO ship-critical bug
+(its 3 findings were the KNOWN by-design LLM-ceiling-consume-before-call + two low-sev free-tier
+TOCTOUs — deferred). `asgi.py` was clean of any higher-urgency contender, so it finally went to
+the **long-deferred (8+ runs) analytics instrumentation** — the PMF-measurement foundation that
+kept losing the single asgi.py/migration slot to functional/security/store work. Shipped 3
+file-disjoint PRs through 2 Sonnet reviewers each + the CI gate, all merged:
+- **#146 privacy-safe analytics instrumentation** (Track G line 287 + Track H line 294 → BOTH
+  TICKED; the asgi.py + models.py + ≤1-migration owner). `src/analytics.py` `record_event()` is
+  a BEST-EFFORT allowlisted upsert (mirrors the RateCounter integrity-retry idiom) that NEVER
+  raises — analytics must never break a user request — called strictly AFTER each endpoint's own
+  commit. New `AggregateEvent` table (counts ONLY: `event_type`+`event_date`+count — no PII, no
+  user id, no raw events) + drift-gated migration `b2c8d4e6f1a5` (down_revision a1b7c2f9e0d3).
+  Hooks at signup → job_added → fit_score_generated (the activation "aha" funnel; fit_score
+  decoupled via a `scored` bool so it only fires when scoring succeeded — no phantom count) +
+  prep_pack + coach. `GET /api/analytics/summary` shared-secret gated (`ANALYTICS_READ_TOKEN`,
+  constant-time, rate-limited) — NOT any-authed-user (no aggregate-count leak), honest 503 unset.
+  VALIDATION.md declares it `validation: real` (the gated read path is fully exercised in CI by an
+  in-test token — an honest "real" without a standing CI secret). 12 tests incl. the real funnel
+  round-trip. BOTH reviewers APPROVE; Reviewer A mutation-tested the never-raises contract (both
+  IntegrityError retries fail → returns None, no throw); their two non-blocking nits (docstring
+  "retention" overclaim — an aggregate table can't derive per-user retention; + no rate-limit on
+  the read endpoint) were both FIXED in a refine commit (cycle 1) before merge.
+- **#147 web coach a11y** (web/app/app/coach/page.tsx, disjoint): the AI-coach suggestion CHIPS
+  (a Premium CTA) were raw `<button>`s with hover styling but ZERO focus indicator (WCAG 2.4.7).
+  Applied the app's established focus-visible ring (byte-identical to Button/job-card/legal).
+  BOTH APPROVE first pass. Web-design scout's other two picks were REJECTED as false/churn:
+  landing feature titles are ALREADY `<h3>` (verified — false positive); upgrading all text
+  INPUTS from border-focus to rings is the intentional app-wide input pattern (consistency wins).
+- **#148 scorer embedding-reload coverage** (tests/test_scorer_workflow.py, disjoint): the
+  `ensure_*_embedding` str→`json.loads` / list-passthrough reload branches (scorer.py:49-52,
+  64-67) had ZERO coverage (key-free tests never STORE an embedding, so the reload path is dead
+  in-suite). 4 tests; mutation-verified BOTH directions (drop the guard → str test fails; make
+  json.loads unconditional → list test TypeErrors). BOTH APPROVE.
+LESSONS: (1) **A long-deferred, correctly-scoped item gets its dedicated run when the shared
+resource is finally free** — analytics lost the asgi.py/migration slot 8+ runs to higher-urgency
+functional/security/store work; this run NOTHING outranked it (security clean, no ship-critical
+functional bug, the perf N+1 on /api/jobs/{id} + the TOCTOUs are pre-launch 0-row polish), so it
+correctly claimed the slot. Deferral ≠ abandonment when the item stays named + scoped. (2)
+**maker≠checker's value this run was two non-blocking honesty/hardening nits on the anchor**, both
+fixed pre-merge: a docstring that claimed the aggregate table yields RETENTION (it can't — no
+per-user dimension, by design) and a read endpoint missing the rate-limit every sibling has. (3)
+**PMF-FIRST discipline chose measurement over a revenue lever**: the business-case scout ranked
+TEAM/B2B2C as the floor-flip lever, but it's a genuine multi-run epic that CONTENDS the exact
+asgi.py/models.py/migration slot analytics needed — and pre-PMF (0 users) a B2B2C sales tier on a
+spreadsheet moves no real ARR, whereas analytics is the prerequisite to VALIDATE any model with
+real cohort data (§9). Analytics this run; TEAM queued as the dedicated next epic. Career+-solo
+stays REJECTED (dishonest dark pattern — PREMIUM is already unlimited-everything). (4) **Rejected
+several scout false positives before building**: mobile job-status "fake success" (#3 — verified
+FALSE: `setJob(await updateJobStatus(...))` sets state from the awaited server response, not
+optimistically); `get_session_summary` coverage (dead code — defined, wired to no endpoint);
+mobile silent-failure polish + hardcoded-rgba token (churn-ish, optional surfaces).
+DEFERRED (named, buildable — next runs): TEAM/B2B2C tier (floor-flip epic, multi-run, owner GTM);
+coach "100 msg/mo" doc↔code mismatch (README/BUSINESS_CASE promise it; code enforces only the
+daily spend ceiling — user-GENEROUS not deceptive, but a living-artifact gap → enforce a monthly
+counter OR correct the docs; wants models/migration/asgi.py — dedicated run); `/api/jobs/{id}`
+N+1 (selectinload the detail endpoint; pre-launch 0-row polish, asgi.py); free-tier job/prep
+TOCTOU (atomic increment in auth_service — avoids asgi.py); rate limits on /api/auth/me +
+/api/referrals/me (low-sev, asgi.py); CAPTCHA (owner keys). QUALITY SCORECARD still STALE (as_of
+2026-06-29 — its named gaps CORS/#96, N+1/#121, referral/#109, limiter/#114, store user-report/#142
+are all CLOSED); the independent Quality Auditor should re-grade (consumed as DATA, never
+self-edited — maker≠checker).
+
+
 ### 2026-07-01 (run 11) — Maximal run: the DEDICATED GenAI user-report affordance (Track D) + coach-suggestions bounded query + mobile a11y + 8-scout sweep
 Ran the full 8-scout sweep (functional-reality / security / backend-tests / web-design /
 mobile-design / store+artifact-freshness / business-case+PMF / performance) doubling as the
