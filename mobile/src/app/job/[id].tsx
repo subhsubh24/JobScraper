@@ -2,7 +2,7 @@ import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { Button, Card, ErrorBanner } from '@/components/ui';
+import { Button, Card, ErrorBanner, Field } from '@/components/ui';
 import { Markdown } from '@/components/markdown';
 import { ReportButton } from '@/components/report-button';
 import { useAuth } from '@/contexts/auth';
@@ -29,6 +29,11 @@ export default function JobDetailScreen() {
   const [prepLoading, setPrepLoading] = useState(false);
   const [prep, setPrep] = useState<{ title: string; content: string } | null>(null);
   const [prepMsg, setPrepMsg] = useState<string | null>(null);
+  const [targetSalary, setTargetSalary] = useState('');
+  const [negLoading, setNegLoading] = useState(false);
+  const [neg, setNeg] = useState<{ title: string; content: string } | null>(null);
+  const [negMsg, setNegMsg] = useState<string | null>(null);
+  const isCareerPlus = user?.career_plus === true;
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -74,6 +79,38 @@ export default function JobDetailScreen() {
       }
     } finally {
       setPrepLoading(false);
+    }
+  }
+
+  async function generateNegotiation() {
+    if (!id) return;
+    // Round BEFORE validating: "0.4" is > 0 but rounds to 0, which the backend (ge=0) would
+    // accept — burning an LLM call on a nonsensical "$0" guide. Validate the value we send.
+    const parsed = Math.round(Number(targetSalary));
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      setNegMsg('Enter your target salary (a positive number).');
+      return;
+    }
+    if (parsed > 10_000_000) {
+      setNegMsg('Enter a realistic target salary.');
+      return;
+    }
+    setNegLoading(true);
+    setNegMsg(null);
+    try {
+      setNeg(await api.generateSalaryNegotiation(id, parsed));
+    } catch (e) {
+      // The UI already gates this to Career+, but the server is the source of truth — if it
+      // says 403, route to the paywall rather than dead-end.
+      if (e instanceof ApiError && e.status === 403) {
+        router.push('/paywall');
+      } else if (e instanceof ApiError) {
+        setNegMsg(e.message); // 503 (AI not configured) and other API errors, honestly inline
+      } else {
+        setNegMsg('Could not generate a negotiation guide. Please try again.');
+      }
+    } finally {
+      setNegLoading(false);
     }
   }
 
@@ -169,6 +206,39 @@ export default function JobDetailScreen() {
           <ReportButton contentType="prep_pack" contentRef={id} contentExcerpt={prep.content} />
         </Card>
       ) : null}
+
+      <Text style={styles.section}>Salary negotiation</Text>
+      {isCareerPlus ? (
+        <>
+          <Field
+            label="Your target salary (USD)"
+            keyboardType="numeric"
+            value={targetSalary}
+            onChangeText={setTargetSalary}
+            placeholder="180000"
+          />
+          <Button label="Generate negotiation guide" onPress={generateNegotiation} loading={negLoading} />
+          {negMsg ? (
+            <Text style={styles.prepMsg} accessibilityRole="alert" accessibilityLiveRegion="polite">
+              {negMsg}
+            </Text>
+          ) : null}
+          {neg ? (
+            <Card style={styles.prepCard}>
+              <Text style={styles.prepTitle}>{neg.title}</Text>
+              <Markdown content={neg.content} />
+              <ReportButton contentType="prep_pack" contentRef={id} contentExcerpt={neg.content} />
+            </Card>
+          ) : null}
+        </>
+      ) : (
+        <Card style={styles.upsellCard}>
+          <Text style={styles.upsellText}>
+            AI salary-negotiation coaching is a Career+ feature — scripts and strategies tailored to this offer.
+          </Text>
+          <Button label="Upgrade to Career+" onPress={() => router.push('/paywall')} />
+        </Card>
+      )}
     </ScrollView>
   );
 }
@@ -201,4 +271,6 @@ const styles = StyleSheet.create({
   prepMsg: { color: colors.danger, fontSize: 13, marginTop: spacing.sm },
   prepCard: { marginTop: spacing.md, gap: spacing.sm },
   prepTitle: { color: colors.text, fontSize: 16, fontWeight: '700' },
+  upsellCard: { gap: spacing.md, alignItems: 'flex-start' },
+  upsellText: { color: colors.text, lineHeight: 20 },
 });

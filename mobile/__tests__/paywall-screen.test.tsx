@@ -18,8 +18,12 @@ jest.mock('expo-router', () => ({
 
 const mockRefresh = jest.fn((..._a: unknown[]) => Promise.resolve());
 let mockTier: 'free' | 'premium' = 'free';
+let mockCareerPlus = false;
 jest.mock('@/contexts/auth', () => ({
-  useAuth: () => ({ user: { id: 'u1', tier: mockTier }, refresh: (...a: unknown[]) => mockRefresh(...a) }),
+  useAuth: () => ({
+    user: { id: 'u1', tier: mockTier, career_plus: mockCareerPlus },
+    refresh: (...a: unknown[]) => mockRefresh(...a),
+  }),
 }));
 
 import PaywallScreen from '@/app/paywall';
@@ -27,6 +31,7 @@ import PaywallScreen from '@/app/paywall';
 afterEach(() => {
   jest.clearAllMocks();
   mockTier = 'free';
+  mockCareerPlus = false;
 });
 
 describe('PaywallScreen', () => {
@@ -41,13 +46,29 @@ describe('PaywallScreen', () => {
     expect(screen.queryByText("You're on Premium")).toBeNull();
   });
 
-  it('shows a confirmation state (no buy CTA) to a premium user', () => {
+  it('shows Pro confirmation to a Pro user WITHOUT falsely claiming the Career+ exclusive', () => {
     mockTier = 'premium';
+    mockCareerPlus = false;
     render(<PaywallScreen />);
-    expect(screen.getByText("You're on Premium")).toBeTruthy();
-    // The upgrade CTA + plan cards must NOT show to someone already entitled.
+    // A Pro user is on Pro, not "Premium"/"Career+", and sees no buy CTA.
+    expect(screen.getByText("You're on Pro")).toBeTruthy();
+    expect(screen.queryByText("You're on Career+")).toBeNull();
     expect(screen.queryByText('Start Premium')).toBeNull();
     expect(screen.queryByText('Monthly')).toBeNull();
+    // HONESTY (the bug this guards): salary negotiation is presented as a Career+ UPSELL
+    // ("coming soon"), never as an already-unlocked feature — and it is not a dead end.
+    expect(screen.getByText(/Career\+ adds/i)).toBeTruthy();
+    expect(screen.getByText(/coming soon/i)).toBeTruthy();
+  });
+
+  it('shows Career+ confirmation (salary negotiation unlocked) to a Career+ user', () => {
+    mockTier = 'premium';
+    mockCareerPlus = true;
+    render(<PaywallScreen />);
+    expect(screen.getByText("You're on Career+")).toBeTruthy();
+    // The Career+ exclusive is genuinely theirs — shown as an unlocked feature row.
+    expect(screen.getByLabelText('AI salary-negotiation coaching')).toBeTruthy();
+    expect(screen.queryByText('Start Premium')).toBeNull();
   });
 
   it('refreshes entitlement when the paywall opens', () => {

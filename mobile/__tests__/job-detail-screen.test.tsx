@@ -17,12 +17,13 @@ jest.mock('expo-router', () => ({
   useLocalSearchParams: () => ({ id: 'job-1' }),
 }));
 
-let mockUser: { tier: string } = { tier: 'free' };
+let mockUser: { tier: string; career_plus?: boolean } = { tier: 'free' };
 jest.mock('@/contexts/auth', () => ({ useAuth: () => ({ user: mockUser }) }));
 
 const mockGetJob = jest.fn();
 const mockGeneratePrep = jest.fn();
 const mockUpdateStatus = jest.fn();
+const mockGenerateNeg = jest.fn();
 jest.mock('@/services/api', () => {
   class ApiError extends Error {
     status: number;
@@ -36,6 +37,7 @@ jest.mock('@/services/api', () => {
       getJob: (id: string) => mockGetJob(id),
       generatePrepPack: (id: string) => mockGeneratePrep(id),
       updateJobStatus: (id: string, s: string) => mockUpdateStatus(id, s),
+      generateSalaryNegotiation: (id: string, target: number) => mockGenerateNeg(id, target),
     },
     ApiError,
   };
@@ -102,6 +104,47 @@ describe('JobDetailScreen', () => {
     // markdown itself is covered by markdown.test.tsx.
     expect(await screen.findByText('Interview Prep: Senior Backend Engineer')).toBeTruthy();
     expect(screen.getByTestId('prep-content').props.children).toContain('Acme builds rockets.');
+  });
+
+  it('gates salary negotiation behind Career+ for a non-Career+ user (upsell, no input)', async () => {
+    mockUser = { tier: 'premium' }; // Pro (premium, not career_plus) — must NOT see the tool
+    render(<JobDetailScreen />);
+    await screen.findByText('Senior Backend Engineer');
+    expect(screen.getByText('Upgrade to Career+')).toBeTruthy();
+    expect(screen.queryByText('Generate negotiation guide')).toBeNull();
+
+    fireEvent.press(screen.getByText('Upgrade to Career+'));
+    expect(mockPush).toHaveBeenCalledWith('/paywall');
+  });
+
+  it('lets a Career+ user generate a negotiation guide and renders it inline', async () => {
+    mockUser = { tier: 'premium', career_plus: true };
+    mockGenerateNeg.mockResolvedValue({
+      title: 'Salary Negotiation: Senior Backend Engineer',
+      content: '## Talking points\nAnchor high, cite market data.',
+    });
+    render(<JobDetailScreen />);
+    await screen.findByText('Senior Backend Engineer');
+
+    fireEvent.changeText(screen.getByPlaceholderText('180000'), '190000');
+    fireEvent.press(screen.getByText('Generate negotiation guide'));
+
+    expect(await screen.findByText('Salary Negotiation: Senior Backend Engineer')).toBeTruthy();
+    // The real target salary reached the API (rounded int), and the artifact content rendered.
+    expect(mockGenerateNeg).toHaveBeenCalledWith('job-1', 190000);
+    expect(screen.getByTestId('prep-content').props.children).toContain('Anchor high');
+  });
+
+  it('rejects a sub-1 target salary that rounds to 0 (no wasted LLM call)', async () => {
+    mockUser = { tier: 'premium', career_plus: true };
+    render(<JobDetailScreen />);
+    await screen.findByText('Senior Backend Engineer');
+
+    fireEvent.changeText(screen.getByPlaceholderText('180000'), '0.4');
+    fireEvent.press(screen.getByText('Generate negotiation guide'));
+
+    expect(await screen.findByText('Enter your target salary (a positive number).')).toBeTruthy();
+    expect(mockGenerateNeg).not.toHaveBeenCalled();
   });
 
   it('shows an honest error state when the job fails to load', async () => {
