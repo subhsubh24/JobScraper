@@ -69,6 +69,9 @@ describe('PipelineScreen', () => {
     expect(screen.getByText('Tracked')).toBeTruthy();
     expect(screen.getByText('Avg fit')).toBeTruthy();
     expect(screen.getByText('84')).toBeTruthy();
+    // Each stat announces as ONE labelled element ("Avg fit: 84"), not two bare Text nodes.
+    expect(screen.getByLabelText('Avg fit: 84')).toBeTruthy();
+    expect(screen.getByLabelText('Tracked: 2')).toBeTruthy();
     // Personalized greeting uses the real user.
     expect(screen.getByText(/Ada/)).toBeTruthy();
   });

@@ -117,8 +117,15 @@ function activeCount(stats: PipelineStats): number {
 }
 
 function Stat({ label, value }: { label: string; value: string }) {
+  // Announce as ONE labelled element ("Tracked: 12") instead of two bare Text nodes a
+  // screen reader would read as a contextless number followed by a word.
   return (
-    <View style={styles.stat}>
+    <View
+      style={styles.stat}
+      accessible
+      accessibilityRole="text"
+      accessibilityLabel={`${label}: ${value}`}
+    >
       <Text style={styles.statValue}>{value}</Text>
       <Text style={styles.statLabel}>{label}</Text>
     </View>

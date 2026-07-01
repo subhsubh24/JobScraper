@@ -53,7 +53,11 @@ export default function LoginScreen() {
           secureTextEntry
           placeholder="••••••••"
         />
-        {error ? <Text style={styles.error}>{error}</Text> : null}
+        {error ? (
+          <Text style={styles.error} accessibilityRole="alert" accessibilityLiveRegion="polite">
+            {error}
+          </Text>
+        ) : null}
         <Button label="Log in" onPress={onSubmit} loading={loading} />
         <View style={styles.footer}>
           <Text style={styles.muted}>New here? </Text>
