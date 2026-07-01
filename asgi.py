@@ -467,6 +467,11 @@ class CheckoutRequest(BaseModel):
     plan: str = Field(min_length=2, max_length=50)
 
 
+class SalaryNegotiationRequest(BaseModel):
+    job_id: str = Field(min_length=1, max_length=64)
+    target_salary: int = Field(ge=0, le=10_000_000)
+
+
 class ImportPreviewRequest(BaseModel):
     careers_url: str = Field(min_length=4, max_length=500)
 
@@ -491,14 +496,20 @@ _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 # ---------------------------------------------------------------------------
 def user_public(user: User, db: Session) -> dict:
     limits = AuthService(db).check_usage_limits(user)
+    # ``plan_level`` (free | pro | career_plus) is DERIVED from the webhook-verified
+    # Subscription.plan (see src/billing.py) — clients use it to gate the Career+ surface, but
+    # the server RE-CHECKS it on every Career+ endpoint (never trust the client flag).
+    plan_level = billing.current_plan_level(user, user.subscription)
     return {
         "id": user.id,
         "email": user.email,
         "full_name": user.full_name,
         "tier": user.tier.value if isinstance(user.tier, UserTier) else user.tier,
+        "plan_level": plan_level,
         "jobs_remaining": limits["jobs_remaining"],
         "prep_packs_remaining": limits["prep_packs_remaining"],
         "ai_coach": user.tier == UserTier.PREMIUM,
+        "career_plus": plan_level == "career_plus",
     }
 
 
@@ -1052,6 +1063,65 @@ def generate_prep_pack(
             "content": artifact.content,
         },
         "prep_packs_remaining": auth.check_usage_limits(user)["prep_packs_remaining"],
+    }
+
+
+# ---------------------------------------------------------------------------
+# Salary negotiation coaching (Career+ EXCLUSIVE; LLM — degrades gracefully)
+# ---------------------------------------------------------------------------
+@app.post("/api/prep/salary-negotiation", dependencies=[Depends(rate_limit("llm", 10))])
+def generate_salary_negotiation_guide(
+    data: SalaryNegotiationRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Generate salary-negotiation scripts for a tracked job — a Career+ EXCLUSIVE feature.
+
+    Career+ is a REAL, verified entitlement, not a client flag: the gate reads
+    ``current_plan_level`` (derived from the signature-verified-webhook-written
+    ``Subscription.plan``). This feature is ADDITIVE — it had no endpoint before, so gating it
+    to Career+ takes nothing away from Pro/Premium users (no dark pattern). Honest degradation:
+    no LLM key -> 503, never a fake or blank script (SIDE-EFFECT INTEGRITY §6). The gate is
+    checked BEFORE any LLM work so a non-Career+ user always gets a clean 403, never a 503.
+    """
+    if billing.current_plan_level(user, user.subscription) != "career_plus":
+        raise HTTPException(
+            status_code=403,
+            detail="Salary negotiation coaching is a Career+ feature. Upgrade to Career+ to unlock it.",
+        )
+
+    job = (
+        db.query(JobPosting)
+        .filter(JobPosting.id == data.job_id, JobPosting.user_id == user.id)
+        .first()
+    )
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    if not llm_available():
+        # Truthful graceful degradation — not a crash, not a fake result.
+        raise HTTPException(
+            status_code=503,
+            detail="AI salary-negotiation coaching requires the server's GEMINI_API_KEY to be configured.",
+        )
+
+    check_llm_ceiling(user, db)
+    try:
+        artifact: PrepArtifact = LLMWorkflows(db).generate_salary_negotiation(
+            job, data.target_salary
+        )
+    except Exception:
+        logger.exception("Salary negotiation generation failed")
+        raise HTTPException(status_code=502, detail="AI provider error generating negotiation guide")
+
+    db.commit()
+    return {
+        "success": True,
+        "artifact": {
+            "id": artifact.id,
+            "title": artifact.title,
+            "content": artifact.content,
+        },
     }
 
 
