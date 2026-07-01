@@ -41,7 +41,8 @@ for (const { label, size } of WIDTHS) {
     await page.screenshot({ path: `${SHOTS}/register-${label}.png`, fullPage: true });
 
     await page.goto('/pricing');
-    await expect(page.getByRole('heading', { name: /Career Operator Premium/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Pricing/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Career\+/i })).toBeVisible();
     await page.screenshot({ path: `${SHOTS}/pricing-${label}.png`, fullPage: true });
 
     await page.goto('/waitlist');
@@ -86,6 +87,9 @@ for (const { label, size } of WIDTHS) {
     await expect(
       page.getByRole('heading', { name: /Senior Backend Engineer/i }).first(),
     ).toBeVisible({ timeout: 20_000 });
+    // Career+-gated salary-negotiation surface: a free user sees the honest locked CTA,
+    // not the tool (BUILDS != WORKS for the entitlement gate).
+    await expect(page.getByRole('button', { name: /Upgrade to Career\+/i })).toBeVisible();
     await page.screenshot({ path: `${SHOTS}/app-job-detail-${label}.png`, fullPage: true });
 
     // coach (free tier sees the honest upgrade-gated state — a real state worth judging)

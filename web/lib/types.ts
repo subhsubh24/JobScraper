@@ -1,6 +1,10 @@
 // Mirrors the FastAPI response shapes (see asgi.py serializers).
 export type Tier = 'free' | 'premium';
 
+// Entitlement LEVEL within the paid tier — derived server-side from the webhook-verified
+// Subscription.plan (see src/billing.py). `career_plus` unlocks the Career+ exclusives.
+export type PlanLevel = 'free' | 'pro' | 'career_plus';
+
 export type ApplicationStatus =
   | 'saved'
   | 'applied'
@@ -35,6 +39,9 @@ export interface User {
   email: string;
   full_name: string | null;
   tier: Tier;
+  // `plan_level` may be absent on an older API deploy; treat a missing value as not-Career+.
+  plan_level?: PlanLevel;
+  career_plus?: boolean;
   jobs_remaining: number | string;
   prep_packs_remaining: number | string;
   ai_coach: boolean;
