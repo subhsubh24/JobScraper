@@ -156,7 +156,11 @@ export default function JobDetailScreen() {
         onPress={generatePrep}
         loading={prepLoading}
       />
-      {prepMsg ? <Text style={styles.prepMsg}>{prepMsg}</Text> : null}
+      {prepMsg ? (
+        <Text style={styles.prepMsg} accessibilityRole="alert" accessibilityLiveRegion="polite">
+          {prepMsg}
+        </Text>
+      ) : null}
       {prep ? (
         <Card style={styles.prepCard}>
           <Text style={styles.prepTitle}>{prep.title}</Text>

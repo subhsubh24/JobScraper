@@ -53,7 +53,11 @@ export default function NewJobScreen() {
           style={{ minHeight: 140, textAlignVertical: 'top' }}
           placeholder="Responsibilities, requirements, tech stack…"
         />
-        {error ? <Text style={styles.error}>{error}</Text> : null}
+        {error ? (
+          <Text style={styles.error} accessibilityRole="alert" accessibilityLiveRegion="polite">
+            {error}
+          </Text>
+        ) : null}
         <Button label="Add & score" onPress={onSubmit} loading={loading} />
       </ScrollView>
     </KeyboardAvoidingView>

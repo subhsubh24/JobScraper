@@ -58,7 +58,10 @@ describe('LoginScreen', () => {
   it('blocks submit and shows an error when fields are blank (no API call)', async () => {
     render(<LoginScreen />);
     fireEvent.press(screen.getByText('Log in'));
-    expect(await screen.findByText('Enter your email and password.')).toBeTruthy();
+    const err = await screen.findByText('Enter your email and password.');
+    expect(err).toBeTruthy();
+    // The error is announced to screen readers (role=alert), not silent red text.
+    expect(err.props.accessibilityRole).toBe('alert');
     expect(mockSignIn).not.toHaveBeenCalled();
     expect(mockReplace).not.toHaveBeenCalled();
   });

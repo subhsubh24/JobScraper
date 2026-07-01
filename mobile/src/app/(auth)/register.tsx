@@ -62,7 +62,11 @@ export default function RegisterScreen() {
           style={{ minHeight: 100, textAlignVertical: 'top' }}
           placeholder="Your experience, skills, achievements…"
         />
-        {error ? <Text style={styles.error}>{error}</Text> : null}
+        {error ? (
+          <Text style={styles.error} accessibilityRole="alert" accessibilityLiveRegion="polite">
+            {error}
+          </Text>
+        ) : null}
         <Button label="Create account" onPress={onSubmit} loading={loading} />
         <View style={styles.footer}>
           <Text style={styles.muted}>Already have an account? </Text>
