@@ -4,6 +4,78 @@ Durable lessons for the factory loop. Append dated entries. Keep it honest and s
 
 ---
 
+### 2026-07-01 (run 10) — Maximal run: 6 PRs (coach multi-turn FIX web+mobile, API input-bounds+rate-limit hardening, web+mobile a11y ×3) + 8-scout sweep
+Ran the full 8-scout sweep (functional-reality / security / performance / backend-tests /
+web-frontend / mobile+TrackE / store+artifact-freshness / business-case+PMF) doubling as the
+~daily DEEP AUDIT. **Functional-reality surfaced a REAL ship-critical bug** that green tests +
+a "wired" flow hid: the AI coach (flagship $12/mo Premium feature) NEVER threaded a
+`session_id` from either client, so the backend generated a fresh session per message and
+`_get_conversation_history` returned empty every turn — the coach RETURNED replies (looked
+working) but had ZERO multi-turn memory (BUILDS≠WORKS: a follow-up like "what about the salary
+part?" had no context). This JUMPED THE QUEUE over the Track-D GenAI report affordance (which
+contends the same coach surfaces → stays a dedicated run). `asgi.py` was owned by exactly ONE
+PR (the security hardening); the report affordance + analytics instrumentation + composite
+indexes all contend asgi.py/models/migration → deferred. Shipped 6 file-disjoint PRs through 2
+Sonnet reviewers each + the CI gate:
+- **#135 web coach session continuity** + **#136 mobile coach session continuity** (functional
+  break, both clients): generate ONE stable session id per conversation (crypto UUID + a
+  time+random Hermes fallback, held in a ref) and pass it on every `coachChat`. Backend session
+  threading already existed + was tested; only the clients weren't using it (mobile's api client
+  already accepted `sessionId` — only the screen failed to pass one). New jest-expo test proves
+  two turns reuse the SAME non-empty id (reviewer B mutation-verified it fails against pre-fix
+  code). BOTH reviewers APPROVE each.
+- **#137 API input-bounds + rate-limit hardening** (Track F, the single asgi.py owner): bounded
+  `ChatRequest.job_id`/`session_id` (completing #126, which missed the coach ids) + rate-limited
+  the two unprotected endpoints (`/api/auth/verify-purchase` "auth"/10, `/api/coach/suggestions`
+  "suggest"/30). `tests/test_api_input_hardening.py` proves each bound rejects (422) + both
+  throttle (429). Reviewer A (APPROVE + follow-up, applied): `session_id` was 64 but is INSERTED
+  into `ChatMessage.session_id` String(36) → a 37–64-char value would pass Pydantic then raise a
+  DB-truncation 502; TIGHTENED to 36 (job_id stays 64 — equality-filter only, no write) + a
+  40-char rejection test to lock it.
+- **#138 web shared-component a11y**: `ErrorText` → `role="alert"` (announces validation/API
+  errors across ~8 forms) + focus-visible rings on the legal-page nav links. Reviewer B
+  (REQUEST_CHANGES, 1 cycle): I added rings to the 3 header links but MISSED the footer
+  "Back to home" link in the same file → fixed (replace-all-style incompleteness, a reviewer catch).
+- **#139 web pipeline dashboard**: focus-visible ring on the job-card `<Link>` (core-loop
+  keyboard nav) + de-cramped the 3-KPI stat row on phones (`gap-2 sm:gap-4`, `text-xl sm:text-2xl`,
+  skeleton matched). BOTH APPROVE.
+- **#140 mobile a11y**: `accessibilityRole="alert"` + `accessibilityLiveRegion` on the
+  login/register/add-job/job-detail error text (mirrors coach.tsx) + made each pipeline stat tile
+  ONE labelled accessible element ("Avg fit: 84"). Tests assert role=alert + the composite labels
+  (reviewer A mutation-verified both are load-bearing). BOTH APPROVE.
+LESSONS: (1) **A critical functional-reality bug hid behind green tests + a "wired" flow** — the
+coach returned replies so every unit/journey test passed, but the multi-turn CONTRACT (client
+threads session_id) was silently broken. Only tracing client→backend end-to-end (not "the handler
+is wired") caught it. Classic BUILDS≠WORKS on a PAID feature. (2) **maker≠checker earned its keep
+on the two subtlest points**: #138's footer-link miss (I applied the ring to 3 of 4 links in the
+file — the incomplete-sweep foot-gun) and #137's `session_id` bound-vs-column-width (64 would 502
+on a 37–64-char id inserted into String(36)) were BOTH reviewer finds, each fixed within cycle 1.
+(3) **asgi.py contention forced a genuine prioritization, not artificial scarcity**: a flagship
+functional break + security hardening beat the store-compliance GenAI report affordance for the
+single asgi.py slot — and the report sprawls the very coach/prep surfaces this run touched, so it's
+correctly a dedicated next run. (4) **Skepticism killed two scout false positives before building**:
+the perf scout's "`/api/jobs` calls `score_all_jobs` → N embedding calls" is FALSE (score_all_jobs
+is wired to no endpoint — only defs in scorer.py); the functional-reality scout's free-tier job-limit
+TOCTOU is REAL but low-severity (self-limit bypass, needs concurrent requests, ~1 extra job) →
+deferred, not built. (5) **DROPPED a SELECTED candidate as padding**: composite indexes
+(Application/ChatMessage) were scouted + selected, but pre-launch (0 rows, no query-plan evidence,
+not a named scorecard gap — the real N+1 was fixed #121) they're speculative perf work with
+migration + index-redundancy friction → dropped before implementation (anti-padding discipline),
+recorded as deferred. NO box ticked/un-ticked this run (the coach fix repairs a break behind
+already-ticked flow boxes; the a11y/hardening advance already-ticked tracks) — honest, no mass-tick.
+DEFERRED (named, buildable — next runs): GenAI user-report affordance (Track D, dedicated run —
+sprawls asgi.py+web coach/prep+mobile coach/prep); privacy-safe analytics instrumentation (PMF
+foundation, deferred 7+ runs — AggregateEvent table + shared-secret read endpoint + 1 migration,
+wants asgi.py); composite indexes on Application(user_id,status) + ChatMessage(user_id,session_id)
+(revisit with real query-plan evidence post-launch); **free-tier job-limit TOCTOU** (create_job
+check-then-increment lacks locking — atomic conditional increment in auth_service, low severity);
+Career+ ($24) + TEAM/B2B2C tiers (business-case levers); CAPTCHA (owner keys); prompt-injection
+delimiter-escaping of resume_text in the coach prompt (deferred — weak without an eval). QUALITY
+SCORECARD still STALE (as_of 2026-06-29; named gaps CORS/#96, perf-N+1/#121, referral/#109,
+limiter/#114 all CLOSED) — the independent Quality Auditor should re-grade (consumed as DATA, never
+self-edited).
+
+
 ### 2026-06-30 (run 9) — Maximal run: 5 PRs (input-bounds wallet-drain, billing + mobile-billing money-path tests, web + mobile coach a11y) + 8-scout sweep
 Ran the full 8-scout sweep (functional-reality / security / performance / backend-tests /
 web-frontend / mobile / store+artifact-freshness / business-case+PMF) doubling as the ~daily
