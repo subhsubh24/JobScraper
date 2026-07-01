@@ -41,12 +41,16 @@ Subscription, good-better-best + annual (annual ≈ 2 months free). See
 |---|---|---|---|---|
 | **Free** | $0 | — | Trial / casual | 5 tracked jobs, 1 prep pack/mo, no AI coach |
 | **Pro** (Premium) | $12 | $96 | Active seeker | Unlimited jobs, 10 prep packs/mo, AI coach (100 msg/mo) |
-| **Career+** _(planned)_ | $24 | $192 | Senior / urgent | Everything unlimited, salary negotiation, outreach, priority |
+| **Career+** | $24 | $192 | Senior / urgent | Everything in Pro + AI salary-negotiation coaching |
 
-> **Current state:** the tier model is binary — **Free** and **Premium** (the "Pro" price).
-> **Career+** is a *planned* tier, not yet a purchasable entitlement (the `careerplus_*`
-> price envs exist but the tier enum is FREE/PREMIUM); it's a named business-case lever, not
-> a live product. See [docs/BUSINESS_CASE.md](./docs/BUSINESS_CASE.md).
+> **Current state:** **Career+ is now a real, differentiated entitlement** (PRs #152/#153/#155).
+> `UserTier` stays binary FREE/PREMIUM at the DB layer; the *level* (Pro vs Career+) is derived
+> from the webhook-verified `Subscription.plan` prefix (`careerplus_*`), so Career+ is granted
+> only by a signed Stripe event. Its exclusive is **AI salary-negotiation coaching** (additive —
+> it had no endpoint at any tier before, so Pro loses nothing). Web checkout for Career+ is live;
+> the on-device mobile *purchase* stays owner-blocked (RevenueCat keys/store accounts — see
+> PENDING_OPS), though a Career+ user who subscribed on web uses the feature on mobile. Outreach/
+> priority are not yet built and are no longer advertised. See [docs/BUSINESS_CASE.md](./docs/BUSINESS_CASE.md).
 
 The honest Year-1 planning case is **~$57.5K ARR** (below the $100K factory floor —
 stated plainly, not inflated). The path to the floor is the buildable lever list in the
