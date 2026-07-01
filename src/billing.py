@@ -33,6 +33,40 @@ _PLAN_PRICE_ENV = {
 }
 
 
+# Entitlement LEVELS within the paid tier. ``UserTier`` stays binary (FREE/PREMIUM) at the
+# DB layer — no risky native-enum ``ALTER TYPE`` migration — and the *level* (Pro vs Career+)
+# is DERIVED from the webhook-authoritative ``Subscription.plan`` id. So Career+ is a REAL,
+# verified entitlement: only a signature-verified Stripe event ever writes ``plan``, never a
+# client-supplied flag. A missing/garbled plan degrades to ``pro`` (the base paid level), so a
+# corrupt row can never accidentally unlock the higher tier.
+_CAREERPLUS_PREFIX = "careerplus"
+
+
+def plan_level_for_plan(plan: Optional[str]) -> str:
+    """Map a stored ``Subscription.plan`` id to an entitlement level: ``pro`` | ``career_plus``.
+
+    Fail-safe: an unknown/None paid plan returns ``pro`` (never ``career_plus``).
+    """
+    if plan and plan.startswith(_CAREERPLUS_PREFIX):
+        return "career_plus"
+    return "pro"
+
+
+def current_plan_level(user: User, subscription: Optional[Subscription]) -> str:
+    """A user's effective entitlement level: ``free`` | ``pro`` | ``career_plus``.
+
+    ``users.tier`` is the source of truth for paid-vs-free (a lapsed/canceled webhook flips it
+    back to FREE, which drops the level to ``free`` regardless of any stale plan string); the
+    verified ``Subscription.plan`` distinguishes Career+ from Pro among PREMIUM users. Pure
+    function — pass the user's ``Subscription`` row (or ``None``) so it never does implicit DB IO.
+    """
+    if user.tier != UserTier.PREMIUM:
+        return "free"
+    if subscription is None:
+        return "pro"
+    return plan_level_for_plan(subscription.plan)
+
+
 class BillingNotConfigured(Exception):
     """Raised when a billing operation is attempted without the required Stripe config."""
 
