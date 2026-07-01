@@ -13,5 +13,8 @@
       "maxDuration": 60,
       "excludeFiles": "{mobile/**,mobile-flutter-legacy/**,web/**,tests/**,docs/**,data/**}"
     }
+  },
+  "git": {
+    "deploymentEnabled": false
   }
 }
