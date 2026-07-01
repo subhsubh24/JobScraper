@@ -4,7 +4,7 @@ from typing import List, Optional
 from sqlalchemy.orm import Session, selectinload
 
 from src.ai_coach.moderation import ContentModerator
-from src.db.models import ChatMessage, User, JobPosting, Application
+from src.db.models import ApplicationStatus, ChatMessage, User, JobPosting, Application
 from src.llm import get_llm_client, llm_available, chat_model
 
 
@@ -206,14 +206,20 @@ burnout) supportively is in scope; generating harmful content is not."""
 
     def get_suggested_questions(self, user: User) -> List[str]:
         """Get suggested questions based on user's situation."""
-        # Check user's current state
-        applications = self.db.query(Application).filter(
-            Application.user_id == user.id
-        ).all()
+        # Bounded existence checks, NOT a full load: the branch only needs "any application?"
+        # and "any at the interview stage?". Loading every Application row (this endpoint runs
+        # on each coach-tab open, rate-limited but per-user) just to test two booleans is an
+        # unbounded query that grows with the pipeline — `.first()` short-circuits at one row.
+        has_application = (
+            self.db.query(Application.id)
+            .filter(Application.user_id == user.id)
+            .first()
+            is not None
+        )
 
         suggestions = []
 
-        if not applications:
+        if not has_application:
             suggestions = [
                 "How do I optimize my resume for ATS systems?",
                 "What's the best strategy for finding remote jobs?",
@@ -221,9 +227,19 @@ burnout) supportively is in scope; generating harmful content is not."""
                 "Should I use a cover letter for every application?",
             ]
         else:
-            # Check for interviews
-            interviewing = [a for a in applications if a.status.value in ["phone_screen", "interview"]]
-            if interviewing:
+            # Check for interviews (any application at the phone-screen/interview stage).
+            has_interview = (
+                self.db.query(Application.id)
+                .filter(
+                    Application.user_id == user.id,
+                    Application.status.in_(
+                        [ApplicationStatus.PHONE_SCREEN, ApplicationStatus.INTERVIEW]
+                    ),
+                )
+                .first()
+                is not None
+            )
+            if has_interview:
                 suggestions = [
                     "How do I prepare for a technical interview?",
                     "What questions should I ask the interviewer?",
