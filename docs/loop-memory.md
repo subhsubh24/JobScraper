@@ -4,6 +4,67 @@ Durable lessons for the factory loop. Append dated entries. Keep it honest and s
 
 ---
 
+### 2026-07-01 (run 11) — Maximal run: the DEDICATED GenAI user-report affordance (Track D) + coach-suggestions bounded query + mobile a11y + 8-scout sweep
+Ran the full 8-scout sweep (functional-reality / security / backend-tests / web-design /
+mobile-design / store+artifact-freshness / business-case+PMF / performance) doubling as the
+~daily DEEP AUDIT. Functional-reality found NO ship-critical bug (core web+mobile loops +
+side-effects sound; the one real-low finding — mobile register can't take a `?ref` code — is
+web-flow-covered and needs native deep-linking → deferred). This run finally executed the
+**long-deferred (3+ runs) Track-D GenAI user-report affordance as its DEDICATED run** — it was
+correctly waiting for a clean asgi.py slot (prior runs' asgi.py went to functional/security
+fixes). Shipped 3 file-disjoint PRs through 2 Sonnet reviewers each + the CI gate, all merged:
+- **#142 GenAI user-report affordance** (Track D → TICKED; store-readiness ship-critical). Apple
+  App Review + Google Play 2026 GenAI/UGC guidelines require a USER-FACING report control for AI
+  content; the app already moderated output server-side but had no user-facing half. New
+  `ContentReport` model + drift-gated migration `a1b7c2f9e0d3` + `POST /api/report`
+  (`Literal`-constrained content_type/reason, bounded free-text, rate-limited `report`/20) + a
+  shared `ReportButton` on every coach reply + prep pack on web AND mobile. SIDE-EFFECT
+  INTEGRITY: success only after the row commits; copy says "flagged for review", NOT "notified"
+  (no email pipeline is wired — DECISION COROLLARY, no gate on an unbuilt loop). Cascade-purged
+  on account deletion via the ORM relationship. `tests/test_content_report.py` (8) + a mobile
+  jest test. BOTH reviewers APPROVE first pass — Reviewer A MUTATION-tested the cascade,
+  rate-limit, and bounds guards (each fails when its guard is removed). Living docs updated in
+  the SAME PR: ACCEPTANCE_AUDIT A1 PARTIAL→PASS, ASO_COPY disclosure. Coach `sessionId` switched
+  ref→lazy `useState` (web+mobile) so the control can reference the reply without a render-time
+  ref read (`react-hooks/refs`).
+- **#143 coach-suggestions bounded query** (perf, `src/ai_coach/career_coach.py`, disjoint):
+  `get_suggested_questions` loaded EVERY Application row just to test two booleans → two
+  `.first()` existence checks. Reviewer A (REQUEST_CHANGES, 1 cycle): the FIRST test counted SQL
+  *statements*, but the old `.all()` and new `.first()` both issue ONE statement — not
+  load-bearing. REWROTE to assert every `applications` SELECT carries a `LIMIT` (the `.first()`
+  bound the old full load lacks); MUTATION-verified it fails against the reverted `.all()` code.
+  BOTH reviewers then APPROVE.
+- **#144 mobile a11y** (disjoint): auth footer links (`login`/`register`) had NO role — added
+  `accessibilityRole="link"`; the pipeline JobRow's explicit `accessibilityLabel` omitted the
+  pipeline STATUS (the status pill Text is swallowed by the Pressable) → folded status in. Tests
+  assert role=link + the status-in-label; the `expo-router` Link mock now forwards props so the
+  a11y attr is actually verified. BOTH reviewers APPROVE (Reviewer A mutation-verified both
+  assertions fail against pre-fix code).
+LESSONS: (1) **maker≠checker earned its keep on the perf test** — a statement-COUNT regression
+guard was NOT load-bearing because the old `.all()` and new `.first()` emit the same one
+statement; the discriminating signal is the `LIMIT` in the SQL, not the count. When guarding a
+"bounded query" fix, assert the BOUND (LIMIT / rows fetched), never the statement count. (2)
+**A long-deferred, named item finally gets its dedicated run** — the GenAI report affordance was
+deferred 3+ runs specifically because it sprawls asgi.py+web+mobile; a clean-asgi.py run (no
+higher-urgency functional/security break contending) was the right time. Deferral ≠ abandonment
+when the item is named + correctly scoped. (3) **DECISION COROLLARY applied cleanly**: the report
+feature does NOT claim a notification was sent (no email pipeline) — the committed row is the real
+side-effect and the copy is honest, so no gate on an unbuilt loop. (4) **A large coherent
+cross-stack feature is ONE PR, not padding** — the anchor touched 15 files but is a single
+store-compliance unit; the OTHER two PRs stayed strictly file-disjoint from it (career_coach.py;
+auth/pipeline screens) for parallel auto-merge.
+DEFERRED (named, buildable — next runs, unchanged priority): privacy-safe analytics
+instrumentation (PMF foundation, deferred 8+ runs — AggregateEvent table + shared-secret read
+endpoint + 1 migration, wants asgi.py — NOW the priority asgi.py owner, no higher-urgency item
+pending); Career+ ($24) + TEAM/B2B2C tiers (business-case floor levers, multi-run); CAPTCHA
+(owner keys, multi-surface); `/api/auth/me` + `/api/referrals/me` rate limits (low-sev, asgi.py);
+free-tier job-limit TOCTOU (low-sev, atomic increment in auth_service); mobile referral deep-link
+(needs native/owner). QUALITY SCORECARD still STALE (as_of 2026-06-29; store-readiness gap
+"user-report affordance" is now CLOSED by #142 alongside the already-closed CORS/N+1/limiter/
+referral gaps) — the independent Quality Auditor should re-grade (consumed as DATA, never
+self-edited).
+
+
 ### 2026-07-01 (run 10) — Maximal run: 6 PRs (coach multi-turn FIX web+mobile, API input-bounds+rate-limit hardening, web+mobile a11y ×3) + 8-scout sweep
 Ran the full 8-scout sweep (functional-reality / security / performance / backend-tests /
 web-frontend / mobile+TrackE / store+artifact-freshness / business-case+PMF) doubling as the
