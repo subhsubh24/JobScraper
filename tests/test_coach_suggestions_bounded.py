@@ -29,36 +29,40 @@ def _seed(db, email, statuses):
     return user
 
 
-def _count_queries(db, fn):
+def _capture_statements(db, fn):
     conn = db.connection()
-    count = {"n": 0}
+    stmts = []
 
-    def _on_exec(*_args, **_kwargs):
-        count["n"] += 1
+    def _on_exec(_conn, _cursor, statement, *_a, **_k):
+        stmts.append(statement)
 
     event.listen(conn, "after_cursor_execute", _on_exec)
     try:
         fn()
     finally:
         event.remove(conn, "after_cursor_execute", _on_exec)
-    return count["n"]
+    return stmts
 
 
-def test_suggestions_query_count_is_bounded(db_session):
+def test_suggestions_query_is_bounded_not_full_load(db_session):
+    """Every SELECT against `applications` must be BOUNDED (`.first()` → `LIMIT 1`), never a
+    full-table load. This is the real regression guard: the OLD `.all()` code issued the SAME
+    number of statements (one), so a statement-COUNT check could NOT catch it — but the old
+    full load has no `LIMIT`, so this assertion fails against it and passes only for the
+    bounded existence checks (confirmed load-bearing by mutation: reverting to `.all()` drops
+    the LIMIT and fails this test)."""
     coach = CareerCoach(db_session)
-
-    small = _seed(db_session, "sugg-small@example.com", [ApplicationStatus.APPLIED] * 2)
+    user = _seed(db_session, "sugg-bounded@example.com", [ApplicationStatus.APPLIED] * 25)
     db_session.expire_all()
-    q_small = _count_queries(db_session, lambda: coach.get_suggested_questions(small))
 
-    big = _seed(db_session, "sugg-big@example.com", [ApplicationStatus.APPLIED] * 25)
-    db_session.expire_all()
-    q_big = _count_queries(db_session, lambda: coach.get_suggested_questions(big))
-
-    # Constant regardless of pipeline size (existence checks, not a full load). The OLD
-    # full `.all()` load was also technically 1 query but materialised every row; the guard
-    # that matters is that adding rows never adds queries AND never grows the result set.
-    assert q_big == q_small, f"suggestion query count grew with applications: {q_small} -> {q_big}"
+    stmts = _capture_statements(db_session, lambda: coach.get_suggested_questions(user))
+    app_selects = [
+        s for s in stmts
+        if s.lstrip().lower().startswith("select") and "application" in s.lower()
+    ]
+    assert app_selects, "expected at least one SELECT against applications"
+    unbounded = [s for s in app_selects if "limit" not in s.lower()]
+    assert not unbounded, f"applications loaded WITHOUT a LIMIT (full load): {unbounded}"
 
 
 def test_suggestions_match_user_state(db_session):
