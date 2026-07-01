@@ -24,6 +24,15 @@ interface Msg {
   content: string;
 }
 
+// Stable per-conversation id used to thread multi-turn context server-side. React Native
+// has no guaranteed crypto.randomUUID, so fall back to a time+random token; uniqueness per
+// conversation is all that's required (the server groups history by this id).
+function newSessionId(): string {
+  const c = (globalThis as { crypto?: { randomUUID?: () => string } }).crypto;
+  if (c?.randomUUID) return c.randomUUID();
+  return `s-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
 // AI Career Coach. Premium-gated server-side; we reflect that honestly in the UI and
 // route free users to the paywall instead of letting them hit a dead end.
 export default function CoachScreen() {
@@ -35,6 +44,9 @@ export default function CoachScreen() {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const counter = useRef(0);
+  // One stable session id for this conversation so the coach threads multi-turn context.
+  // Created once and never regenerated on re-render (ref, not state).
+  const sessionId = useRef<string>(newSessionId());
 
   useEffect(() => {
     api.coachSuggestions().then(setSuggestions).catch(() => setSuggestions([]));
@@ -50,7 +62,7 @@ export default function CoachScreen() {
       setMessages((m) => [...m, userMsg]);
       setSending(true);
       try {
-        const reply = await api.coachChat(trimmed);
+        const reply = await api.coachChat(trimmed, sessionId.current);
         setMessages((m) => [...m, { id: `a${counter.current++}`, role: 'assistant', content: reply }]);
       } catch (e) {
         setError(e instanceof ApiError ? e.message : 'Coach is unavailable right now.');
