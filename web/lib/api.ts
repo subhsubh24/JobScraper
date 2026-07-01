@@ -190,6 +190,22 @@ export const api = {
     ).prep_pack;
   },
 
+  // Generate salary-negotiation coaching for a job — a Career+ EXCLUSIVE. Throws
+  // ApiError(403) if the user isn't Career+ (the server is the source of truth; the client
+  // only uses `career_plus` to decide whether to OFFER the action) and ApiError(503) when the
+  // server has no LLM key — the caller surfaces either honestly, never a fake result.
+  async generateSalaryNegotiation(
+    jobId: string,
+    targetSalary: number,
+  ): Promise<{ title: string; content: string }> {
+    return (
+      await request<{ artifact: { title: string; content: string } }>(
+        '/api/prep/salary-negotiation',
+        { method: 'POST', body: { job_id: jobId, target_salary: targetSalary } },
+      )
+    ).artifact;
+  },
+
   // Report/flag an AI-generated response (coach reply or prep pack) for moderator review.
   // Awaits the REAL POST /api/report and throws ApiError on failure so the caller can
   // surface it honestly — the success state is only shown once the server records the row.

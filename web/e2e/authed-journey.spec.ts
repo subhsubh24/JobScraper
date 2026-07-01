@@ -87,15 +87,17 @@ test('PAYWALL -> checkout behaves HONESTLY (no fake success, no error boundary)'
   await signInViaUI(page, email, logs);
 
   await page.goto('/pricing');
-  await expect(page.getByRole('heading', { name: /Premium/i })).toBeVisible();
-  await page.getByRole('button', { name: /Go Premium/i }).first().click();
+  await expect(page.getByRole('heading', { name: /Pricing/i })).toBeVisible();
+  // The two-tier structure renders: Pro and the Career+ upsell tier.
+  await expect(page.getByRole('heading', { name: /Career\+/i })).toBeVisible();
+  await page.getByRole('button', { name: /Get Pro/i }).first().click();
 
   // Stripe isn't configured in CI, so checkout must refuse HONESTLY (a notice), never a fake
   // "you're premium" and never a crash/error boundary. If Stripe IS configured it navigates out.
   await page.waitForLoadState('networkidle').catch(() => {});
   const navigatedToCheckout = /checkout\.stripe\.com|\/billing\//.test(page.url());
   if (!navigatedToCheckout) {
-    await expect(page.getByRole('heading', { name: /Premium/i })).toBeVisible(); // page intact, not broken
+    await expect(page.getByRole('heading', { name: /Pricing/i })).toBeVisible(); // page intact, not broken
     const body = (await page.locator('body').innerText()) || '';
     expect(
       /try again|could not|unavailable|not configured|checkout|premium/i.test(body),
