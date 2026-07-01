@@ -435,9 +435,11 @@ class AggregateEvent(Base):
     """Privacy-safe aggregate product analytics — counts ONLY, no PII, no raw per-user
     events, no user ids. One row is a single ``(event_type, event_date)`` daily tally, so the
     table stays tiny (a handful of event types × days) and can NEVER be used to reconstruct an
-    individual's behaviour. This is the PMF-measurement foundation (activation/retention are
-    derived from these aggregates — see ``src/analytics.py``); it deliberately stores counts
-    only. Writes are best-effort and never block a user request.
+    individual's behaviour. This is the PMF-measurement foundation: aggregate ACTIVATION and
+    ENGAGEMENT counts are derived from these tallies (see ``src/analytics.py``). Per-user
+    RETENTION cohorts are deliberately NOT derivable here — that needs a per-user dimension we
+    intentionally do not store. It keeps counts only; writes are best-effort and never block a
+    user request.
     """
 
     __tablename__ = "aggregate_events"

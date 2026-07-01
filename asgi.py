@@ -1182,7 +1182,7 @@ def pipeline_stats(user: User = Depends(get_current_user), db: Session = Depends
     }
 
 
-@app.get("/api/analytics/summary")
+@app.get("/api/analytics/summary", dependencies=[Depends(rate_limit("analytics", 30))])
 def analytics_summary(request: Request, db: Session = Depends(get_db)):
     """Privacy-safe AGGREGATE product metrics for the owner's growth dashboard (counts only —
     no PII, no per-user data). Gated by a SERVER-SIDE shared secret (``ANALYTICS_READ_TOKEN``),
