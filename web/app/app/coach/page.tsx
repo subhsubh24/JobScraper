@@ -12,6 +12,14 @@ interface Msg {
   content: string;
 }
 
+// Stable per-conversation id used to thread multi-turn context server-side. Uses the
+// browser crypto UUID where available (secure context / localhost) with a safe fallback.
+function newSessionId(): string {
+  const c = typeof globalThis !== 'undefined' ? (globalThis.crypto as Crypto | undefined) : undefined;
+  if (c?.randomUUID) return c.randomUUID();
+  return `s-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
 export default function CoachPage() {
   const { user } = useAuth();
   const router = useRouter();
@@ -23,6 +31,9 @@ export default function CoachPage() {
   const [error, setError] = useState<string | null>(null);
   const counter = useRef(0);
   const endRef = useRef<HTMLDivElement>(null);
+  // One stable session id for this conversation so the coach can thread multi-turn context.
+  // Created once and never re-generated on re-render (ref, not state).
+  const sessionId = useRef<string>(newSessionId());
 
   useEffect(() => {
     api.coachSuggestions().then(setSuggestions).catch(() => setSuggestions([]));
@@ -42,7 +53,7 @@ export default function CoachPage() {
     setMessages((m) => [...m, { id: `u${counter.current++}`, role: 'user', content: trimmed }]);
     setSending(true);
     try {
-      const reply = await api.coachChat(trimmed);
+      const reply = await api.coachChat(trimmed, sessionId.current);
       setMessages((m) => [...m, { id: `a${counter.current++}`, role: 'assistant', content: reply }]);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Coach is unavailable.');

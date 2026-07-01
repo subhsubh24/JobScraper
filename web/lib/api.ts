@@ -169,9 +169,16 @@ export const api = {
     return (await request<{ suggestions: string[] }>('/api/coach/suggestions')).suggestions;
   },
 
-  async coachChat(message: string): Promise<string> {
-    return (await request<{ message: string }>('/api/coach/chat', { method: 'POST', body: { message } }))
-      .message;
+  // ``sessionId`` groups a multi-turn conversation server-side; the backend builds the
+  // reply from prior messages sharing that id. Omitting it (the old behaviour) made every
+  // message a fresh session, so the coach never remembered anything within a chat.
+  async coachChat(message: string, sessionId?: string): Promise<string> {
+    return (
+      await request<{ message: string }>('/api/coach/chat', {
+        method: 'POST',
+        body: { message, session_id: sessionId },
+      })
+    ).message;
   },
 
   async generatePrepPack(jobId: string): Promise<{ title: string; content: string }> {
