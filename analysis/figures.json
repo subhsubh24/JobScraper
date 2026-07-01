@@ -1,3 +1,7 @@
 {
-  "figures": []
+  "figures": [
+    { "id": "arr_conservative", "script": "analysis/arr_conservative.py", "value": 16500, "tolerance": 0.01 },
+    { "id": "arr_base", "script": "analysis/arr_base.py", "value": 57500, "tolerance": 0.01 },
+    { "id": "arr_optimistic", "script": "analysis/arr_optimistic.py", "value": 132000, "tolerance": 0.01 }
+  ]
 }
