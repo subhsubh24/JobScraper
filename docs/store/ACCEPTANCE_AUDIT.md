@@ -15,7 +15,7 @@
 
 | # | Guideline area | Requirement | Status | Notes |
 |---|---|---|---|---|
-| A1 | 1.x Safety | No objectionable content; UGC/AI output moderated | PARTIAL | AI coach has a content-safety guardrail on input + output (self-harm→crisis resources, violence/hate/sexual-gen blocked; conservative so legit career topics pass) + hardened system prompt — `src/ai_coach/moderation.py`, 35 tests (PR #51). The SAME conservative output moderation now also covers the prep-pack generators (prep packs / cover letters / study plans / negotiation scripts) at the `_call_llm` chokepoint — `src/enrichment/llm_workflows.py` + `tests/test_prep_moderation.py` (PR #86). REMAINING (follow-up, not blocking build): a user-facing "report this response" affordance. |
+| A1 | 1.x Safety | No objectionable content; UGC/AI output moderated | PASS | AI coach has a content-safety guardrail on input + output (self-harm→crisis resources, violence/hate/sexual-gen blocked; conservative so legit career topics pass) + hardened system prompt — `src/ai_coach/moderation.py`, 35 tests (PR #51). The SAME conservative output moderation now also covers the prep-pack generators (prep packs / cover letters / study plans / negotiation scripts) at the `_call_llm` chokepoint — `src/enrichment/llm_workflows.py` + `tests/test_prep_moderation.py` (PR #86). The **user-facing "report this response" affordance** (Apple App Review + Google Play 2026 GenAI/UGC requirement) now ships on both the AI coach and prep-pack surfaces on web AND mobile: `POST /api/report` records a real, moderator-reviewable `ContentReport` row (constrained reason + bounded free-text, rate-limited, cascade-purged on account deletion), surfaced via a `ReportButton` control — `tests/test_content_report.py` (8) + `mobile/__tests__/report-button.test.tsx`. |
 | A2 | 2.1 App Completeness | No crashes, no placeholder content, all features work | OPEN | Backend journeys pass at runtime; full native completeness pending a signed device build (CI/Human) |
 | A3 | 2.3 Accurate Metadata | Screenshots/description match real app | FAIL | ASO copy drafted (`ASO_COPY.md`); rendered screenshots/feature graphic need a running build — not yet produced |
 | A4 | 3.1.1 In-App Purchase | Digital subscriptions via StoreKit, not external payment | FAIL | Web Stripe billing built (PR #40); **mobile** StoreKit/RevenueCat NOT integrated — required before iOS submission |
@@ -50,7 +50,8 @@
       requires a 1024×500 feature graphic (no alpha) + ≥2 screenshots, with 2026 a11y alt
       text; a brand-aware icon (vs the current Expo-template `icon.png`) is owner/designer work
 - [x] AI-output safety guardrail (A1) — coach input+output moderation (PR #51) + prep-pack
-      generator output moderation (PR #86) shipped; follow-up: user-facing report affordance
+      generator output moderation (PR #86) + user-facing "report this response" affordance
+      (web + mobile coach/prep; `POST /api/report` → real `ContentReport` row) all shipped
 - [ ] Owner enters App Privacy / Data Safety answers in the consoles + counsel review (PENDING_OPS)
 
 **Open FAILs remain (mobile billing, rendered assets). Submission readiness: NO.**

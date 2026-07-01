@@ -4,6 +4,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import { Button, Card, Skeleton } from '@/components/ui';
 import { Markdown } from '@/components/markdown';
+import { ReportButton } from '@/components/report-button';
 import { api, ApiError } from '@/lib/api';
 import { STATUS_LABELS, STATUS_ORDER, scoreColor, type ApplicationStatus, type Job } from '@/lib/types';
 
@@ -121,6 +122,7 @@ export default function JobDetailPage() {
           <Card className="mt-4">
             <h3 className="mb-2 font-semibold">{prep.title}</h3>
             <Markdown content={prep.content} />
+            <ReportButton contentType="prep_pack" contentRef={id} contentExcerpt={prep.content} />
           </Card>
         )}
       </div>
