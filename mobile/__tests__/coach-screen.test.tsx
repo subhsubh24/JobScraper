@@ -63,8 +63,35 @@ describe('CoachScreen', () => {
     render(<CoachScreen />);
     await waitFor(() => expect(screen.getByText('How do I negotiate salary?')).toBeTruthy());
     fireEvent.press(screen.getByText('How do I negotiate salary?'));
-    expect(api.coachChat).toHaveBeenCalledWith('How do I negotiate salary?');
+    // A non-empty session id is threaded so the backend can keep multi-turn context.
+    expect(api.coachChat).toHaveBeenCalledWith(
+      'How do I negotiate salary?',
+      expect.stringMatching(/.+/),
+    );
     await waitFor(() => expect(screen.getByText('Lead with your strongest signal.')).toBeTruthy());
+  });
+
+  it('reuses ONE session id across turns so the coach keeps conversation context', async () => {
+    mockTier = 'premium';
+    render(<CoachScreen />);
+    await waitFor(() => expect(api.coachSuggestions).toHaveBeenCalled());
+    const input = screen.getByPlaceholderText('Type a message…');
+
+    fireEvent.changeText(input, 'first');
+    fireEvent.press(screen.getByText('Send'));
+    await waitFor(() => expect(api.coachChat).toHaveBeenCalledTimes(1));
+
+    fireEvent.changeText(input, 'second');
+    fireEvent.press(screen.getByText('Send'));
+    await waitFor(() => expect(api.coachChat).toHaveBeenCalledTimes(2));
+
+    const mock = api.coachChat as jest.Mock;
+    const firstSession = mock.mock.calls[0][1];
+    const secondSession = mock.mock.calls[1][1];
+    expect(firstSession).toEqual(expect.stringMatching(/.+/));
+    // Same conversation → identical session id (the whole point of the fix: without it the
+    // server started a fresh, context-free session on every message).
+    expect(secondSession).toBe(firstSession);
   });
 
   it('surfaces a coach provider failure honestly (no fabricated reply)', async () => {
