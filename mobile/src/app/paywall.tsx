@@ -7,56 +7,101 @@ import { Button, Card } from '@/components/ui';
 import { useAuth } from '@/contexts/auth';
 import { colors, radius, spacing } from '@/theme';
 
-const FEATURES = [
+// Features included at the Pro tier. Career+ is a strict superset: Pro + the exclusive below.
+const PRO_FEATURES = [
   'Unlimited tracked jobs',
   'AI interview prep packs',
   'AI Career Coach',
-  'Salary negotiation coaching',
   'Priority fit scoring',
 ];
+// The Career+-exclusive (a real, additive feature — no tier ever lost it).
+const CAREERPLUS_FEATURE = 'AI salary-negotiation coaching';
 
-// Paywall wired to REAL entitlement state (Track B). It reads the user's tier from the auth
-// context and refreshes it on open, so a user who upgraded elsewhere (e.g. web Stripe
-// checkout) sees their Premium status instead of a stale upgrade prompt. The actual in-app
+function FeatureRow({ label }: { label: string }) {
+  return (
+    <View style={styles.featureRow} accessible accessibilityLabel={label}>
+      <Ionicons
+        name="checkmark-circle"
+        size={18}
+        color={colors.success}
+        accessibilityElementsHidden
+        importantForAccessibility="no"
+      />
+      <Text style={styles.feature}>{label}</Text>
+    </View>
+  );
+}
+
+// Paywall wired to REAL entitlement state (Track B/C). It reads the user's tier + plan LEVEL
+// from the auth context and refreshes on open, so a user who upgraded elsewhere (e.g. web
+// Stripe checkout) sees their real status instead of a stale prompt. CRITICAL honesty rule:
+// a Pro (premium, not Career+) user must NOT be told they already have the Career+ exclusive
+// (salary-negotiation coaching) — that would be a false claim + a dead end. The actual in-app
 // purchase (StoreKit / Play Billing via RevenueCat) is Track C and owner-gated; until it's
-// live we are HONEST about it (no fake "purchase complete"), never granting access here —
-// entitlement only ever flips server-side from a verified RevenueCat webhook.
+// live we are HONEST (no fake "purchase complete"), never granting access here — entitlement
+// only ever flips server-side from a verified webhook.
 export default function PaywallScreen() {
   const { user, refresh } = useAuth();
   const isPremium = user?.tier === 'premium';
+  const isCareerPlus = user?.career_plus === true;
 
   // Re-check entitlement when the paywall opens. A user may have subscribed on another
-  // surface; this keeps the screen from showing an upgrade CTA to someone already Premium.
+  // surface; this keeps the screen from showing an upgrade CTA to someone already entitled.
   useEffect(() => {
     refresh().catch(() => {
       // Offline / transient — keep showing whatever tier we already have, no crash.
     });
   }, [refresh]);
 
-  if (isPremium) {
+  if (isCareerPlus) {
     return (
       <ScrollView style={styles.flex} contentContainerStyle={styles.container}>
         <View style={styles.badge}>
           <Ionicons name="checkmark-circle" size={48} color={colors.success} />
         </View>
-        <Text style={styles.title}>You&apos;re on Premium</Text>
+        <Text style={styles.title}>You&apos;re on Career+</Text>
         <Text style={styles.subtitle}>
-          Every Career Operator feature is unlocked on this account.
+          Every Career Operator feature, including salary-negotiation coaching, is unlocked.
         </Text>
 
         <Card>
-          {FEATURES.map((f) => (
-            <View key={f} style={styles.featureRow} accessible accessibilityLabel={f}>
-              <Ionicons
-                name="checkmark-circle"
-                size={18}
-                color={colors.success}
-                accessibilityElementsHidden
-                importantForAccessibility="no"
-              />
-              <Text style={styles.feature}>{f}</Text>
-            </View>
+          {[...PRO_FEATURES, CAREERPLUS_FEATURE].map((f) => (
+            <FeatureRow key={f} label={f} />
           ))}
+        </Card>
+
+        <Button label="Back to app" onPress={() => router.back()} />
+        <Text style={styles.legal}>
+          Manage or cancel your subscription anytime in your app store account.
+        </Text>
+      </ScrollView>
+    );
+  }
+
+  if (isPremium) {
+    // Pro (premium, not Career+): confirm Pro honestly and present Career+ as an upgrade —
+    // WITHOUT claiming they already have the Career+ exclusive, and WITHOUT a dead end.
+    return (
+      <ScrollView style={styles.flex} contentContainerStyle={styles.container}>
+        <View style={styles.badge}>
+          <Ionicons name="checkmark-circle" size={48} color={colors.success} />
+        </View>
+        <Text style={styles.title}>You&apos;re on Pro</Text>
+        <Text style={styles.subtitle}>Your Pro features are unlocked.</Text>
+
+        <Card>
+          {PRO_FEATURES.map((f) => (
+            <FeatureRow key={f} label={f} />
+          ))}
+        </Card>
+
+        <Card>
+          <Text style={styles.upsellTitle}>Career+ adds</Text>
+          <Text style={styles.feature}>{CAREERPLUS_FEATURE}</Text>
+          <Text style={styles.upsellNote}>
+            In-app upgrade to Career+ is coming soon — you can switch plans on the web. No charge
+            is made here.
+          </Text>
         </Card>
 
         <Button label="Back to app" onPress={() => router.back()} />
@@ -84,18 +129,12 @@ export default function PaywallScreen() {
       <Text style={styles.subtitle}>Everything you need to land the offer, faster.</Text>
 
       <Card>
-        {FEATURES.map((f) => (
-          <View key={f} style={styles.featureRow} accessible accessibilityLabel={f}>
-            <Ionicons
-              name="checkmark-circle"
-              size={18}
-              color={colors.success}
-              accessibilityElementsHidden
-              importantForAccessibility="no"
-            />
-            <Text style={styles.feature}>{f}</Text>
-          </View>
+        {PRO_FEATURES.map((f) => (
+          <FeatureRow key={f} label={f} />
         ))}
+        <Text style={styles.upsellNote}>
+          Career+ ($24/mo) adds {CAREERPLUS_FEATURE}.
+        </Text>
       </Card>
 
       <View style={styles.plans}>
@@ -136,6 +175,8 @@ const styles = StyleSheet.create({
   subtitle: { color: colors.textMuted, textAlign: 'center', marginBottom: spacing.sm },
   featureRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: 6 },
   feature: { color: colors.text, fontSize: 15 },
+  upsellTitle: { color: colors.textMuted, fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
+  upsellNote: { color: colors.textMuted, fontSize: 13, marginTop: spacing.xs, lineHeight: 18 },
   plans: { flexDirection: 'row', gap: spacing.md },
   plan: {
     flex: 1,

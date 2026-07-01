@@ -2,6 +2,10 @@
 
 export type Tier = 'free' | 'premium';
 
+// Entitlement LEVEL within the paid tier — derived server-side from the webhook-verified
+// Subscription.plan (see src/billing.py). `career_plus` unlocks the Career+ exclusives.
+export type PlanLevel = 'free' | 'pro' | 'career_plus';
+
 export type ApplicationStatus =
   | 'saved'
   | 'applied'
@@ -26,6 +30,9 @@ export interface User {
   email: string;
   full_name: string | null;
   tier: Tier;
+  // Optional so an older API deploy (no plan_level) safely reads as not-Career+.
+  plan_level?: PlanLevel;
+  career_plus?: boolean;
   jobs_remaining: number | string;
   prep_packs_remaining: number | string;
   ai_coach: boolean;
