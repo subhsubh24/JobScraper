@@ -284,14 +284,25 @@ the guard tests, and **`FACTORY_STANDARD.md`**.
       rule). Honest: flags the Expo-template icon (brand-aware icon = owner/designer) + the
       mobile/web accent divergence as named follow-ups (PR #83, 2 Sonnet reviewers).
 - [ ] ASO/SEO plan + content calendar skeleton
-- [ ] Privacy-safe analytics instrumentation (aggregates only)
+- [x] Privacy-safe analytics instrumentation (aggregates only) — `src/analytics.py`
+      `record_event()` (best-effort, allowlisted, never raises) writes an `AggregateEvent`
+      daily `(event_type, event_date)` COUNT (no PII, no user id, no raw events) at signup →
+      job_added → fit_score_generated (the activation funnel) + prep_pack/coach; drift-gated
+      migration `b2c8d4e6f1a5`. `tests/test_analytics.py` (12) incl. the real funnel
+      round-trip (PR #146, 2 Sonnet reviewers). Retention needs per-user cohorts, deliberately
+      NOT stored — only aggregate activation/engagement is derivable here.
 - [ ] Launch plan doc
 
 ### H — Growth-execution engine
 - [ ] Waitlist capture + double-opt-in
 - [ ] Email provider abstraction (dry-run until connected)
 - [ ] Publishing queue (dry-run until connected)
-- [ ] Privacy-safe analytics read-API
+- [x] Privacy-safe analytics read-API — `GET /api/analytics/summary` returns aggregate
+      counts + the activation funnel, GATED by a server-side shared secret
+      (`ANALYTICS_READ_TOKEN`, constant-time compare, rate-limited) — NOT any authed user, so
+      counts never leak; honest 503 when unset. VALIDATION.md declares it `validation: real`
+      (read path exercised in CI via an in-test token). Owner sets the token in prod to enable
+      the dashboard (PENDING_OPS `analytics-read-token`) — app is fully functional without it (PR #146).
 - [ ] Experiment engine (falsifiable, min-sample-size aware)
 - [x] Owner CONNECT runbook ([docs/growth/CONNECT.md](./docs/growth/CONNECT.md)) — exists; channels awaiting owner
 

@@ -66,6 +66,12 @@ OWNER_ACTIONS:
       status: open
       why: "Growth Agent stays in prepare-mode until a connected, funded, authorized channel exists."
       how: "Follow docs/growth/CONNECT.md (~20 min). Then the Growth Agent can queue/measure for real."
+    - id: analytics-read-token
+      title: "OPTIONAL: set ANALYTICS_READ_TOKEN to enable the aggregate growth-metrics read endpoint"
+      priority: normal
+      status: open
+      why: "The privacy-safe aggregate analytics (PR #146) RECORD path needs no key and runs automatically. The READ endpoint GET /api/analytics/summary (aggregate counts + activation funnel, no PII) is gated by a server-side shared secret and returns an honest 503 until it's set — the product is fully functional without it; this only unlocks the owner/growth dashboard read."
+      how: "In the deploy env set ANALYTICS_READ_TOKEN to a strong random value (openssl rand -hex 32; never commit it). Then read metrics with `Authorization: Bearer <token>` against GET /api/analytics/summary. Rotate freely — no data migration needed. Not required for launch."
     - id: deploy-env
       title: "Set Vercel env vars + deploy (Neon DB done)"
       priority: high
