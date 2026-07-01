@@ -84,7 +84,14 @@ export function Card({ children, className = '' }: { children: React.ReactNode; 
 }
 
 export function ErrorText({ children }: { children: React.ReactNode }) {
-  return children ? <p className="text-sm text-red-400">{children}</p> : null;
+  // role="alert" so a screen reader announces validation/API errors the moment they render
+  // (used across login, register, waitlist, settings, add-job, job-detail forms). Without it
+  // a keyboard/SR user gets no notification that the submit failed.
+  return children ? (
+    <p role="alert" className="text-sm text-red-400">
+      {children}
+    </p>
+  ) : null;
 }
 
 // A shimmer placeholder for content that is still loading. Decorative, so hidden from
