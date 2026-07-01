@@ -428,8 +428,14 @@ class PrepPackRequest(BaseModel):
 
 class ChatRequest(BaseModel):
     message: str = Field(min_length=1, max_length=4000)
-    job_id: Optional[str] = None
-    session_id: Optional[str] = None
+    # Bounded client-supplied ids (a UUID is 36 chars). job_id is only ever an equality
+    # filter (JobPosting.id, String(36)) — an over-length value just misses, so the generous
+    # 64 mirrors PrepPackRequest.job_id. session_id is INSERTED into ChatMessage.session_id
+    # (String(36)), so it is bound to exactly 36: a 37–64-char value would pass Pydantic but
+    # raise a DB string-truncation error surfaced as a misleading 502. 422 at the boundary
+    # is the honest failure.
+    job_id: Optional[str] = Field(default=None, max_length=64)
+    session_id: Optional[str] = Field(default=None, max_length=36)
 
 
 class AppPurchase(BaseModel):
@@ -643,7 +649,7 @@ def join_waitlist(data: WaitlistJoin, db: Session = Depends(get_db)):
     return _WAITLIST_OK
 
 
-@app.post("/api/auth/verify-purchase")
+@app.post("/api/auth/verify-purchase", dependencies=[Depends(rate_limit("auth", 10))])
 def verify_purchase(
     data: AppPurchase,
     user: User = Depends(get_current_user),
@@ -1061,11 +1067,13 @@ def coach_chat(
     return {"success": True, "message": reply}
 
 
-@app.get("/api/coach/suggestions")
+@app.get("/api/coach/suggestions", dependencies=[Depends(rate_limit("suggest", 30))])
 def coach_suggestions(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    # Rate-limited (was the only coach endpoint without one): it runs a per-user context
+    # query on every call, so an authed client shouldn't be able to hammer it unbounded.
     # Works without an LLM key — deterministic, context-aware suggestions.
     suggestions = CareerCoach(db).get_suggested_questions(user)
     return {"success": True, "suggestions": suggestions}
