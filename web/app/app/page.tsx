@@ -42,7 +42,7 @@ export default function PipelinePage() {
       </div>
 
       {stats && (
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-3 gap-2 sm:gap-4">
           <Stat label="Tracked" value={String(stats.total_jobs)} />
           <Stat label="Avg fit" value={stats.average_score ? String(stats.average_score) : '—'} />
           <Stat label="Active" value={String(activeCount(stats))} />
@@ -60,7 +60,11 @@ export default function PipelinePage() {
       ) : (
         <div className="space-y-3">
           {jobs.map((job) => (
-            <Link key={job.id} href={`/app/jobs/${job.id}`} className="block">
+            <Link
+              key={job.id}
+              href={`/app/jobs/${job.id}`}
+              className="block rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
+            >
               <Card className="flex items-center justify-between transition hover:border-slate-600">
                 <div>
                   <p className="font-semibold">{job.title}</p>
@@ -93,7 +97,7 @@ function PipelineSkeleton() {
         <Skeleton className="h-8 w-44" />
         <Skeleton className="h-10 w-28" />
       </div>
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-3 gap-2 sm:gap-4">
         {[0, 1, 2].map((i) => (
           <Skeleton key={i} className="h-20" />
         ))}
@@ -115,7 +119,7 @@ function activeCount(s: PipelineStats): number {
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <Card className="text-center">
-      <div className="text-2xl font-extrabold">{value}</div>
+      <div className="text-xl font-extrabold sm:text-2xl">{value}</div>
       <div className="text-xs text-slate-400">{label}</div>
     </Card>
   );
