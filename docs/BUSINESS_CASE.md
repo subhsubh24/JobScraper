@@ -41,8 +41,9 @@ These are *named, buildable* items (the only valid weak-case loop-back triggers)
 1. **Annual-first paywall + founder/launch pricing** — raise annual mix and ARPA.
 2. **Team/coach/career-services B2B2C tier** — bootcamps & outplacement firms reselling
    seats (higher ARPA, lower CAC per seat).
-3. **AI-prep value expansion** — mock-interview voice sessions + company-specific
-   dossiers as a Career+ wedge raising upgrade rate.
+3. **AI-prep value expansion** — the FIRST Career+ exclusive (AI salary-negotiation
+   coaching) is now **BUILT** (see lever 6); mock-interview voice sessions + company-specific
+   dossiers remain future Career+ wedges to raise the upgrade rate further.
 4. **Mobile ASO + app-store discovery** — the new Expo app opens an acquisition channel
    the web alone doesn't have (organic store traffic).
 5. **Referral loop** — "share a prep pack" invite mechanic to lower CAC. **BUILT (PR #109):**
@@ -50,8 +51,22 @@ These are *named, buildable* items (the only valid weak-case loop-back triggers)
    pack (raises the actual free-tier allowance — no fake billing promise), surfaced on web +
    mobile Settings. This is a CAC/organic-pull lever; its ARR impact stays **unquantified
    until real funnel data exists** (pre-launch) — we do NOT credit it to the projection yet
-   (anti-gaming). Floor still **not met**; the remaining named levers are the **Career+**
-   ($24) entitlement tier and the **team/B2B2C** tier.
+   (anti-gaming).
+6. **Career+ ($24) as a real, differentiated tier** — **BUILT (PRs #152 web/backend, #153
+   web, #155 mobile).** Was dead config (the `careerplus_*` prices granted an identical
+   PREMIUM); now a real, webhook-verified entitlement LEVEL derived from `Subscription.plan`
+   (no risky enum migration — `UserTier` stays binary), with **AI salary-negotiation coaching**
+   as its genuine, ADDITIVE exclusive (it had no endpoint at any tier before, so gating it to
+   Career+ takes nothing from Pro — no dark pattern). Pricing page now shows two honest tiers;
+   the job-detail surface gates the tool on the verified level (web + mobile). Like the referral
+   loop, its incremental ARR is **real but unquantified until cohort data exists** — pre-launch
+   (0 users) we do **not** inflate the projection with a Career+-mix assumption (anti-gaming),
+   and on any defensible mix it is a modest diversifier, **not** a floor-flip.
+
+**Floor still not met.** With Career+ + referral now built, the **team/B2B2C tier** remains
+the primary named floor-lever (highest ARPA, lowest CAC/seat), plus annual-first/founder
+pricing. Career+'s real revenue lift will be reconciled from live free→paid + tier-mix data
+once it exists (metrics win over the model, §9).
 
 When any lever is built and the honest median crosses $100K, re-run the readiness gate.
 Until then, readiness is **rejected** on business-case grounds (per ROADMAP standards),
@@ -82,5 +97,5 @@ BUSINESS_CASE_SUMMARY:
   floor_usd: 100000
   floor_met_year1: false
   time_to_floor: unknown_pre_launch
-  as_of: 2026-06-27
+  as_of: 2026-07-01
 ```

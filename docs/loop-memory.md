@@ -4,6 +4,62 @@ Durable lessons for the factory loop. Append dated entries. Keep it honest and s
 
 ---
 
+### 2026-07-01 (run 13) — Career+ ($24) built as a REAL, differentiated, webhook-verified tier (the #1 ship-critical business-case-strength gap) — 3 file-disjoint PRs (backend/web/mobile)
+The independent Quality Auditor re-graded THIS day (scorecard now FRESH, Overall B): the two
+remaining sub-A ship-critical dims are **business-case-strength C** and **store-readiness C**.
+Store-readiness is largely OWNER-BLOCKED (rendered assets, mobile IAP keys); business-case-strength
+is the binding LOOP-BUILDABLE blocker, and its #1 named lever is **Career+ as a real entitlement**
+(issue #92). Since the ~daily deep audit + the fresh scorecard were both same-day (run 12), ran a
+TARGETED 5-scout sweep (billing/entitlement grounding, LLM-generator grounding, web/mobile paywall
+grounding, functional-reality re-check, Career+-exclusive+business-case-honesty) instead of a full
+8-scout deep audit. Functional-reality found NO new ship-critical break. Shipped 3 file-DISJOINT PRs
+(backend / web / mobile) through 2 Sonnet reviewers each + the CI gate:
+- **#152 backend** (asgi.py + src/billing.py + tests): `UserTier` stays binary FREE/PREMIUM (NO
+  risky native-enum migration); the LEVEL (`pro` | `career_plus`) is DERIVED from the
+  webhook-authoritative `Subscription.plan` prefix via `plan_level_for_plan`/`current_plan_level`
+  (fail-safe to `pro`; a lapsed tier→FREE drops to `free`). `/me` returns `plan_level`+`career_plus`.
+  NEW Career+-EXCLUSIVE `POST /api/prep/salary-negotiation` exposes the already-built-but-UNEXPOSED
+  `generate_salary_negotiation` generator (gate BEFORE job lookup + LLM; ceiling enforced; honest 503
+  keyless). 12 tests incl. a verified-webhook round-trip. BOTH reviewers APPROVE first pass.
+- **#153 web**: pricing restructured to two HONEST tiers (Pro / Career+) — the old single "Premium"
+  tier advertised "Salary negotiation coaching" with NO endpoint at any tier, so moving it to Career+
+  (where it's now real) is a CORRECTION not a demotion. Job detail gains a Career+ salary-negotiation
+  tool (gated on `career_plus`) or an honest "Upgrade to Career+" card. e2e updated + asserts the
+  Career+ tier + the free-user locked CTA render. All 3 e2e specs (7 tests) pass locally.
+- **#155 mobile**: parity — job-detail Career+ tool/upsell + a Career+-aware paywall. jest-expo 58/58.
+LESSONS: (1) **An adversarial scout KILLED a bad design before I built it**: my hypothesis was a
+Career+ "AI Company Dossier" — the scout proved the prep pack ALREADY contains a company-research
+section, so gating a dossier to Career+ = repackage/dark-pattern. Pivoted to the salary-negotiation
+generator (built but had no endpoint → genuinely ADDITIVE, honors the advertised pricing, zero dark
+pattern). maker≠checker paid off at the DESIGN stage, not just review. (2) **maker≠checker caught TWO
+REAL bugs, both fixed cycle 1**: web Reviewer A found a rounding-order bug (`"0.4"` passes the `>0`
+guard but `Math.round`→`0` is sent, burning an LLM call on a nonsensical "$0" guide) — fixed in BOTH
+web AND mobile (round BEFORE validating + an upper bound). Mobile Reviewer B found a HONESTY bug my PR
+made reachable: the mobile paywall gated "everything unlocked (incl. salary negotiation)" on
+`tier==='premium'`, so a **Pro** user tapping my new "Upgrade to Career+" was FALSELY told they already
+had it AND dead-ended → made the paywall Career+-aware (3 honest states). A new tier makes NEW UX
+populations reachable — audit every surface the new distinction touches. (3) **HONESTY on the number**:
+Career+ is BUILT but does NOT flip the $100K floor — pre-launch (0 users) crediting a Career+-mix
+assumption would be anti-gaming, so (like referral #109) its ARR is recorded as real-but-unquantified;
+TEAM/B2B2C remains the primary floor-lever. `floor_met_year1` stays false. (4) **PROCESS — origin/main
+was STALE in the clone** (pointed at run 4 `cd56e8f`; the container HEAD was run 12 but the
+remote-tracking ref lagged): my first branch was based on run-4 code. Caught it via a 126-line
+file-shift + `git log origin/main`; `git fetch origin main` force-updated it to run 12, recreated all
+branches off fresh origin/main. RULE (§1): ALWAYS `git fetch` + verify `origin/main` HEAD BEFORE
+branching — never trust the clone's remote-tracking ref. (5) **PROCESS — edited mobile files while on
+the web branch** (the paywall fix); tsc's "Property 'career_plus' does not exist on type 'User'" was
+the tell (the type lives on the mobile branch). `git stash` → checkout mobile → pop moved them cleanly.
+Verify the current branch before editing cross-stack.
+DEFERRED (named, buildable — next runs): **TEAM/B2B2C tier** (the primary floor-lever; multi-run epic +
+owner GTM); **Pro→Career+ in-place upgrade** via the Stripe billing portal (loop/code — avoids
+double-billing; today a Pro user gets an honest "switch on the web" message); voice-mock / company-
+dossier Career+ wedges (future upgrade-rate levers); billing/success page Career+-aware copy (web Rev B
+non-blocking nit); coach "100 msg/mo" doc↔code mismatch (carried); mobile Career+ IAP + the CAREERPLUS_*
+Stripe price IDs (owner — PENDING_OPS). QUALITY SCORECARD: business-case-strength should improve on
+re-grade (Career+ now built) but likely stays sub-A until the floor is honestly met — consumed as DATA,
+never self-edited (maker≠checker).
+
+
 ### 2026-07-01 (run 12) — Maximal run: the long-deferred PMF analytics foundation (Track G+H) + web coach a11y + scorer coverage + 8-scout sweep
 Ran the full 8-scout sweep (functional-reality / security / backend-tests / web-design /
 mobile-design / store+artifact-freshness / business-case+PMF / performance) doubling as the
