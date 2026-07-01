@@ -50,3 +50,48 @@ greenhouse.py 53% / llm_workflows.py 61%); performance **B** (unpaginated N+1 on
 chromium build pin mismatch (project wants 1228; sandbox has 1194) — relied on the green CI
 required check instead. If a future audit needs to re-run the browser journey locally, pin
 the browser to a sandbox-installable build or launch with `executablePath`.
+
+## 2026-07-01 — 2nd independent audit
+
+**Overall: B (↑ from C) · ship_gate_met: false.** Real, evidence-backed improvement since the
+baseline: **two ship-critical dimensions moved B→A** and both non-critical dims stayed strong.
+
+Per-dimension (Δ vs 2026-06-29): functional-reality **A** (=), correctness **A** (=), security
+**A** (▲ from B), design-taste **A** (▲ from B), store-readiness **C** (=), artifact-integrity
+**A** (=), business-case-strength **C** (=), tests-evals **A** (=), performance **B** (~, improved
+rationale — N+1 now fixed, one unbounded query remains).
+
+Method: 9 fresh independent adversarial grader subagents (maker ≠ checker), each ran its own
+mechanical signal + cited file/line. Auditor pre-ran the gate: flake8 clean, **258 backend
+pass @ 90.64% cov** (was 163 @ 85.68%; floor 75), 9 journeys pass, 23 evals pass, scorecard
+parses, `floor_met_year1=false`/`engine_pct=0`. web/mobile tsc/lint/jest/Playwright not
+re-runnable locally (node_modules absent by design) — relied on committed artifacts + required
+CI on main HEAD `c7ae017`.
+
+**What genuinely improved (drove C→B):**
+- **security B→A** — both prior B-gaps fixed: CORS now returns `[]` in prod (never `*`,
+  `asgi.py:103-136`, `test_cors.py`); rate-limit + LLM spend-ceiling now Postgres cross-instance
+  (`asgi.py:238-295` `RateCounter` + `SELECT…FOR UPDATE`, `test_rate_counter.py`). Only CAPTCHA +
+  in-memory login lockout remain (off A+, not below A).
+- **design-taste B→A** — 24 real non-zero rendered screenshots committed (was zero); accent
+  converged on `#6366F1`; bespoke brand icon replaces the Expo template. Independent visual read
+  clears the DESIGNER QUESTION + AI-slop list.
+- **coverage** 85.68%→90.64%; greenhouse.py 53%→100%, llm_workflows.py 61%→100%.
+- **performance** — N+1 genuinely eliminated on `/api/jobs`, `/api/analytics/pipeline`, and coach
+  context (`selectinload` verified); `/api/jobs` gained pagination. Held at B by the still-unbounded
+  `/api/analytics/pipeline` `.all()`+sort and no embedding cache.
+
+**Standing ship-critical gaps (still C — these block the ship gate):**
+1. **business-case-strength (C):** honest $57.5K < $100K floor. Referral loop now BUILT (PR #109,
+   correctly uncredited), but **Career+ ($24) is dead config** — `careerplus_*` grants the identical
+   `PREMIUM`; `UserTier` is binary FREE/PREMIUM; **no team/B2B2C seat model** exists. Floor unmet.
+2. **store-readiness (C):** unchanged — no rendered store assets (`docs/store/assets/` absent), no
+   store screenshots, mobile IAP (StoreKit/Play Billing) not integrated → 4 open ACCEPTANCE_AUDIT
+   FAILs (A3/A4/G4/G7). Vercel deploy config itself is A-level.
+
+**New named nits surfaced this run (non-blocking):** correctness — no dedup/idempotency on
+persisted jobs (`create_job` inserts unconditionally, asgi.py:807); design — all `-mobile`
+screenshots are the web app at 390px (zero native-mobile visual proof) + a 390px header collision.
+
+**Issues:** updated #92 (business-case) + #93 (store-readiness), both still C. Closed #94
+(security) + #95 (design-taste) — both reached A this audit; recorded the fix evidence.
