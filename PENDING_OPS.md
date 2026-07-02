@@ -65,7 +65,7 @@ OWNER_ACTIONS:
       priority: normal
       status: open
       why: "Growth Agent stays in prepare-mode until a connected, funded, authorized channel exists. The email SEAM is now BUILT (PR #187, src/email): waitlist double-opt-in dispatches a confirmation email + a signed confirm link, but the default backend is DRY-RUN (logs, delivers nothing) — so no confirmation email actually leaves the system until a real provider is connected. The app is fully functional without it (the waitlist row is captured either way); this only activates confirmation delivery."
-      how: "Follow docs/growth/CONNECT.md (~20 min). To ACTIVATE waitlist-confirmation email delivery specifically: wire a real email provider behind the src/email abstraction (add a delivering backend + its key) AND set WEB_APP_URL to the live public origin (the confirm LINK is built ONLY from WEB_APP_URL — never the request Host, an anti-phishing measure — so double-opt-in emails are silently NOT sent until WEB_APP_URL is set). Then the Growth Agent can queue/measure for real."
+      how: "Follow docs/growth/CONNECT.md (~20 min). To ACTIVATE waitlist-confirmation email delivery specifically: a real delivering backend now EXISTS (src/email SMTPBackend) — no code needed. Set EMAIL_BACKEND=smtp + the SMTP_* config (SMTP_HOST, SMTP_FROM, SMTP_PORT, SMTP_USERNAME, SMTP_PASSWORD; STARTTLS on by default) for your ESP (SendGrid/Mailgun/SES all speak SMTP), AND set WEB_APP_URL to the live public origin (the confirm LINK is built ONLY from WEB_APP_URL — never the request Host, an anti-phishing measure — so double-opt-in emails are silently NOT sent until WEB_APP_URL is set). Never commit any SMTP_* value. Then the Growth Agent can queue/measure for real."
     - id: analytics-read-token
       title: "OPTIONAL: set ANALYTICS_READ_TOKEN to enable the aggregate growth-metrics read endpoint"
       priority: normal
@@ -114,6 +114,12 @@ OWNER_ACTIONS:
       status: done
       why: "The `ai` capability was validation=degraded_only (CI ran Gemini with an EMPTY key, so only the honest-503/heuristic path was exercised). Owner added a GEMINI_API_KEY Actions secret; the preflight-ci job passes it to pytest so tests/test_llm_live.py now exercises a REAL Gemini chat+embedding round-trip — a loop change that breaks the real AI call is now caught by CI."
       how: "DONE: secret added (2026-07-02); ci.yml passes secrets.GEMINI_API_KEY to the preflight-ci job (PR #160); VALIDATION.md `ai` flipped to validation: real / key_in_ci: true after the live test was verified running green in CI. Keep the key's spend cap in place; rotate if it ever leaks (same UI path)."
+    - id: require-live-tests
+      title: "OPTIONAL: set REQUIRE_LIVE_TESTS=1 in the nightly workflow so a missing live key REDDENS (not skips)"
+      priority: normal
+      status: open
+      why: "FACTORY_STANDARD §28: the nightly `live` lane (real Gemini + Stripe test-mode round-trips) uses skipif(not KEY) — so if a secret is rotated away or never set in the nightly env, the 'real' lane passes having validated NOTHING (a synthetic green). The loop built the fail-loud mechanism (tests/live_guard.py): with REQUIRE_LIVE_TESTS set, a missing key becomes a hard FAILURE instead of a silent skip. The loop cannot edit .github, so wiring the env is owner-only."
+      how: "In .github/workflows/nightly.yml, add REQUIRE_LIVE_TESTS: '1' to the live job's `env:` block (alongside GEMINI_API_KEY/STRIPE_*). Then a nightly run with a missing/rotated secret fails loudly (GitHub emails you) instead of green-passing. Keep the secrets present so the real round-trips actually run. If you intentionally drop a live lane, remove its secret AND leave REQUIRE_LIVE_TESTS unset for that run, or the lane will (correctly) redden."
     - id: email-verification-deferred
       title: "DECISION: signup is NOT gated on email verification (no email pipeline wired)"
       priority: normal

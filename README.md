@@ -40,7 +40,7 @@ Subscription, good-better-best + annual (annual ≈ 2 months free). See
 | Tier | Monthly | Annual | Who | Key gates |
 |---|---|---|---|---|
 | **Free** | $0 | — | Trial / casual | 5 tracked jobs, 1 prep pack/mo, no AI coach |
-| **Pro** (Premium) | $12 | $96 | Active seeker | Unlimited jobs, 10 prep packs/mo, AI coach (100 msg/mo) |
+| **Pro** (Premium) | $12 | $96 | Active seeker | Unlimited jobs, 10 prep packs/mo, AI coach (fair-use: 25 AI actions/day, shared across AI features) |
 | **Career+** | $24 | $192 | Senior / urgent | Everything in Pro + AI salary-negotiation coaching |
 
 > **Current state:** **Career+ is now a real, differentiated entitlement** (PRs #152/#153/#155).

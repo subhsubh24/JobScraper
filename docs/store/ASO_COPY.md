@@ -64,7 +64,8 @@ Start free today and run your search like an operator.
 > Career Operator offers auto-renewing subscriptions: Pro ($12/month or $96/year) and
 > Career+ ($24/month or $192/year). Payment is charged to your account at confirmation. Subscriptions renew automatically
 > unless cancelled at least 24 hours before the end of the period; manage or cancel in your
-> account settings. **Restore purchases is available in the app** (Settings → Restore).
+> account settings. **Restore purchases will be available in the app** (Settings → Restore)
+> once mobile in-app subscriptions are integrated (StoreKit/Play Billing — not yet landed).
 > The subscription Terms of Use and Privacy Policy are linked at the point of purchase
 > (Apple 3.1.2 requires the functional Terms + Privacy links + a Restore action in the
 > paywall UI, not just this text — wire them when StoreKit lands).
