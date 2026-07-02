@@ -4,6 +4,19 @@ Durable lessons for the factory loop. Append dated entries. Keep it honest and s
 
 ---
 
+### 2026-07-02 — Stripe billing: staged the mock->real upgrade (owner adds test-mode secrets)
+The `billing` capability is validation:mock — the webhook signature round-trip is ALREADY real
+crypto (test_billing.py), only the outbound checkout.Session.create is mocked. Staged the real
+upgrade: tests/test_billing_live.py creates a REAL Stripe TEST-MODE Checkout Session (skipif no
+sk_test_ key + a configured price; refuses a LIVE key in CI) and ci.yml passes STRIPE_SECRET_KEY
++ STRIPE_PRICE_* + STRIPE_WEBHOOK_SECRET to preflight-ci (safe no-op while unset). Owner one-time
+(OWNER_ACTION stripe-account, CI REAL-VALIDATION note): add those test-mode secrets as GitHub
+Actions secrets; then flip VALIDATION.md `billing` -> real. NOT flipped yet (honest — skips until
+keys present). Lower value than the AI real-output evals (the security path was already real), but
+completes 'real on all features' once keys are added. RevenueCat stays mock (real mobile IAP can't
+be validated headlessly — honest ceiling).
+
+
 ### 2026-07-02 — Eval coverage upgraded from deterministic to REAL-OUTPUT + made a growing ratchet
 The eval suite was ALL deterministic (golden math / prep-pack STRUCTURE with a fake LLM) — nothing
 judged real Gemini output quality. Now that GEMINI_API_KEY is in CI, added tests/evals/
