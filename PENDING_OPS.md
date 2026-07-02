@@ -109,11 +109,11 @@ OWNER_ACTIONS:
       why: "During auto-migrate setup the Neon connection string (incl. password) was pasted into an assistant chat several times, so it must be treated as compromised. The DB is SSL-gated by this password; anyone with the string could connect."
       how: "Neon Console -> Roles -> reset neondb_owner password. Then update the NEW pooled string in BOTH places via UI (no terminal/transcript): GitHub repo Settings -> Secrets -> Actions -> DATABASE_URL, and Vercel env DATABASE_URL -> redeploy. The DB stays stamped (the marker lives in the DB, survives password change); no re-stamp needed."
     - id: validation-capability-gemini
-      title: "Add GEMINI_API_KEY (test key + spend cap) to CI so the REAL AI path is validated"
-      priority: urgent
-      status: open
-      why: "The self-validation manifest (docs/ci/VALIDATION.md) flags `ai` as validation=degraded_only: CI runs Gemini with an EMPTY key, so only the honest-503/heuristic path is exercised — the REAL Gemini call (prompt + response parsing) is never validated. A loop change that breaks the real AI call would NOT be caught by CI."
-      how: "Create a Gemini API key scoped to a HARD monthly spend cap (Google AI Studio usage limits), then add it as a GitHub Actions repository secret GEMINI_API_KEY (Settings -> Secrets -> Actions). tests/test_llm_live.py auto-runs a tiny real chat+embedding call when the key is present. Wire the key into the CI jobs' env, then flip VALIDATION.md `ai`: key_in_ci: true, validation: real. To FORCE this before more AI work ships, set `ai.blocking: true` (the gate will then block merges until the key is in CI)."
+      title: "GEMINI_API_KEY in CI — DONE (real AI path validated) 2026-07-02"
+      priority: normal
+      status: done
+      why: "The `ai` capability was validation=degraded_only (CI ran Gemini with an EMPTY key, so only the honest-503/heuristic path was exercised). Owner added a GEMINI_API_KEY Actions secret; the preflight-ci job passes it to pytest so tests/test_llm_live.py now exercises a REAL Gemini chat+embedding round-trip — a loop change that breaks the real AI call is now caught by CI."
+      how: "DONE: secret added (2026-07-02); ci.yml passes secrets.GEMINI_API_KEY to the preflight-ci job (PR #160); VALIDATION.md `ai` flipped to validation: real / key_in_ci: true after the live test was verified running green in CI. Keep the key's spend cap in place; rotate if it ever leaks (same UI path)."
     - id: email-verification-deferred
       title: "DECISION: signup is NOT gated on email verification (no email pipeline wired)"
       priority: normal

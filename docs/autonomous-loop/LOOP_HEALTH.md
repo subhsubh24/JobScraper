@@ -43,7 +43,7 @@ LOOP_HEALTH:
   auto_migrate_on_deploy: enabled # NO new migration this run — Career+ needed none (UserTier stays binary; the level derives from the existing Subscription.plan). Latest migration remains b2c8d4e6f1a5.
   validation:                    # self-validation manifest readiness (compute every run: scripts/check_validation.py --report)
     enforced_in_ci: true         # validate-capabilities runs inside the required `preflight` check
-    capabilities_total: 6        # unchanged — Career+ reuses the existing Stripe billing capability (no new external service, no new secret-like env var)
-    unmet: [ai]                  # degraded_only — surfaced as OWNER_ACTION validation-capability-gemini (urgent).
+    capabilities_total: 6
+    unmet: []                    # ai closed 2026-07-02: GEMINI_API_KEY added to CI, test_llm_live.py real round-trip green
   signal: improving              # bootstrapping | improving | steady | churning | stuck — 3 shipped, 0 abandoned, 0 circuit-breaker trips. Headline: built the #1 ship-critical LOOP-BUILDABLE gap — Career+ ($24) as a REAL, webhook-verified, differentiated tier (was dead config) with AI salary-negotiation coaching as its additive exclusive, across backend/web/mobile. maker≠checker earned its keep HARD: an adversarial scout killed a dark-pattern design at the DESIGN stage, and 2 formal REQUEST_CHANGES caught a real wasted-LLM-call bug + a real paywall honesty/dead-end bug, all fixed cycle 1. HONEST on the number: Career+ does NOT flip the floor (recorded as real-but-unquantified, no inflation); TEAM/B2B2C remains the primary floor-lever. No recurring wall → no harness proposal warranted.
 ```

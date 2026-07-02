@@ -73,12 +73,12 @@ VALIDATION_CAPABILITIES:
     service: "Google Gemini (OpenAI-compat): scoring rationale, prep packs, coach"
     env: [GEMINI_API_KEY]
     used_for: "fit-score explanation, prep-pack generation, AI coach chat"
-    validation: degraded_only # CI runs with an EMPTY key — only the honest-503/heuristic path is
-                              # tested; the REAL Gemini call (prompt + response parsing) is NOT validated
-    covered_by: tests/test_llm_live.py  # auto-runs the REAL call once GEMINI_API_KEY is in CI
-    key_in_ci: false
-    blocking: false           # accepted gap for now; flip true to FORCE real-AI validation before more ships
-    owner_action: validation-capability-gemini
+    validation: real          # GEMINI_API_KEY is set in CI; tests/test_llm_live.py exercises a real
+                              # Gemini chat+embedding round-trip (verified running green in CI 2026-07-02)
+    covered_by: tests/test_llm_live.py
+    key_in_ci: true
+    blocking: false
+    owner_action: null
   - id: analytics
     service: "Privacy-safe aggregate analytics (internal counts; shared-secret read API)"
     env: [ANALYTICS_READ_TOKEN]
