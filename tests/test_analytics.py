@@ -2,7 +2,7 @@
 and the shared-secret-gated read endpoint (503 unset / 401 wrong / 200 right), plus the
 real activation-funnel round-trip through the live API (signup -> job_added -> fit_score).
 """
-from datetime import date
+from datetime import date, datetime
 
 from src import analytics
 from src.db.models import AggregateEvent
@@ -18,7 +18,7 @@ def test_record_event_creates_then_increments_same_day(db_session):
     rows = db_session.query(AggregateEvent).filter_by(event_type="signup").all()
     assert len(rows) == 1  # one (event_type, day) row, not one per call
     assert rows[0].count == 2
-    assert rows[0].event_date == date.today()  # UTC-ish; test-day granularity is enough here
+    assert rows[0].event_date == datetime.utcnow().date()  # code stamps UTC — assert UTC, not local date.today()
 
 
 def test_record_event_separate_types_and_days_are_distinct_rows(db_session):
