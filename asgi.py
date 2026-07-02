@@ -725,23 +725,48 @@ def delete_account(user: User = Depends(get_current_user), db: Session = Depends
 # A generic, identical response for both new and already-present emails: the endpoint must
 # never reveal whether an address is already on the list (enumeration defense, same posture
 # as register/login).
+def _trusted_public_base() -> Optional[str]:
+    """The OWNER-CONFIGURED public origin (``WEB_APP_URL``), or None if unset.
+
+    SECURITY: links embedded in an email sent to a third party must NEVER be derived from the
+    request ``Host`` header (attacker-controlled, no TrustedHostMiddleware here) — a spoofed
+    Host on ``/api/waitlist/join`` would send a victim a genuine-looking confirmation email
+    whose link points at an attacker domain (a phishing primitive). So outbound-email links use
+    ONLY this trusted, owner-set origin — never ``request.base_url``."""
+    base = os.getenv("WEB_APP_URL")
+    return base.rstrip("/") if base else None
+
+
+def _waitlist_confirm_operational() -> bool:
+    """True only when the confirmation email can actually be sent AND its link is safe to build:
+    a delivering provider is connected (``email_enabled()``) AND a trusted public origin is
+    configured (``WEB_APP_URL``). Both the user-facing copy and the send guard on this, so we
+    never promise a confirmation email we won't (safely) send."""
+    return email_enabled() and _trusted_public_base() is not None
+
+
 def _waitlist_response() -> dict:
     """Generic, enumeration-safe success. The message is IDENTICAL for new and existing
-    signups (never reveals membership) and only promises a confirmation email when a provider
-    is actually connected (``email_enabled()``) — otherwise it would be a fake-success claim
-    for an email that never leaves the system (SIDE-EFFECT INTEGRITY)."""
-    if email_enabled():
+    signups (never reveals membership) and only promises a confirmation email when one will
+    actually be sent (``_waitlist_confirm_operational()``) — otherwise it would be a
+    fake-success claim for an email that never leaves the system (SIDE-EFFECT INTEGRITY)."""
+    if _waitlist_confirm_operational():
         return {"success": True, "message": "You're on the list — check your email to confirm your spot."}
     return {"success": True, "message": "You're on the list — we'll be in touch."}
 
 
-def _send_waitlist_confirm(email: str, request: Request) -> None:
+def _send_waitlist_confirm(email: str) -> None:
     """Best-effort double-opt-in email. NEVER raises — the captured row is the real
     side-effect, and email must not be able to break signup (mirrors analytics.record_event).
-    With the default dry-run backend nothing is delivered and the visitor is NOT dead-ended:
-    the row is stored and the response makes no false 'check your email' claim."""
+    The link is built from the TRUSTED owner-configured origin only (never the request Host —
+    see ``_trusted_public_base``); when no provider/origin is configured nothing is delivered,
+    the visitor is NOT dead-ended, and the response makes no false 'check your email' claim."""
     try:
-        base = _web_base_url(request)
+        base = _trusted_public_base()
+        if base is None or not email_enabled():
+            # No trusted public origin and/or no delivering provider: do not build a
+            # Host-derived link or fake a send. The row is already captured.
+            return
         token = make_confirm_token(email)
         url = f"{base}/api/waitlist/confirm?email={quote(email)}&token={token}"
         send_email(EmailMessage(
@@ -763,7 +788,7 @@ def _send_waitlist_confirm(email: str, request: Request) -> None:
 
 
 @app.post("/api/waitlist/join", dependencies=[Depends(rate_limit("waitlist", 5, 3600))])
-def join_waitlist(data: WaitlistJoin, request: Request, db: Session = Depends(get_db)):
+def join_waitlist(data: WaitlistJoin, db: Session = Depends(get_db)):
     """Capture a pre-launch waitlist signup + send a double-opt-in confirmation (Track H / F4.1).
 
     The DB row IS the primary, always-present side-effect (makes visitor->signup measurable);
@@ -792,7 +817,7 @@ def join_waitlist(data: WaitlistJoin, request: Request, db: Session = Depends(ge
         # already dispatched the confirm email.
         db.rollback()
         return _waitlist_response()
-    _send_waitlist_confirm(email, request)
+    _send_waitlist_confirm(email)
     return _waitlist_response()
 
 
@@ -809,7 +834,9 @@ def confirm_waitlist(
     then idempotently stamps ``confirmed_at``. An invalid/forged token or unknown email
     redirects with ``status=invalid`` and grants nothing; a valid token always redirects to the
     same thank-you route (no membership enumeration beyond the identical redirect)."""
-    dest = _web_base_url(request) + "/waitlist/confirmed"
+    # Prefer the trusted owner-configured origin; the click arrives via a link built from it,
+    # so request.base_url is only an edge fallback (a bare/direct hit with no WEB_APP_URL set).
+    dest = (_trusted_public_base() or str(request.base_url).rstrip("/")) + "/waitlist/confirmed"
     e = (email or "").strip().lower()
     if not _EMAIL_RE.match(e) or not verify_confirm_token(e, token):
         return RedirectResponse(dest + "?status=invalid", status_code=303)

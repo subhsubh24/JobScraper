@@ -147,12 +147,14 @@ class Referral(Base):
 class Waitlist(Base):
     """Pre-launch waitlist signup (Track G/H).
 
-    Capturing the row IS the real, verifiable side-effect — it makes visitor->signup
-    measurable without sending anything. We intentionally do NOT send a confirmation email
-    here: no email provider is wired yet, and gating signup on an unbuilt email loop would
-    dead-end the user (DECISION COROLLARY). Double-opt-in (``confirmed_at``) lands once a
-    real/sandbox email provider + a round-trip test exist (Track H / F4.1). A NEW table (not
-    new columns on an existing one) so AUTO_CREATE_TABLES can create it safely on deploy.
+    Capturing the row IS the primary, always-present side-effect — it makes visitor->signup
+    measurable and is stored regardless of email deliverability. Double-opt-in shipped (Track H
+    / F4.1): ``POST /api/waitlist/join`` best-effort dispatches a confirmation email via the
+    email abstraction (``src/email``), and clicking the HMAC-signed link stamps ``confirmed_at``
+    (``GET /api/waitlist/confirm``). Signup is NEVER gated on the email (DECISION COROLLARY):
+    with the default dry-run backend / no connected provider nothing is delivered, the visitor
+    is not dead-ended, and no false 'check your email' claim is made. A NEW table (not new
+    columns on an existing one) so AUTO_CREATE_TABLES can create it safely on deploy.
     """
     __tablename__ = "waitlist"
 

@@ -15,7 +15,10 @@ from src.email import CaptureBackend, DryRunBackend, set_email_backend
 
 
 @pytest.fixture(autouse=True)
-def _reset_backend():
+def _email_env(monkeypatch):
+    # WEB_APP_URL is the TRUSTED origin the confirm link is built from (never the request Host,
+    # to avoid a Host-header phishing primitive). Set it so the operational send path runs.
+    monkeypatch.setenv("WEB_APP_URL", "http://testserver")
     yield
     set_email_backend(None)
 
@@ -75,6 +78,22 @@ def test_forged_token_confirms_nothing(client, db_session):
     db_session.expire_all()
     row = db_session.query(Waitlist).filter(Waitlist.email == "victim@example.com").one()
     assert row.confirmed_at is None  # a forged link grants nothing
+
+
+def test_no_email_sent_without_trusted_base(client, db_session, monkeypatch):
+    # SECURITY REGRESSION: a real provider is connected but WEB_APP_URL is unset. The confirm
+    # link must NOT be derived from the request Host header (a spoofed Host would email a victim
+    # an attacker-domain link — a phishing primitive). So NO email is sent and the response must
+    # not claim one was; the row is still captured.
+    monkeypatch.delenv("WEB_APP_URL", raising=False)
+    cap = CaptureBackend()
+    set_email_backend(cap)
+    r = client.post("/api/waitlist/join", json={"email": "notrust@example.com"})
+    assert r.status_code == 200, r.text
+    assert "check your email" not in r.json()["message"].lower()
+    assert cap.outbox == []  # no Host-derived link ever emailed
+    row = db_session.query(Waitlist).filter(Waitlist.email == "notrust@example.com").one()
+    assert row.email == "notrust@example.com"  # primary side-effect still happened
 
 
 def test_dryrun_captures_row_without_faking_delivery(client, db_session):
