@@ -4,6 +4,11 @@ import os
 
 # Force a known, key-free environment BEFORE importing the app. python-dotenv's
 # load_dotenv(override=False) will not clobber these already-present values.
+# Stash any REAL key first (into GEMINI_API_KEY_LIVE) so the deterministic degradation tests
+# run key-free while tests/test_llm_live.py can still exercise the REAL Gemini round-trip when
+# CI provides the secret. (Without this stash, blanking the key here would make the live test
+# always skip — a false "validated" — even with GEMINI_API_KEY set in CI.)
+os.environ["GEMINI_API_KEY_LIVE"] = os.environ.get("GEMINI_API_KEY", "")
 os.environ["GEMINI_API_KEY"] = ""
 os.environ["JWT_SECRET"] = "test-secret"
 os.environ.setdefault("ALLOWED_ORIGINS", "http://testserver")
