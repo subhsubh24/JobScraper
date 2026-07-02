@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
@@ -71,7 +72,12 @@ export function ReportButton({
         accessibilityLabel="Report this response"
         style={styles.trigger}
       >
-        <Text style={styles.triggerText}>⚑ Report this response</Text>
+        <View style={styles.triggerRow}>
+          {/* Real icon (not an emoji — VISION: no emoji-as-iconography). Decorative: the
+              Pressable's accessibilityLabel already names the control for screen readers. */}
+          <Ionicons name="flag-outline" size={13} color={colors.textMuted} />
+          <Text style={styles.triggerText}>Report this response</Text>
+        </View>
       </Pressable>
     );
   }
@@ -122,6 +128,7 @@ export function ReportButton({
 
 const styles = StyleSheet.create({
   trigger: { marginTop: spacing.xs, alignSelf: 'flex-start' },
+  triggerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   triggerText: { color: colors.textMuted, fontSize: 12 },
   doneText: { color: colors.textMuted, fontSize: 12, marginTop: spacing.xs },
   panel: {
