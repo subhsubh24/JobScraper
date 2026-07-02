@@ -15,6 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/ui';
 import { ReportButton } from '@/components/report-button';
+import { AiConsentCard, hasAiConsent } from '@/components/ai-consent';
 import { useAuth } from '@/contexts/auth';
 import { api, ApiError } from '@/services/api';
 import { colors, radius, spacing } from '@/theme';
@@ -84,6 +85,16 @@ export default function CoachScreen() {
           The Coach is a Premium feature.
         </Text>
         <Button label="Upgrade to unlock" onPress={() => router.push('/paywall')} />
+      </SafeAreaView>
+    );
+  }
+
+  // Premium but not yet consented: the coach sends messages to the third-party AI, so require
+  // explicit consent first (Apple 5.1.2(i)) rather than dead-ending on a 403.
+  if (!hasAiConsent(user)) {
+    return (
+      <SafeAreaView style={styles.flex} edges={['top']}>
+        <AiConsentCard />
       </SafeAreaView>
     );
   }

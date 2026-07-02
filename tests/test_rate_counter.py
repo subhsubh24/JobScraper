@@ -78,6 +78,11 @@ def test_llm_ceiling_enforced_over_http(client, db_session, monkeypatch):
     user, token = auth.register("ceiling@example.com", "password123")
     user.tier = UserTier.PREMIUM
     db_session.commit()
+    # Third-party-AI consent precedes the ceiling check; grant it so the 429 (not a 403
+    # consent block) is what this test exercises.
+    assert client.post(
+        "/api/ai-consent", headers={"Authorization": f"Bearer {token}"}
+    ).status_code == 200
 
     res = client.post(
         "/api/coach/chat",

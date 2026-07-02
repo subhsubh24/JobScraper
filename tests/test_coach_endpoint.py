@@ -38,6 +38,8 @@ def test_coach_honest_degradation_without_key(client, db_session):
 def test_coach_success_contract(client, db_session, monkeypatch):
     token = _register(client, "premium-ok@example.com")
     _make_premium(db_session)
+    # Third-party-AI consent is required before any Gemini call (Apple 5.1.2(i)).
+    assert client.post("/api/ai-consent", headers=_auth(token)).status_code == 200
 
     class _FakeCoach:
         def __init__(self, db):
@@ -62,6 +64,7 @@ def test_coach_daily_ceiling_blocks(client, db_session, monkeypatch):
     """The per-user/day LLM ceiling is a wallet-drain defense — it must actually block."""
     token = _register(client, "premium-ceiling@example.com")
     _make_premium(db_session)
+    assert client.post("/api/ai-consent", headers=_auth(token)).status_code == 200
 
     class _FakeCoach:
         def __init__(self, db):

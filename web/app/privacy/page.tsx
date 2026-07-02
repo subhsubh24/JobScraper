@@ -63,6 +63,15 @@ export default function PrivacyPage() {
           provider is configured, the product falls back to a non-AI heuristic where possible
           rather than failing. We do not use your data to train our own models.
         </p>
+        <p className="mt-3">
+          <strong>Your consent &amp; control.</strong> We do not send your personal data to
+          Google (Gemini) until you explicitly enable AI features. You are asked before the
+          first time your data would be shared, and you can turn this off at any time in the
+          app&rsquo;s Settings under &ldquo;AI features.&rdquo; With AI features off, fit
+          scoring falls back to a fully on-server heuristic (nothing is sent to Google) and the
+          generative features (prep packs, salary coaching, the AI coach) are unavailable until
+          you turn it back on.
+        </p>
       </Section>
 
       <Section heading="Service providers we rely on">

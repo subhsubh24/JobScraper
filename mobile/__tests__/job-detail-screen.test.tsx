@@ -17,8 +17,11 @@ jest.mock('expo-router', () => ({
   useLocalSearchParams: () => ({ id: 'job-1' }),
 }));
 
-let mockUser: { tier: string; career_plus?: boolean } = { tier: 'free' };
-jest.mock('@/contexts/auth', () => ({ useAuth: () => ({ user: mockUser }) }));
+let mockUser: { tier: string; career_plus?: boolean; ai_consent?: boolean } = {
+  tier: 'free',
+  ai_consent: true,
+};
+jest.mock('@/contexts/auth', () => ({ useAuth: () => ({ user: mockUser, setUser: jest.fn() }) }));
 
 const mockGetJob = jest.fn();
 const mockGeneratePrep = jest.fn();
@@ -38,6 +41,7 @@ jest.mock('@/services/api', () => {
       generatePrepPack: (id: string) => mockGeneratePrep(id),
       updateJobStatus: (id: string, s: string) => mockUpdateStatus(id, s),
       generateSalaryNegotiation: (id: string, target: number) => mockGenerateNeg(id, target),
+      grantAiConsent: jest.fn(async () => ({ ...mockUser, ai_consent: true })),
     },
     ApiError,
   };
@@ -64,7 +68,9 @@ const JOB = {
 };
 
 beforeEach(() => {
-  mockUser = { tier: 'free' };
+  // Default: consented, so the AI-consent gate is a no-op and these tests exercise the
+  // prep/salary flows directly. A dedicated test below covers the not-consented gate.
+  mockUser = { tier: 'free', ai_consent: true };
   mockGetJob.mockResolvedValue(JOB);
 });
 afterEach(() => jest.clearAllMocks());
@@ -106,6 +112,17 @@ describe('JobDetailScreen', () => {
     expect(screen.getByTestId('prep-content').props.children).toContain('Acme builds rockets.');
   });
 
+  it('gates prep generation on third-party-AI consent — no LLM call until consented (Apple 5.1.2(i))', async () => {
+    mockUser = { tier: 'free', ai_consent: false };
+    render(<JobDetailScreen />);
+    await screen.findByText('Senior Backend Engineer');
+
+    fireEvent.press(screen.getByText('Generate prep pack (1 free)'));
+    // The consent prompt appears and NO prep request is made until the user consents.
+    expect(await screen.findByText('Enable AI features')).toBeTruthy();
+    expect(mockGeneratePrep).not.toHaveBeenCalled();
+  });
+
   it('gates salary negotiation behind Career+ for a non-Career+ user (upsell, no input)', async () => {
     mockUser = { tier: 'premium' }; // Pro (premium, not career_plus) — must NOT see the tool
     render(<JobDetailScreen />);
@@ -118,7 +135,7 @@ describe('JobDetailScreen', () => {
   });
 
   it('lets a Career+ user generate a negotiation guide and renders it inline', async () => {
-    mockUser = { tier: 'premium', career_plus: true };
+    mockUser = { tier: 'premium', career_plus: true, ai_consent: true };
     mockGenerateNeg.mockResolvedValue({
       title: 'Salary Negotiation: Senior Backend Engineer',
       content: '## Talking points\nAnchor high, cite market data.',
@@ -136,7 +153,7 @@ describe('JobDetailScreen', () => {
   });
 
   it('rejects a sub-1 target salary that rounds to 0 (no wasted LLM call)', async () => {
-    mockUser = { tier: 'premium', career_plus: true };
+    mockUser = { tier: 'premium', career_plus: true, ai_consent: true };
     render(<JobDetailScreen />);
     await screen.findByText('Senior Backend Engineer');
 

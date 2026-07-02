@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Button, Card, ErrorText, LinkButton } from '@/components/ui';
+import { AiConsentSetting } from '@/components/ai-consent';
 import { api, ApiError, type ReferralStats } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 
@@ -161,6 +162,8 @@ export default function SettingsPage() {
           </p>
         )}
       </Card>
+
+      <AiConsentSetting />
 
       <ReferAFriendCard />
 

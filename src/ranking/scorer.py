@@ -108,18 +108,31 @@ class JobScorer:
                 found_skills.append(skill)
         return found_skills
 
-    def score_job(self, job: JobPosting, user: User) -> JobScore:
-        """Score a job for a user and save the result."""
-        # Get embeddings
-        try:
-            resume_embedding = self.ensure_user_embedding(user)
-            job_embedding = self.ensure_job_embedding(job)
+    def score_job(
+        self, job: JobPosting, user: User, use_embeddings: bool = True
+    ) -> JobScore:
+        """Score a job for a user and save the result.
 
-            # Calculate semantic similarity (0-1)
-            semantic_score = self.cosine_similarity(resume_embedding, job_embedding)
-        except Exception as e:
-            print(f"Embedding error: {e}")
-            semantic_score = 0.5  # Default if API fails
+        ``use_embeddings`` controls whether the semantic-similarity half uses the third-party
+        AI (Gemini) embeddings. When it is False the scorer runs purely LOCALLY — no personal
+        data leaves the server — using the neutral 0.5 semantic baseline plus the local skills
+        match. Callers pass False when the user has not consented to third-party AI sharing
+        (Apple 5.1.2(i)); the user still gets a real, honest fit score, just heuristic-only.
+        """
+        # Get embeddings (only when allowed — see ``use_embeddings``).
+        if use_embeddings:
+            try:
+                resume_embedding = self.ensure_user_embedding(user)
+                job_embedding = self.ensure_job_embedding(job)
+
+                # Calculate semantic similarity (0-1)
+                semantic_score = self.cosine_similarity(resume_embedding, job_embedding)
+            except Exception as e:
+                print(f"Embedding error: {e}")
+                semantic_score = 0.5  # Default if API fails
+        else:
+            # Consent not granted (or no key): stay fully local, never call the third party.
+            semantic_score = 0.5
 
         # Extract skills
         resume_skills = set(self.extract_skills(user.resume_text or ""))

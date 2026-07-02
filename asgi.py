@@ -381,6 +381,36 @@ def check_llm_ceiling(user: User, db: Session) -> None:
         )
 
 
+def ai_consent_ok(user: User) -> bool:
+    """True once the user has granted third-party-AI consent (Apple 5.1.2(i))."""
+    return user.ai_consent_at is not None
+
+
+def require_ai_consent(user: User) -> None:
+    """Gate any path that sends personal data to the third-party AI (Gemini).
+
+    Apple App Review 5.1.2(i) requires EXPLICIT, revocable consent BEFORE personal data is
+    shared with a third-party AI — a blanket privacy-policy/account acceptance does not
+    satisfy it. Raises a 403 with a machine-readable ``code`` the clients key on to surface
+    the consent prompt (never a dead-end): granting it and retrying completes the flow. The
+    check is enforced server-side on EVERY generative AI endpoint; the client flag is only a
+    UX hint. (Job scoring degrades to a fully-local heuristic instead of blocking — see
+    ``create_job`` — so the core loop still works before consent, with no third-party share.)
+    """
+    if not ai_consent_ok(user):
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "code": "ai_consent_required",
+                "message": (
+                    "Enable AI features to use this. We'll send the relevant text to our AI "
+                    "provider (Google Gemini) to generate this for you — you can turn this "
+                    "off anytime in Settings."
+                ),
+            },
+        )
+
+
 # ---------------------------------------------------------------------------
 # Schemas
 # ---------------------------------------------------------------------------
@@ -519,6 +549,11 @@ def user_public(user: User, db: Session) -> dict:
         "prep_packs_remaining": limits["prep_packs_remaining"],
         "ai_coach": user.tier == UserTier.PREMIUM,
         "career_plus": plan_level == "career_plus",
+        # Third-party-AI consent (Apple 5.1.2(i)). Clients read ``ai_consent`` to decide
+        # whether to PROMPT for consent before an AI action; the server RE-CHECKS it on every
+        # AI path (never trusts the client flag). ``ai_consent_at`` is the audit timestamp.
+        "ai_consent": user.ai_consent_at is not None,
+        "ai_consent_at": user.ai_consent_at.isoformat() if user.ai_consent_at else None,
     }
 
 
@@ -629,6 +664,31 @@ def login(data: UserLogin, db: Session = Depends(get_db)):
 
 @app.get("/api/auth/me")
 def me(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    return {"success": True, "user": user_public(user, db)}
+
+
+@app.post("/api/ai-consent", dependencies=[Depends(rate_limit("auth", 10))])
+def grant_ai_consent(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Record explicit, revocable third-party-AI consent (Apple 5.1.2(i)).
+
+    Idempotent: re-granting refreshes the timestamp. This is the ONLY thing that unlocks the
+    generative AI paths (prep packs, salary coaching, AI coach) and the embedding-based
+    scorer; the server checks ``ai_consent_at`` on every one of them.
+    """
+    user.ai_consent_at = datetime.utcnow()
+    db.commit()
+    return {"success": True, "user": user_public(user, db)}
+
+
+@app.delete("/api/ai-consent", dependencies=[Depends(rate_limit("auth", 10))])
+def revoke_ai_consent(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Revoke third-party-AI consent (Apple 5.1.2(i) requires consent be revocable).
+
+    After revoke, generative AI endpoints return 403 ``ai_consent_required`` again and job
+    scoring drops back to the local heuristic — no further personal data is sent to Gemini.
+    """
+    user.ai_consent_at = None
+    db.commit()
     return {"success": True, "user": user_public(user, db)}
 
 
@@ -830,14 +890,22 @@ def create_job(
     # immediately (its cross-instance contract requires "check before real work"), so it MUST
     # run BEFORE the job/Application writes below: otherwise its commit would split job
     # creation into two transactions, and a failure in between (e.g. a slow Gemini call killed
-    # by the serverless budget) could orphan a JobPosting with no Application/usage row. We
-    # only consume a slot when a real paid call would fire (a Gemini key is present); the
-    # keyless heuristic path is free and always allowed. (Note: the very first scored job for a
-    # user makes 2 embedding calls — resume + JD — but consumes 1 slot; harmless, the resume
-    # embedding is cached thereafter.)
-    may_score = not llm_available() or _consume_counter(
-        db, user.id, "score_daily", SCORE_DAILY_CEILING, 86400
-    )
+    # by the serverless budget) could orphan a JobPosting with no Application/usage row.
+    #
+    # We use the Gemini embeddings ONLY when a key is present AND the user has granted
+    # third-party-AI consent (Apple 5.1.2(i)) — otherwise scoring stays fully LOCAL (the
+    # skills-match heuristic), sending nothing to Gemini. The per-day ceiling slot is consumed
+    # ONLY when a real paid embedding call will actually fire; the local heuristic is free and
+    # always allowed, so the core loop still produces a real fit score before consent. (Note:
+    # the very first embedding-scored job makes 2 calls — resume + JD — but consumes 1 slot;
+    # harmless, the resume embedding is cached thereafter.)
+    use_embeddings = llm_available() and ai_consent_ok(user)
+    if use_embeddings:
+        may_score = _consume_counter(
+            db, user.id, "score_daily", SCORE_DAILY_CEILING, 86400
+        )
+    else:
+        may_score = True
 
     job = JobPosting(
         user_id=user.id,
@@ -859,7 +927,7 @@ def create_job(
     scored = False
     if may_score:
         try:
-            JobScorer(db).score_job(job, user)
+            JobScorer(db).score_job(job, user, use_embeddings=use_embeddings)
             scored = True
         except Exception:
             logger.exception("Scoring failed for job %s; continuing unscored", job.id)
@@ -1078,6 +1146,8 @@ def generate_prep_pack(
             detail="AI prep packs require the server's GEMINI_API_KEY to be configured.",
         )
 
+    # Apple 5.1.2(i): explicit consent BEFORE sending the resume/job text to Gemini.
+    require_ai_consent(user)
     check_llm_ceiling(user, db)
     try:
         artifact: PrepArtifact = LLMWorkflows(db).generate_prep_pack(job, user)
@@ -1138,6 +1208,8 @@ def generate_salary_negotiation_guide(
             detail="AI salary-negotiation coaching requires the server's GEMINI_API_KEY to be configured.",
         )
 
+    # Apple 5.1.2(i): explicit consent BEFORE sending the resume/job text to Gemini.
+    require_ai_consent(user)
     check_llm_ceiling(user, db)
     try:
         artifact: PrepArtifact = LLMWorkflows(db).generate_salary_negotiation(
@@ -1178,6 +1250,8 @@ def coach_chat(
             detail="The AI Coach requires the server's GEMINI_API_KEY to be configured.",
         )
 
+    # Apple 5.1.2(i): explicit consent BEFORE sending resume/coach text to Gemini.
+    require_ai_consent(user)
     check_llm_ceiling(user, db)
     job = None
     if data.job_id:

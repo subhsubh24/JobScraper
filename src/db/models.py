@@ -61,6 +61,13 @@ class User(Base):
     referral_code = Column(String(16), unique=True, index=True, nullable=True)
     bonus_prep_packs = Column(Integer, nullable=False, server_default="0", default=0)
 
+    # Third-party-AI consent (Apple App Review 5.1.2(i) / privacy). NULL = never consented
+    # (the default): the app must NOT send this user's personal data (resume / job text /
+    # coach messages) to the third-party AI provider (Gemini) until they grant explicit,
+    # revocable consent. Set to the grant timestamp on consent, back to NULL on revoke, so
+    # the column doubles as an audit trail of WHEN consent was given.
+    ai_consent_at = Column(DateTime, nullable=True)
+
     # Profile
     full_name = Column(String(255))
     resume_text = Column(Text)

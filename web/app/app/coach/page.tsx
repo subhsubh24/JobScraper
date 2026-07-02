@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { Button, Card } from '@/components/ui';
 import { ReportButton } from '@/components/report-button';
+import { AiConsentCard, hasAiConsent } from '@/components/ai-consent';
 import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 
@@ -77,6 +78,12 @@ export default function CoachPage() {
         </div>
       </Card>
     );
+  }
+
+  // Premium but not yet consented: the coach sends messages to the third-party AI, so require
+  // explicit consent first (Apple 5.1.2(i)) rather than dead-ending on a 403.
+  if (!hasAiConsent(user)) {
+    return <AiConsentCard />;
   }
 
   return (

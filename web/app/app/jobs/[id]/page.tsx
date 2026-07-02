@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Button, Card, Field, Skeleton } from '@/components/ui';
 import { Markdown } from '@/components/markdown';
 import { ReportButton } from '@/components/report-button';
+import { useAiConsent } from '@/components/ai-consent';
 import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { STATUS_LABELS, STATUS_ORDER, scoreColor, type ApplicationStatus, type Job } from '@/lib/types';
@@ -34,6 +35,8 @@ export default function JobDetailPage() {
   const router = useRouter();
   const { user } = useAuth();
   const isCareerPlus = user?.career_plus === true;
+  // Third-party-AI consent gate (Apple 5.1.2(i)) — prep + salary send resume/JD to Gemini.
+  const { ensureConsent, dialog: consentDialog } = useAiConsent();
   const [job, setJob] = useState<Job | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -73,8 +76,10 @@ export default function JobDetailPage() {
   }
 
   async function generatePrep() {
-    setPrepLoading(true);
     setPrepMsg(null);
+    // Get explicit AI consent before sending resume/job text to the AI provider.
+    if (!(await ensureConsent())) return;
+    setPrepLoading(true);
     try {
       setPrep(await api.generatePrepPack(id));
     } catch (e) {
@@ -97,8 +102,9 @@ export default function JobDetailPage() {
       setNegMsg('Enter a realistic target salary.');
       return;
     }
-    setNegLoading(true);
     setNegMsg(null);
+    if (!(await ensureConsent())) return;
+    setNegLoading(true);
     try {
       setNeg(await api.generateSalaryNegotiation(id, parsed));
     } catch (e) {
@@ -122,6 +128,7 @@ export default function JobDetailPage() {
 
   return (
     <div className="space-y-6">
+      {consentDialog}
       <div>
         <h1 className="text-2xl font-extrabold">{job.title}</h1>
         <p className="text-slate-400">{job.company}{job.location ? ` · ${job.location}` : ''}</p>

@@ -36,6 +36,10 @@ export interface User {
   jobs_remaining: number | string;
   prep_packs_remaining: number | string;
   ai_coach: boolean;
+  // Third-party-AI consent (Apple 5.1.2(i)). Absent on an older API deploy reads as
+  // not-consented (the safe default — prompt before sending data to the AI provider).
+  ai_consent?: boolean;
+  ai_consent_at?: string | null;
 }
 
 export interface Job {

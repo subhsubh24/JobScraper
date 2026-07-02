@@ -5,6 +5,7 @@ import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View
 import { Button, Card, ErrorBanner, Field } from '@/components/ui';
 import { Markdown } from '@/components/markdown';
 import { ReportButton } from '@/components/report-button';
+import { useAiConsent } from '@/components/ai-consent';
 import { useAuth } from '@/contexts/auth';
 import { api, ApiError } from '@/services/api';
 import { colors, radius, scoreColor, spacing } from '@/theme';
@@ -34,6 +35,8 @@ export default function JobDetailScreen() {
   const [neg, setNeg] = useState<{ title: string; content: string } | null>(null);
   const [negMsg, setNegMsg] = useState<string | null>(null);
   const isCareerPlus = user?.career_plus === true;
+  // Third-party-AI consent gate (Apple 5.1.2(i)) — prep + salary send resume/JD to Gemini.
+  const { ensureConsent, dialog: consentDialog } = useAiConsent();
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -63,8 +66,10 @@ export default function JobDetailScreen() {
 
   async function generatePrep() {
     if (!id) return;
-    setPrepLoading(true);
     setPrepMsg(null);
+    // Get explicit AI consent before sending resume/job text to the AI provider.
+    if (!(await ensureConsent())) return;
+    setPrepLoading(true);
     try {
       // Render the full pack inline (scrollable) instead of a truncated, ephemeral alert —
       // the prep pack is the value, the user needs to read all of it and come back to it.
@@ -95,8 +100,9 @@ export default function JobDetailScreen() {
       setNegMsg('Enter a realistic target salary.');
       return;
     }
-    setNegLoading(true);
     setNegMsg(null);
+    if (!(await ensureConsent())) return;
+    setNegLoading(true);
     try {
       setNeg(await api.generateSalaryNegotiation(id, parsed));
     } catch (e) {
@@ -142,6 +148,7 @@ export default function JobDetailScreen() {
 
   return (
     <ScrollView style={styles.flex} contentContainerStyle={styles.container}>
+      {consentDialog}
       <Stack.Screen options={{ title: job.company ?? 'Job' }} />
       <Text style={styles.title}>{job.title}</Text>
       <Text style={styles.company}>

@@ -24,7 +24,10 @@ class _RecordingScorer:
     def __init__(self, db):  # noqa: D401 - matches JobScorer(db) construction
         pass
 
-    def score_job(self, job, user):
+    def score_job(self, job, user, use_embeddings=True):
+        # ``use_embeddings`` mirrors the real JobScorer signature (whether the paid Gemini
+        # embedding path is used). The metering decision lives in create_job, not here, so we
+        # count every invocation and let the tests assert how often create_job chose to score.
         _RecordingScorer.calls += 1
         return None
 
@@ -57,6 +60,9 @@ def test_scoring_metered_over_ceiling_creates_job_unscored(client, monkeypatch):
     monkeypatch.setattr(asgi, "SCORE_DAILY_CEILING", 2)
 
     token = _register(client, "meter-cap@example.com")
+    # Grant third-party-AI consent so the embedding (paid) path is actually used and metered —
+    # without consent, scoring stays on the free local heuristic and is never metered.
+    assert client.post("/api/ai-consent", headers=_auth(token)).status_code == 200
     # 3 adds, all within the free-tier 5-job cap so only the scoring ceiling (2) is exercised.
     for i in range(3):
         assert _add_job(client, token, i).status_code == 200

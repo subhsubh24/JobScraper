@@ -189,6 +189,8 @@ def test_career_plus_generates_real_artifact(client, db_session, _llm_on):
     uid, token = _register(client, "cp4@example.com")
     job_id = _add_job(client, token)
     _make_career_plus(db_session, uid)
+    # Third-party-AI consent is required before the resume/JD go to Gemini (Apple 5.1.2(i)).
+    assert client.post("/api/ai-consent", headers=_auth(token)).status_code == 200
     r = client.post(
         "/api/prep/salary-negotiation",
         headers=_auth(token),
