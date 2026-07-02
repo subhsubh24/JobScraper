@@ -6,10 +6,12 @@
 > Readiness requires **ZERO open FAILs**. At the readiness gate, RE-FETCH the live
 > guidelines via web research (they change) and re-verify every row against a real build.
 >
-> Updated 2026-06-28: reconciled to shipped artifacts. Account deletion, hosted privacy
-> policy/ToS, web subscription billing, and the privacy-labels/data-safety/permissions
-> drafts now exist; rendered store assets and the mobile (StoreKit/Play Billing) purchase
-> flow do **not**, so submission readiness remains **NO** (honest).
+> Updated 2026-07-02: re-validated vs current guidelines (WebSearch). Account deletion, hosted
+> privacy policy/ToS, web subscription billing, the GenAI user-report affordance (PR #142), and
+> the privacy-labels/data-safety/permissions drafts exist. Still open: rendered store assets and
+> the mobile (StoreKit/Play Billing) purchase flow (owner/native), PLUS a **newly-surfaced**
+> requirement — Apple 5.1.2(i) explicit consent before sharing personal data with a third-party
+> AI (A11, loop-buildable). Submission readiness remains **NO** (honest).
 
 ## Apple — App Store Review Guidelines
 
@@ -25,6 +27,7 @@
 | A8 | 5.1.1(v) Account Deletion | In-app account deletion required | PASS | `DELETE /api/auth/me` cascade-deletes all user data (PR #36); mobile Settings "Delete account" calls it |
 | A9 | 5.1.2 Data Use | Permission strings for any data accessed | PASS | Zero sensitive permissions used; audited in `PERMISSIONS_AUDIT.md` — nothing to justify |
 | A10 | 5.6 Developer Code of Conduct | No fake reviews / ratings manipulation | OPEN | Growth boundary enforces this; nothing published yet |
+| A11 | 5.1.2(i) Third-party AI data sharing | Explicit, unbundled, revocable consent BEFORE personal data is shared with a third-party AI | FAIL | NEW: Apple's Nov-2025 guideline update (in effect for 2026 review) requires an explicit consent prompt — naming the AI service + the data — BEFORE the first transmission; a blanket privacy-policy/account acceptance does not satisfy it, and users must be able to review/revoke. We send resume/JD/coach text to Google Gemini with only a Privacy-Policy disclosure and **no consent gate**. Loop-buildable (consent gate on first AI use + a Settings revoke toggle + honest degrade when declined); tracked in ROADMAP Track D. Sources: [Apple App Review Guidelines](https://developer.apple.com/app-store/review/guidelines/), [TechCrunch 2025-11-13](https://techcrunch.com/2025/11/13/apples-new-app-review-guidelines-clamp-down-on-apps-sharing-personal-data-with-third-party-ai/) |
 
 ## Google — Play Developer Program Policies
 
@@ -53,6 +56,8 @@
       generator output moderation (PR #86) + user-facing "report this response" affordance
       (web + mobile coach/prep; `POST /api/report` → real `ContentReport` row) all shipped
 - [ ] Owner enters App Privacy / Data Safety answers in the consoles + counsel review (PENDING_OPS)
+- [ ] Third-party-AI consent gate before the first Gemini call + revoke control (A11, Apple
+      5.1.2(i)) — loop-buildable, ROADMAP Track D; not yet built
 
-**Open FAILs remain (mobile billing, rendered assets). Submission readiness: NO.**
-Re-audit vs live guidelines at the gate.
+**Open FAILs remain (mobile billing, rendered assets, third-party-AI consent gate).
+Submission readiness: NO.** Re-audit vs live guidelines at the gate.

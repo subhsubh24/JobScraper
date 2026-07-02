@@ -40,12 +40,21 @@ used for third-party advertising. No tracking SDKs are present.**
 
 | Recipient | Data sent | When | Role |
 |---|---|---|---|
-| Google Gemini (LLM/embeddings) | Resume text, job descriptions, and coach messages | Only when the user runs scoring / generates prep / chats with the coach | Processing on our behalf |
+| Google Gemini (LLM/embeddings) | Resume text, job descriptions, coach messages, and (Career+) salary-negotiation context (title/salary range) | Only when the user runs scoring / generates prep / chats with the coach / uses the Career+ salary tool | Processing on our behalf |
 | Neon (Postgres) | All stored rows above | At rest | Data storage |
 | Vercel | HTTP request metadata (logs) | Every request | Hosting |
 | Stripe | Name/email + card details entered on Stripe Checkout (we never see the card) | At subscription purchase (when billing is live) | Payment processing |
 
 These are **service providers processing data on our behalf**, not independent data sales.
+
+> **CONSENT (Apple 5.1.2(i), updated Nov 2025 — in effect for 2026 review):** Apple now
+> requires **explicit, unbundled, revocable user consent BEFORE** personal data is shared with
+> a third-party AI (Google Gemini here), naming the service and the data — a blanket
+> privacy-policy or account-creation acceptance does **not** satisfy it. Career Operator
+> currently discloses this in the Privacy Policy but does **not** yet gate the first AI call
+> behind an explicit consent prompt. This is a **loop-buildable ship gap** tracked in
+> `ACCEPTANCE_AUDIT.md` (A11) and ROADMAP Track D — build the consent gate + a revoke control
+> before iOS submission.
 
 ---
 

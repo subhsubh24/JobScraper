@@ -50,18 +50,19 @@ needs attention so nothing slips.
 - Your data is yours: export-free deletion in one tap removes everything.
 - Encrypted in transit. No ads. No data sold. No tracking.
 
-**Free vs Premium**
+**Plans**
 - **Free:** track up to 5 jobs, 1 prep pack/month, fit scoring.
-- **Premium:** unlimited jobs, unlimited prep packs, the AI Career Coach, and salary
-  negotiation help. Monthly or annual (annual saves ~33%).
+- **Pro — $12/mo or $96/yr:** unlimited jobs, unlimited prep packs, and the AI Career Coach.
+- **Career+ — $24/mo or $192/yr:** everything in Pro, plus the AI salary-negotiation coaching
+  tool. (Annual saves ~33%.)
 
 Start free today and run your search like an operator.
 
 ---
 
 ## Subscription disclosure (required near the paywall + in the listing)
-> Career Operator Premium is an auto-renewing subscription. Pro: $12/month or $96/year.
-> Payment is charged to your account at confirmation. Subscriptions renew automatically
+> Career Operator offers auto-renewing subscriptions: Pro ($12/month or $96/year) and
+> Career+ ($24/month or $192/year). Payment is charged to your account at confirmation. Subscriptions renew automatically
 > unless cancelled at least 24 hours before the end of the period; manage or cancel in your
 > account settings. **Restore purchases is available in the app** (Settings → Restore).
 > The subscription Terms of Use and Privacy Policy are linked at the point of purchase
