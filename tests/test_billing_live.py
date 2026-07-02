@@ -20,11 +20,19 @@ STRIPE_KEY = os.getenv("STRIPE_SECRET_KEY") or ""
 # the first plan whose Stripe Price ID is configured in this environment
 CONFIGURED_PLAN = next((plan for plan, env in billing._PLAN_PRICE_ENV.items() if os.getenv(env)), None)
 
-pytestmark = [pytest.mark.live, pytest.mark.skipif(
-    not (STRIPE_KEY.startswith("sk_test") and CONFIGURED_PLAN),
-    reason="No Stripe TEST key (sk_test_) + configured price in CI — real billing validation "
-    "skipped. See OWNER_ACTION stripe-account.",
-)]
+pytestmark = pytest.mark.live
+
+
+def setup_module(module):
+    # §28: skip in local/dev (no test key expected) but FAIL LOUD in the nightly lane
+    # (REQUIRE_LIVE_TESTS=1) if the Stripe test key + configured price are unexpectedly
+    # absent — never skip-green.
+    from tests.live_guard import require_live_key
+
+    require_live_key(
+        STRIPE_KEY.startswith("sk_test") and CONFIGURED_PLAN,
+        "Stripe TEST key (sk_test_) + a configured price",
+    )
 
 
 def test_real_stripe_test_mode_checkout_session(db_session):
