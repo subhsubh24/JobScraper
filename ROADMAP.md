@@ -306,8 +306,23 @@ the guard tests, and **`FACTORY_STANDARD.md`**.
 - [ ] Launch plan doc
 
 ### H — Growth-execution engine
-- [ ] Waitlist capture + double-opt-in
-- [ ] Email provider abstraction (dry-run until connected)
+- [x] Waitlist capture + double-opt-in — capture shipped earlier (PR #68); double-opt-in
+      SHIPPED run 16 (PR #187, 2 Sonnet reviewers + 2 fresh re-reviewers, all APPROVE). `POST
+      /api/waitlist/join` stores the row (primary, always-present side-effect) then best-effort
+      dispatches a confirmation email; `GET /api/waitlist/confirm` verifies a stateless,
+      email-bound HMAC token (no migration — reuses `waitlist.confirmed_at`) and idempotently
+      stamps `confirmed_at`, redirecting to a `/waitlist/confirmed` page. F4.1 round-trip proven
+      in CI via the capture backend (`tests/journeys/test_waitlist_double_optin.py`). Degrades
+      HONESTLY under the dry-run default (row captured, no false "check your email", no dead-end;
+      DECISION COROLLARY). maker≠checker caught + fixed TWO real Host-header trust bugs before
+      merge (a phishing email-link primitive + an open-redirect on the confirm endpoint).
+- [x] Email provider abstraction (dry-run until connected) — SHIPPED run 16 (PR #187). `src/email`
+      seam (`EmailMessage`/`EmailResult` + pluggable backends); DEFAULT is dry-run: it logs and
+      reports `delivered=False` — NEVER a fake "sent" (SIDE-EFFECT INTEGRITY). `email_enabled()`
+      is true only when a backend actually delivers, so callers degrade honestly. `CaptureBackend`
+      exercises the real send + confirm round-trip in CI. Wiring a live ESP for production
+      deliverability is a future owner-connect (`docs/growth/CONNECT.md`); the app is fully
+      functional without it. `VALIDATION.md` declares `email` (reuses `JWT_SECRET` — no new secret).
 - [ ] Publishing queue (dry-run until connected)
 - [x] Privacy-safe analytics read-API — `GET /api/analytics/summary` returns aggregate
       counts + the activation funnel, GATED by a server-side shared secret
