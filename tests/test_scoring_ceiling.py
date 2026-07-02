@@ -65,6 +65,36 @@ def test_scoring_metered_over_ceiling_creates_job_unscored(client, monkeypatch):
     assert _RecordingScorer.calls == 2
 
 
+def test_job_creation_stays_atomic_when_a_later_step_fails(client, db_session, monkeypatch):
+    """Regression: the scoring meter must not split job creation into two transactions.
+
+    ``_consume_counter`` commits immediately, so if it ran AFTER the job insert, a failure in
+    a later step (here: ``increment_job_usage``) would leave an ORPHANED JobPosting with no
+    Application/usage row. The fix moves the meter BEFORE any writes, so on such a failure the
+    job insert rolls back cleanly. Load-bearing: against the pre-fix ordering the orphaned job
+    would be committed and this count assertion fails."""
+    import pytest
+
+    from src.db.models import JobPosting
+
+    monkeypatch.setattr(asgi, "llm_available", lambda: True)
+    monkeypatch.setattr(asgi, "JobScorer", _RecordingScorer)
+
+    def _boom(self, user):
+        raise RuntimeError("simulated failure after the scoring meter")
+
+    monkeypatch.setattr(asgi.AuthService, "increment_job_usage", _boom)
+
+    token = _register(client, "atomic@example.com")
+    # The later step raises; the TestClient surfaces it (the add is not a success).
+    with pytest.raises(RuntimeError):
+        _add_job(client, token, 1)
+
+    # The job insert must have rolled back — no orphaned JobPosting persisted (the meter's
+    # earlier commit only persisted the counter row, never the job).
+    assert db_session.query(JobPosting).count() == 0
+
+
 def test_scoring_not_metered_without_a_key(client, monkeypatch):
     """The keyless heuristic scoring path is FREE, so it must never be metered — every add
     scores even with the ceiling set to 1 (proves the ``not llm_available()`` short-circuit)."""

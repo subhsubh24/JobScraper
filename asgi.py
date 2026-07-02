@@ -824,6 +824,21 @@ def create_job(
             detail="Free tier is limited to 5 tracked jobs. Upgrade to Pro for unlimited.",
         )
 
+    # Decide scoring eligibility BEFORE any DB writes. The embedding-based scorer makes a PAID
+    # Gemini call per job, so meter it under a per-user/day ceiling — unlimited job-adds must
+    # not drive unbounded embedding spend (wallet-drain defense). ``_consume_counter`` commits
+    # immediately (its cross-instance contract requires "check before real work"), so it MUST
+    # run BEFORE the job/Application writes below: otherwise its commit would split job
+    # creation into two transactions, and a failure in between (e.g. a slow Gemini call killed
+    # by the serverless budget) could orphan a JobPosting with no Application/usage row. We
+    # only consume a slot when a real paid call would fire (a Gemini key is present); the
+    # keyless heuristic path is free and always allowed. (Note: the very first scored job for a
+    # user makes 2 embedding calls — resume + JD — but consumes 1 slot; harmless, the resume
+    # embedding is cached thereafter.)
+    may_score = not llm_available() or _consume_counter(
+        db, user.id, "score_daily", SCORE_DAILY_CEILING, 86400
+    )
+
     job = JobPosting(
         user_id=user.id,
         title=data.title,
@@ -838,16 +853,11 @@ def create_job(
     db.add(job)
     db.flush()
 
-    # Score (heuristic fallback when no Gemini key — never crashes). The embedding-based
-    # scorer makes a PAID Gemini call per job; meter it under a per-user/day scoring ceiling
-    # so unlimited job-adds can't drive unbounded embedding spend (wallet-drain defense). We
-    # only consume a slot when a real paid call would actually fire (a Gemini key is present);
-    # the keyless heuristic path is free and always allowed. Over the ceiling the job is still
-    # created, just UNSCORED — the same graceful outcome as a scoring error, never a blocked add.
+    # Score (heuristic fallback when no Gemini key — never crashes). Over the ceiling the job
+    # is still created, just UNSCORED (the same graceful outcome as a scoring error) — never a
+    # blocked add. A False ``may_score`` here always means "key present but over the ceiling".
     scored = False
-    if not llm_available() or _consume_counter(
-        db, user.id, "score_daily", SCORE_DAILY_CEILING, 86400
-    ):
+    if may_score:
         try:
             JobScorer(db).score_job(job, user)
             scored = True
