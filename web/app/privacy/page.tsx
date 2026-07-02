@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 
 export default function PrivacyPage() {
   return (
-    <LegalPage title="Privacy Policy" updated="June 28, 2026">
+    <LegalPage title="Privacy Policy" updated="July 2, 2026">
       <p>
         Career Operator (&ldquo;we,&rdquo; &ldquo;us&rdquo;) helps you run your job search:
         scoring roles against your background, generating interview prep, and tracking your

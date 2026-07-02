@@ -63,6 +63,25 @@ def test_scoring_works_without_consent_via_local_heuristic(client):
     assert job["score"] is not None
 
 
+def test_scoring_makes_no_embedding_call_without_consent_even_with_key(client, monkeypatch):
+    """Even with a Gemini key present, adding a job WITHOUT consent must NOT send the resume/JD
+    to Gemini — scoring stays on the local heuristic. Mirrors the aggressive prep/coach checks:
+    the embedding call raises if ever reached, proving no third-party share occurs pre-consent
+    (Apple 5.1.2(i)), while the job is still created with a real heuristic score."""
+    monkeypatch.setattr(asgi, "llm_available", lambda: True)
+
+    def _boom(self, text):  # noqa: ANN001
+        raise AssertionError("get_embedding must not run before consent")
+
+    monkeypatch.setattr(asgi.JobScorer, "get_embedding", _boom)
+
+    token = _register(client)
+    job = _add_job(client, token)
+    # No embedding call fired (else _boom would raise, be caught, and leave the job unscored);
+    # the local heuristic still produced a real score.
+    assert job["score"] is not None
+
+
 # --------------------------------------------------------------------------- #
 # Consent state round-trips (grant + revoke) via the API
 # --------------------------------------------------------------------------- #
