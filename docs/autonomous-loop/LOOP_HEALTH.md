@@ -45,5 +45,9 @@ LOOP_HEALTH:
     enforced_in_ci: true         # validate-capabilities runs inside the required `preflight` check
     capabilities_total: 6
     unmet: []                    # ai closed 2026-07-02: GEMINI_API_KEY added to CI, test_llm_live.py real round-trip green
+  eval_coverage:                 # OUTPUT-quality coverage (compute: scripts/check_eval_coverage.py --report)
+    enforced_in_ci: true         # check_eval_coverage runs inside the required `preflight` check
+    ai_features_total: 3         # fit-scoring, prep-pack, coach
+    with_real_output_eval: 3     # each judged on REAL Gemini output in CI (tests/evals/test_ai_output_evals.py)
   signal: improving              # bootstrapping | improving | steady | churning | stuck — 3 shipped, 0 abandoned, 0 circuit-breaker trips. Headline: built the #1 ship-critical LOOP-BUILDABLE gap — Career+ ($24) as a REAL, webhook-verified, differentiated tier (was dead config) with AI salary-negotiation coaching as its additive exclusive, across backend/web/mobile. maker≠checker earned its keep HARD: an adversarial scout killed a dark-pattern design at the DESIGN stage, and 2 formal REQUEST_CHANGES caught a real wasted-LLM-call bug + a real paywall honesty/dead-end bug, all fixed cycle 1. HONEST on the number: Career+ does NOT flip the floor (recorded as real-but-unquantified, no inflation); TEAM/B2B2C remains the primary floor-lever. No recurring wall → no harness proposal warranted.
 ```

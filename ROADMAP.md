@@ -372,6 +372,17 @@ marked connected/available) — a real number with no source is a fabrication ri
 dims ≥ A. Green on pre-launch feeds (all 0/null). The Growth Agent must set a metric to 0/null
 until its source is connected, or declare the connected source + a `gtm-connect-*` OWNER_ACTION.
 
+### Eval coverage (every AI-output feature is evaluated — and grows with the product)
+Two layers per AI feature: a **deterministic** eval (golden/structure, fake LLM, key-free) AND a
+**real-output** eval that judges the ACTUAL Gemini output (substantive / on-topic / structured /
+safe), which runs in CI when `GEMINI_API_KEY` is set. `scripts/check_eval_coverage.py` (required,
+in `preflight`) fails CLOSED if a NEW LLM-using module in `src/` (get_llm_client / chat /
+embeddings) is not declared in `docs/ci/EVAL_COVERAGE.md` with both eval kinds — so coverage
+can't drift behind new features. Current: fit-scoring, prep-pack, coach — all with real-output
+evals (`tests/evals/test_ai_output_evals.py`). Real-output assertions stay tolerant (length /
+relevance / structure), not exact strings; an LLM-as-judge scorer is a future upgrade that must
+prove non-flaky before it gates. A new AI feature MUST add its module + both evals here.
+
 ### Readiness audit gate (two gates; maker ≠ checker)
 The box-ticker is **not** the sole certifier. Submission-readiness requires BOTH:
 1. `scripts/preflight.sh` exits **0**; and

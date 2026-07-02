@@ -134,6 +134,9 @@ $PY scripts/check_validation.py || fail "self-validation gate failed (see docs/c
 sect "GTM honesty gate (no GROWTH_STATUS metric without a connected source)"
 $PY scripts/validate_gtm.py || fail "validate-gtm failed (a GTM metric has no source, or GTM_SCORECARD invalid)"
 
+sect "eval coverage (every AI-output module has a deterministic + real-output eval)"
+$PY scripts/check_eval_coverage.py || fail "eval-coverage gate failed (see docs/ci/EVAL_COVERAGE.md)"
+
 if [ "$MODE" = "ci" ]; then
   echo ""; echo "PREFLIGHT(ci): mechanical gate GREEN"; exit 0
 fi

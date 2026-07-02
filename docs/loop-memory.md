@@ -4,6 +4,22 @@ Durable lessons for the factory loop. Append dated entries. Keep it honest and s
 
 ---
 
+### 2026-07-02 — Eval coverage upgraded from deterministic to REAL-OUTPUT + made a growing ratchet
+The eval suite was ALL deterministic (golden math / prep-pack STRUCTURE with a fake LLM) — nothing
+judged real Gemini output quality. Now that GEMINI_API_KEY is in CI, added tests/evals/
+test_ai_output_evals.py: real-output evals for the 3 AI features (prep-pack substantive+structured,
+coach substantive+on-topic, fit-scoring real-embedding-path -> valid score). skipif no key +
+restore the key via monkeypatch (same conftest GEMINI_API_KEY_LIVE stash as test_llm_live). Made
+it a GROWING ratchet: docs/ci/EVAL_COVERAGE.md (per-feature manifest) + scripts/check_eval_coverage.py
+(required in preflight) scans src/ for LLM-using modules and FAILS if a new one isn't declared with
+a deterministic AND a real-output eval — so coverage can't drift behind new AI features. LOOP_HEALTH
+eval_coverage block (ai_features_total=3, with_real_output_eval=3) + ROADMAP standing standard.
+KEY DESIGN CALL: real-output assertions are TOLERANT (length/relevance/structure/safety), not exact
+strings or an LLM-judge, so the required gate stays non-flaky; LLM-as-judge is a future upgrade that
+must prove non-flaky before gating. Verified: gate passes + blocks a simulated undeclared LLM module;
+real evals confirmed RUNNING green in CI (not skipped).
+
+
 ### 2026-07-02 — AI capability validated for real in CI (owner added GEMINI_API_KEY)
 Closed the last self-validation gap. Owner added a spend-capped GEMINI_API_KEY as a GitHub
 Actions secret; ci.yml passes it to the preflight-ci job (PR #160) so tests/test_llm_live.py
