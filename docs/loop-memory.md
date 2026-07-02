@@ -4,6 +4,18 @@ Durable lessons for the factory loop. Append dated entries. Keep it honest and s
 
 ---
 
+### 2026-07-02 — AI capability validated for real in CI (owner added GEMINI_API_KEY)
+Closed the last self-validation gap. Owner added a spend-capped GEMINI_API_KEY as a GitHub
+Actions secret; ci.yml passes it to the preflight-ci job (PR #160) so tests/test_llm_live.py
+now exercises a REAL Gemini chat+embedding round-trip instead of skipping. After VERIFYING the
+live test actually RAN + passed in CI (not skipped — checked the preflight-ci log), flipped
+VALIDATION.md `ai` -> validation: real / key_in_ci: true / owner_action: null; LOOP_HEALTH
+validation.unmet -> []; OWNER_ACTION validation-capability-gemini -> done. LESSON: a manifest
+"validation: real" claim is only honest if the covering test genuinely RUNS in CI — a skipif
+test that silently skips would let a false "real" merge, so confirm from the CI log that it ran,
+never just that the check was green. All external capabilities now validated (real or mock).
+
+
 ### 2026-07-01 (run 13) — Career+ ($24) built as a REAL, differentiated, webhook-verified tier (the #1 ship-critical business-case-strength gap) — 3 file-disjoint PRs (backend/web/mobile)
 The independent Quality Auditor re-graded THIS day (scorecard now FRESH, Overall B): the two
 remaining sub-A ship-critical dims are **business-case-strength C** and **store-readiness C**.
