@@ -975,6 +975,32 @@ def create_job(
     db: Session = Depends(get_db),
 ):
     auth = AuthService(db)
+
+    # Idempotency guard: a re-submit of an IDENTICAL posting (same user + title + company + url)
+    # returns the EXISTING job instead of inserting a duplicate row. Without this, a double-click
+    # / network retry / offline replay creates duplicate JobPostings AND double-fires every
+    # side-effect — a wasted paid re-score against the daily ceiling, a double usage-count against
+    # the free-tier cap, and a corrupted analytics funnel (job_added counted twice). Placed BEFORE
+    # the usage-limit check so re-submitting a job you already track never trips the cap (you are
+    # not adding a NEW job). ``url`` may be NULL — SQLAlchemy renders ``== None`` as ``IS NULL``.
+    existing = (
+        db.query(JobPosting)
+        .options(
+            selectinload(JobPosting.application),
+            selectinload(JobPosting.score),
+            selectinload(JobPosting.company),
+        )
+        .filter(
+            JobPosting.user_id == user.id,
+            JobPosting.title == data.title,
+            JobPosting.company_name == data.company_name,
+            JobPosting.url == data.url,
+        )
+        .first()
+    )
+    if existing is not None:
+        return {"success": True, "job": job_public(existing), "duplicate": True}
+
     limits = auth.check_usage_limits(user)
     if not limits["can_add_job"]:
         raise HTTPException(
