@@ -45,6 +45,26 @@ def test_fetch_job_details_parses_content_and_department():
     assert client.last_error is None
 
 
+def test_fetch_job_details_survives_department_without_name():
+    """A department object present but missing "name" must NOT KeyError-500 the fetch — the
+    optional field degrades to None while the job still parses (real-world partial payload)."""
+    client = GreenhouseClient("acme")
+    payload = {
+        "id": 7,
+        "title": "Data Engineer",
+        "location": {"name": "NYC"},
+        "content": "ETL, warehousing.",
+        "departments": [{"id": 123}],  # malformed: no "name" key
+        "absolute_url": "https://example.com/jobs/7",
+    }
+    with patch("src.ingestion.greenhouse.requests.get", return_value=_Resp(payload)):
+        listing = client.fetch_job_details("7")
+
+    assert listing is not None
+    assert listing.title == "Data Engineer"
+    assert listing.department is None  # gracefully absent, not a crash
+
+
 def test_fetch_job_details_returns_none_on_http_error():
     import requests
 

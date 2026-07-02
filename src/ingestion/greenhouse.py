@@ -67,9 +67,11 @@ class GreenhouseClient(BaseATSClient):
         location = job_data.get("location", {}).get("name", "")
         content = job_data.get("content", "")
 
-        # Parse departments
+        # Parse departments. Use ``.get("name")`` — a Greenhouse department object can be
+        # present but lack a "name" key (partial/malformed API payload), and a bare
+        # ``["name"]`` would raise KeyError and 500 the whole detail fetch on one bad job.
         departments = job_data.get("departments", [])
-        department = departments[0]["name"] if departments else None
+        department = departments[0].get("name") if departments else None
 
         return JobListing(
             external_id=str(job_data["id"]),
