@@ -98,17 +98,22 @@ VALIDATION_CAPABILITIES:
     owner_action: analytics-read-token
   - id: email
     service: "Email provider abstraction (Track H): waitlist double-opt-in confirmation"
-    env: [EMAIL_BACKEND]      # selector only (not a secret): dryrun (default) | capture (tests).
-                              # The confirm token reuses JWT_SECRET (declared under `auth`) — no new secret.
+    env: [EMAIL_BACKEND, SMTP_HOST, SMTP_PORT, SMTP_FROM, SMTP_USERNAME, SMTP_PASSWORD, SMTP_STARTTLS, SMTP_TIMEOUT]
+                              # EMAIL_BACKEND selects the backend: dryrun (default) | capture (tests) | smtp (real).
+                              # SMTP_* configure the real SMTPBackend (owner-provided; NEVER committed). The confirm
+                              # token reuses JWT_SECRET (declared under `auth`) — no new token secret.
     used_for: "dispatching the waitlist confirmation email + the double-opt-in round-trip"
-    validation: real          # the send + confirm round-trip is fully exercised in CI via the in-memory
-                              # capture backend (tests/journeys/test_waitlist_double_optin.py). Default prod
-                              # backend is dry-run: it degrades HONESTLY (row captured, no fake 'sent' claim),
-                              # so the app is fully functional with NO provider connected. Wiring a real ESP for
-                              # production deliverability is a future owner-connect; the flow does not depend on it.
-    covered_by: tests/journeys/test_waitlist_double_optin.py
+    validation: real          # BOTH paths exercised in CI without any live secret: (1) the send + confirm
+                              # round-trip via the in-memory capture backend (tests/journeys/test_waitlist_double_optin.py);
+                              # (2) the real SMTPBackend envelope/STARTTLS/login/failure-handling via a monkeypatched
+                              # smtplib.SMTP (tests/test_email_smtp.py). Default prod backend is dry-run: it degrades
+                              # HONESTLY (row captured, no fake 'sent' claim; delivered=False), so the app is fully
+                              # functional with NO provider connected. EMAIL_BACKEND=smtp with incomplete SMTP_* config
+                              # fails LOUD (explicit log) and falls back to dry-run — never a silent no-op (§28).
+    covered_by: tests/journeys/test_waitlist_double_optin.py   # + tests/test_email_smtp.py (SMTPBackend)
     key_in_ci: false
-    blocking: false           # non-critical: no provider -> honest dry-run; signup still works, no dead-end
+    blocking: false           # non-critical: no provider -> honest dry-run; signup still works, no dead-end.
+                              # Real production deliverability needs the owner's SMTP_* config (OWNER_ACTION connect-marketing).
     owner_action: null
 ```
 
