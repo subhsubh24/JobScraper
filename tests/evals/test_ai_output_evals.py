@@ -18,11 +18,11 @@ from src.db.models import JobPosting, PrepArtifact, User, UserTier
 
 LIVE_KEY = os.getenv("GEMINI_API_KEY_LIVE") or os.getenv("GEMINI_API_KEY") or ""
 
-pytestmark = pytest.mark.skipif(
+pytestmark = [pytest.mark.live, pytest.mark.skipif(
     not LIVE_KEY,
     reason="No real GEMINI_API_KEY in CI — real-output evals skipped (degraded mode). "
     "See OWNER_ACTION validation-capability-gemini.",
-)
+)]
 
 
 def _seed(db, tier=UserTier.PREMIUM):

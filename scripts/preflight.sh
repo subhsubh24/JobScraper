@@ -51,12 +51,15 @@ if [ -d tests ]; then
   # otherwise so the gate still works without the plugin. The threshold lives ONLY in
   # setup.cfg ([coverage:report] fail_under) — coverage.py reads it automatically, so there
   # is no duplicated number here to drift out of sync.
+  # `-m "not live"`: skip the REAL external-API tests (Gemini/Stripe) per-PR — they run
+  # NIGHTLY (.github/workflows/nightly.yml) so PRs stay fast + make no live calls. The
+  # deterministic evals still run here.
   if $PY -c "import pytest_cov" >/dev/null 2>&1; then
-    $PY -m pytest -q --cov --cov-report=term-missing tests \
+    $PY -m pytest -q -m "not live" --cov --cov-report=term-missing tests \
       || fail "pytest failed or coverage below the setup.cfg floor"
     ok "pytest green + coverage floor met (setup.cfg)"
   else
-    $PY -m pytest -q tests || fail "pytest failed"
+    $PY -m pytest -q -m "not live" tests || fail "pytest failed"
     ok "pytest green (coverage skipped: pytest-cov not installed)"
   fi
 else

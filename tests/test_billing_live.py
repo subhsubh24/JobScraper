@@ -20,11 +20,11 @@ STRIPE_KEY = os.getenv("STRIPE_SECRET_KEY") or ""
 # the first plan whose Stripe Price ID is configured in this environment
 CONFIGURED_PLAN = next((plan for plan, env in billing._PLAN_PRICE_ENV.items() if os.getenv(env)), None)
 
-pytestmark = pytest.mark.skipif(
+pytestmark = [pytest.mark.live, pytest.mark.skipif(
     not (STRIPE_KEY.startswith("sk_test") and CONFIGURED_PLAN),
     reason="No Stripe TEST key (sk_test_) + configured price in CI — real billing validation "
     "skipped. See OWNER_ACTION stripe-account.",
-)
+)]
 
 
 def test_real_stripe_test_mode_checkout_session(db_session):

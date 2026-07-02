@@ -25,21 +25,10 @@ jobs:
             mobile/package-lock.json
       - run: cd web && npm ci
       - run: cd mobile && npm ci
+      # No live-API secrets here: the REAL Gemini/Stripe tests are marked `live` and deselected
+      # per-PR (`pytest -m "not live"` in preflight). They run NIGHTLY (.github/workflows/nightly.yml)
+      # so PRs stay fast and never make live calls.
       - run: bash scripts/preflight.sh ci
-        # Real-AI round-trip: when GEMINI_API_KEY is set as an Actions secret, pytest's
-        # tests/test_llm_live.py exercises a real Gemini chat+embedding call (upgrading the
-        # `ai` capability from degraded_only -> real). Absent, the var is empty and that test
-        # skips (safe no-op) — so this can be wired ahead of the owner adding the secret.
-        env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          # Real Stripe TEST-MODE validation: when these sk_test_/price secrets are set,
-          # tests/test_billing_live.py creates a REAL test-mode Checkout Session (no money),
-          # upgrading `billing` mock -> real. Absent -> that test skips (safe no-op). Use a
-          # sk_test_ key ONLY — the test refuses a live key. See OWNER_ACTION stripe-account.
-          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
-          STRIPE_PRICE_PRO_MONTHLY: ${{ secrets.STRIPE_PRICE_PRO_MONTHLY }}
-          STRIPE_PRICE_PRO_ANNUAL: ${{ secrets.STRIPE_PRICE_PRO_ANNUAL }}
-          STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
 
   functional-journeys:
     name: functional journeys (web E2E)

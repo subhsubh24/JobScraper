@@ -1,0 +1,28 @@
+name: Nightly (live API validation)
+# Runs the REAL external-API tests (marked `live`: Gemini + Stripe test-mode) on a schedule
+# instead of every PR — so PRs stay fast and make no live calls, while the real integrations
+# are still validated daily. A failure here means a real integration broke (GitHub emails the
+# owner on a failed scheduled run). Also manually runnable via the Actions tab.
+on:
+  schedule:
+    - cron: "0 8 * * *"   # 08:00 UTC daily
+  workflow_dispatch:
+
+jobs:
+  live:
+    name: live API validation (Gemini + Stripe test-mode)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -r requirements-dev.txt
+      - name: Run the live (real external API) tests
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          STRIPE_PRICE_PRO_MONTHLY: ${{ secrets.STRIPE_PRICE_PRO_MONTHLY }}
+          STRIPE_PRICE_PRO_ANNUAL: ${{ secrets.STRIPE_PRICE_PRO_ANNUAL }}
+          STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+        run: python -m pytest -m live -v tests

@@ -75,8 +75,18 @@ DEFERRED (named, buildable): **AI-consent gate** (Track D, dedicated next run); 
 floor-lever epic + owner GTM); coach 100-msg/mo enforcement (honesty, wants the migration slot); /api/jobs/{id} N+1
 + /api/analytics/pipeline pagination + free-tier TOCTOU (pre-launch 0-row polish); web screenshot regen
 (design-taste A+ artifact refresh); markdown list a11y roles (skipped — unsupported-RN-role risk). OWNER-BLOCKED
-(PENDING_OPS): mobile IAP client, store asset images/brand icon, CAPTCHA keys, CAREERPLUS_* Stripe price IDs.
-
+(PENDING_OPS): mobile IAP client, store asset images/brand icon, CAPTCHA keys, CAREERPLUS_* Stripe price IDs.### 2026-07-02 — Live (real external-API) tests moved from per-PR to NIGHTLY
+The real Gemini/Stripe tests (test_llm_live, evals/test_ai_output_evals, test_billing_live) were
+running on EVERY PR (live calls + token/API cost per PR). Marked them all `@pytest.mark.live`
+(registered in setup.cfg), and preflight now runs `pytest -m "not live"` — so per-PR is fast and
+makes ZERO live calls (deterministic + mock layer only). Added .github/workflows/nightly.yml
+(cron 08:00 UTC + workflow_dispatch) that runs `pytest -m live` with the Gemini+Stripe secrets;
+removed those secrets from the preflight-ci job. VALIDATION.md/EVAL_COVERAGE.md note the cadence:
+`real` capabilities (ai, billing) + real-output evals are still CI-validated, just NIGHTLY — a
+real integration break is caught nightly (GitHub emails on failed scheduled run), not on the PR.
+Coverage floor unaffected (live tests skip locally anyway, so deselecting == current local
+behavior, still >=75). TRADEOFF accepted by owner: cost/speed per-PR vs immediacy of catching a
+real-integration break.
 
 ### 2026-07-02 — Stripe billing: staged the mock->real upgrade (owner adds test-mode secrets)
 The `billing` capability is validation:mock — the webhook signature round-trip is ALREADY real
