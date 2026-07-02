@@ -4,6 +4,80 @@ Durable lessons for the factory loop. Append dated entries. Keep it honest and s
 
 ---
 
+### 2026-07-02 (run 14) — Maximal run: 4 file-disjoint PRs (scoring wallet-drain ceiling, greenhouse KeyError, mobile emoji→icon, store-docs 3-tier + Apple AI-consent) + full 8-scout deep audit
+Ran the full 8-scout sweep (functional-reality / security / business-case+PMF / store+artifact-freshness /
+backend-correctness / web-design / mobile-design / performance+quality-reconcile) doubling as the ~daily DEEP
+AUDIT. Functional-reality found NO ship-critical break (core web+mobile loops + side-effects sound; its only
+finding — GET /api/jobs/{id} lacks selectinload — is a known pre-launch N+1 polish, deferred). Shipped 4
+file-DISJOINT PRs through 2 Sonnet reviewers each + the CI gate:
+- **#168 security wallet-drain (the asgi.py owner)** — the embedding-based scorer fires a PAID Gemini embedding
+  per new job in create_job, a path check_llm_ceiling (prep/coach/salary) does NOT cover → an account with
+  unlimited jobs (any paid tier) could drive unbounded embedding spend. Added a per-user/day `score_daily`
+  ceiling (SCORE_DAILY_CEILING=100) via the existing cross-instance _consume_counter, consumed ONLY when
+  llm_available() (a real paid call would fire); keyless heuristic path is free/unmetered; over the ceiling the
+  job is created UNSCORED (never blocked). **maker≠checker earned its keep HARD**: BOTH Sonnet reviewers
+  INDEPENDENTLY caught a REAL atomicity bug — _consume_counter commits immediately, so placing the check AFTER
+  db.add(job)/db.flush() split job creation into two transactions → a failure in between (e.g. a slow embedding
+  killed by the 60s serverless budget) could ORPHAN a JobPosting with no Application/usage row (+ a free-tier
+  count bypass). Fixed by moving the may_score decision BEFORE any write (it only needs user.id + llm_available);
+  added a load-bearing regression test (a later-step failure leaves ZERO orphaned rows). Two fresh re-reviewers
+  MUTATION-verified the test in isolated worktrees (pre-fix ordering → count==1 → fails) and APPROVED. Fixed
+  within cycle 1 (≤2 cap honored).
+- **#169 greenhouse KeyError** — fetch_job_details parsed departments[0]["name"]; a dept object present-but-
+  missing "name" (partial API payload) raised KeyError, which the method's except (RequestException only) does
+  NOT catch → 500 on import-preview. Fixed to .get("name") + load-bearing test. DISTINCT from the run-8
+  empty-list false positive (that was guarded by `if departments`; this is the missing-KEY case). BOTH APPROVE.
+- **#171 mobile emoji→icon** — the store-required "Report this response" control used a raw emoji ⚑ (an explicit
+  VISION avoid-list violation: no emoji-as-iconography) → Ionicons flag-outline (the icon set already used in the
+  app). KEPT the intentional low-emphasis (a report control is a safety net, not a CTA) — REJECTED the mobile
+  scout's "make it primary" suggestion; Reviewer B independently agreed the maker's low-emphasis call was correct.
+  Verified locally (tsc --noEmit clean, expo lint 0, jest report-button 2/2). BOTH APPROVE.
+- **#172 store-docs freshness** — ASO_COPY said "Free vs Premium" (2 tiers) and implied a single $12 "Premium"
+  INCLUDING salary-negotiation, but the product ships 3 tiers (Free/Pro $12/Career+ $24) with salary-negotiation
+  as a Career+ EXCLUSIVE (#152/153/155) → the store copy misrepresented pricing to App Review. Fixed to an honest
+  3-tier structure claiming ONLY the BUILT Career+ exclusive (deliberately NOT the aspirational outreach/priority
+  from the internal pricing table). APP_PRIVACY_LABELS names the Career+ Gemini flow; ACCEPTANCE_AUDIT re-validated
+  vs CURRENT 2026 guidelines (WebSearch) + added row A11 (below). BOTH APPROVE.
+LESSONS: (1) **maker≠checker's biggest win this run was the #168 atomicity bug** — both reviewers, independently,
+saw that _consume_counter's eager commit turns "check after the job flush" into a two-transaction split; a self-
+review would have missed it (the tests were green). RULE: any NEW _consume_counter call site must run BEFORE the
+endpoint's real writes (its "check before real work" contract) — otherwise its mid-request commit fragments the
+transaction. (2) **SKEPTICISM killed two scout false-positives before building**: the mobile scout's "job score not
+grouped for screen readers" was FALSE (the JobRow Pressable ALREADY carries a full accessibilityLabel incl. the fit
+score — the individual Text nodes aren't separately announced), and its markdown `list`/`listitem` roles were
+dropped (risk of an unsupported-RN-AccessibilityRole tsc failure on a marginal a11y gain). Verified against the
+code, built neither — anti-padding discipline. (3) **A big cross-stack store-compliance feature is DOCUMENTED-then-
+dedicated, not rushed** — the new Apple AI-consent requirement (A11) is a backend-gate + web + mobile UI + revoke
+epic; jamming it into a 4-PR run would produce a shallow, possibly non-compliant gate. Recorded it as a ROADMAP
+Track D item for a dedicated next run (same discipline as the GenAI report affordance #142).
+NEW FINDING — Apple 5.1.2(i) third-party-AI consent (Track D, ship-critical, LOOP-BUILDABLE): Apple's Nov-2025
+guideline update (in effect for 2026 review) requires EXPLICIT, unbundled, revocable consent BEFORE sharing
+personal data with a third-party AI (we send resume/JD/coach text to Google Gemini) — a privacy-policy blanket does
+NOT satisfy it. We have no consent gate. Cited (Apple guidelines + TechCrunch 2025-11-13), added to ACCEPTANCE_AUDIT
+(A11 FAIL) + ROADMAP Track D as the dedicated next-run centerpiece.
+STALE-ARTIFACT FINDING (design-taste A→A+): the scorecard AND this run's web-design scout keep flagging a 390px
+header email-overlap in web/e2e/__screenshots__/app-dashboard-empty-mobile.png — but the LIVE code
+(web/app/app/layout.tsx:38) already has `hidden ... sm:block` (email hidden below 640px). VERIFIED by opening the
+PNG: the email IS visible in the committed image, so the SCREENSHOT is STALE (captured before the `hidden` fix),
+NOT a live bug. Real action = regenerate the screenshots (needs node+Playwright+running API+seeded DB — heavy/
+fragile), deferred; recorded so the Quality Auditor + next run treat it as an ARTIFACT refresh, not a code fix
+(never "fix" already-correct code).
+BUSINESS-CASE re-confirm (no change to the number): the business-case scout, with cited 2026 outplacement/bootcamp
+seat benchmarks, re-confirmed that NO loop-buildable lever HONESTLY flips the $100K floor pre-launch — team/B2B2C
+CODE is buildable but crediting ANY ARR at 0 users is gaming; annual-first is ~2-5% ARPA (still below floor); coach
+100-msg/mo enforcement is zero-revenue honesty. floor_met_year1 stays false; TEAM/B2B2C remains the named primary
+floor-lever (dedicated epic + owner GTM). A genuine pre-launch/market ceiling on the NUMBER, not unbuilt work ignored.
+NO ROADMAP box ticked/un-ticked this run (security/greenhouse advance already-ticked tracks; mobile icon is design
+polish; store-docs advance Track D but ADD a FAIL, honestly leaving it unticked). QUALITY SCORECARD is STALE re
+Career+ (as_of 2026-07-01 still calls Career+ "dead config" though #152/153/155 built it) — the independent Quality
+Auditor should re-grade; consumed as DATA, never self-edited (maker≠checker).
+DEFERRED (named, buildable): **AI-consent gate** (Track D, dedicated next run); **TEAM/B2B2C tier** (primary
+floor-lever epic + owner GTM); coach 100-msg/mo enforcement (honesty, wants the migration slot); /api/jobs/{id} N+1
++ /api/analytics/pipeline pagination + free-tier TOCTOU (pre-launch 0-row polish); web screenshot regen
+(design-taste A+ artifact refresh); markdown list a11y roles (skipped — unsupported-RN-role risk). OWNER-BLOCKED
+(PENDING_OPS): mobile IAP client, store asset images/brand icon, CAPTCHA keys, CAREERPLUS_* Stripe price IDs.
+
+
 ### 2026-07-02 — Stripe billing: staged the mock->real upgrade (owner adds test-mode secrets)
 The `billing` capability is validation:mock — the webhook signature round-trip is ALREADY real
 crypto (test_billing.py), only the outbound checkout.Session.create is mocked. Staged the real
