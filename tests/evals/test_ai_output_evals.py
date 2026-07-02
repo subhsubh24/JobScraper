@@ -82,10 +82,10 @@ def test_coach_real_answer_is_substantive_and_on_topic(db_session, monkeypatch):
 
 def test_fit_score_real_embedding_path_produces_a_valid_score(db_session, monkeypatch):
     monkeypatch.setenv("GEMINI_API_KEY", LIVE_KEY)  # restore the real key so embeddings are real
-    from src.ranking.scorer import JobFitScorer
+    from src.ranking.scorer import JobScorer
 
     user, job = _seed(db_session)
-    score = JobFitScorer(db_session).score_job(job, user)
+    score = JobScorer(db_session).score_job(job, user)
 
     assert score.score is not None and 0 <= float(score.score) <= 100, f"invalid score: {score.score!r}"
     # the REAL embedding path ran (not the heuristic-only fallback): a real resume vector was stored
