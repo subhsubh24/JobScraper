@@ -87,7 +87,8 @@ def test_fit_score_real_embedding_path_produces_a_valid_score(db_session, monkey
     user, job = _seed(db_session)
     score = JobScorer(db_session).score_job(job, user)
 
-    assert score.score is not None and 0 <= float(score.score) <= 100, f"invalid score: {score.score!r}"
+    assert score.overall_score is not None and 0 <= float(score.overall_score) <= 100, \
+        f"invalid score: {score.overall_score!r}"
     # the REAL embedding path ran (not the heuristic-only fallback): a real resume vector was stored
     vec = user.resume_embedding
     if isinstance(vec, str):
