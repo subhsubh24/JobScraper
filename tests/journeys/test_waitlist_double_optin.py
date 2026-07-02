@@ -96,6 +96,23 @@ def test_no_email_sent_without_trusted_base(client, db_session, monkeypatch):
     assert row.email == "notrust@example.com"  # primary side-effect still happened
 
 
+def test_confirm_redirect_is_never_host_derived(client, monkeypatch):
+    # SECURITY REGRESSION (open-redirect / CWE-601): with WEB_APP_URL unset, the confirm
+    # endpoint's redirect Location must be HOST-RELATIVE (same-origin), never built from the
+    # attacker-controlled Host header — even on the invalid-token branch (no valid token needed).
+    monkeypatch.delenv("WEB_APP_URL", raising=False)
+    r = client.get(
+        "/api/waitlist/confirm",
+        params={"email": "x@example.com", "token": "bogus"},
+        headers={"Host": "evil.example.com"},
+        follow_redirects=False,
+    )
+    assert r.status_code == 303
+    loc = r.headers["location"]
+    assert "evil.example.com" not in loc  # attacker Host never reaches the redirect target
+    assert loc.startswith("/waitlist/confirmed")  # host-relative, same-origin by construction
+
+
 def test_dryrun_captures_row_without_faking_delivery(client, db_session):
     # Default state (no provider): the row is still captured, the visitor is NOT dead-ended,
     # and the response does NOT claim an email was sent (no fake success).

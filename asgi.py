@@ -823,7 +823,6 @@ def join_waitlist(data: WaitlistJoin, db: Session = Depends(get_db)):
 
 @app.get("/api/waitlist/confirm", dependencies=[Depends(rate_limit("waitlist_confirm", 30, 3600))])
 def confirm_waitlist(
-    request: Request,
     email: str = Query(..., max_length=255),
     token: str = Query(..., max_length=128),
     db: Session = Depends(get_db),
@@ -831,12 +830,15 @@ def confirm_waitlist(
     """Complete waitlist double-opt-in from the emailed link, then redirect to a thank-you page.
 
     Verifies the stateless HMAC token (bound to the email — a tampered address invalidates it),
-    then idempotently stamps ``confirmed_at``. An invalid/forged token or unknown email
-    redirects with ``status=invalid`` and grants nothing; a valid token always redirects to the
-    same thank-you route (no membership enumeration beyond the identical redirect)."""
-    # Prefer the trusted owner-configured origin; the click arrives via a link built from it,
-    # so request.base_url is only an edge fallback (a bare/direct hit with no WEB_APP_URL set).
-    dest = (_trusted_public_base() or str(request.base_url).rstrip("/")) + "/waitlist/confirmed"
+    then idempotently stamps ``confirmed_at``. A malformed email or invalid/forged token
+    redirects with ``status=invalid`` and grants nothing; an otherwise-valid token redirects
+    with ``status=ok`` (no membership enumeration beyond the identical redirect — a valid token
+    for a non-existent row is a harmless no-op, and forging one needs the server secret)."""
+    # Redirect target uses the TRUSTED owner-configured origin, or a HOST-RELATIVE path when
+    # unset — NEVER request.base_url (the attacker-controlled Host, no TrustedHostMiddleware
+    # here). A relative Location is same-origin by construction, so a spoofed Host can't turn
+    # this branded "confirm" endpoint into an open redirect (CWE-601) to attacker infra.
+    dest = (_trusted_public_base() or "") + "/waitlist/confirmed"
     e = (email or "").strip().lower()
     if not _EMAIL_RE.match(e) or not verify_confirm_token(e, token):
         return RedirectResponse(dest + "?status=invalid", status_code=303)
