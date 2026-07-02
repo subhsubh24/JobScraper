@@ -55,11 +55,13 @@ VALIDATION_CAPABILITIES:
     service: "Stripe Checkout + webhook"
     env: [STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET]
     used_for: "subscription purchase + entitlement grant"
-    validation: mock          # real checkout call mocked + a signature-VERIFIED webhook round-trip
-    covered_by: tests/test_billing.py
-    key_in_ci: false
+    validation: real          # test-mode: a REAL checkout.Session.create against Stripe's TEST API
+                              # (tests/test_billing_live.py) + the signature-VERIFIED webhook round-trip
+                              # (tests/test_billing.py, real crypto). LIVE prod keys tracked separately.
+    covered_by: tests/test_billing_live.py
+    key_in_ci: true
     blocking: false
-    owner_action: stripe-account
+    owner_action: null
   - id: mobile-billing
     service: "RevenueCat webhook (mobile entitlement)"
     env: [REVENUECAT_WEBHOOK_AUTH]
