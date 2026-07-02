@@ -5,9 +5,13 @@ create/verify (HMAC-SHA256) are only exercised INDIRECTLY today, through the reg
 HTTP flow. That leaves the failure branches — a tampered signature, an expired token, a
 malformed token, a wrong password — without a direct assertion, so a silent security
 regression could pass the happy-path integration tests. These tests pin the primitives
-themselves. Each is mutation-provable: e.g. replacing ``hmac.compare_digest`` with ``==`` in
-signature verification, or dropping the expiry check, makes a test here fail while the
-HTTP-flow tests stay green.
+themselves. Each is mutation-provable on the FUNCTIONAL contract: dropping (or short-circuiting)
+the signature comparison in ``verify_token`` makes the tampered-signature/tampered-payload/
+wrong-secret tests fail; dropping the expiry check makes the expired-token test fail; making the
+hash non-salted makes the salted-hash test fail — all while the happy-path HTTP-flow tests stay
+green. (These are functional assertions: they verify that tampering is REJECTED, not the
+constant-time property of ``hmac.compare_digest`` — a timing characteristic a functional unit
+test cannot observe.)
 """
 from datetime import datetime, timedelta
 from types import SimpleNamespace
