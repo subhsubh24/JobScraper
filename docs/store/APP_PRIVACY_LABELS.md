@@ -51,10 +51,13 @@ These are **service providers processing data on our behalf**, not independent d
 > requires **explicit, unbundled, revocable user consent BEFORE** personal data is shared with
 > a third-party AI (Google Gemini here), naming the service and the data — a blanket
 > privacy-policy or account-creation acceptance does **not** satisfy it. Career Operator
-> currently discloses this in the Privacy Policy but does **not** yet gate the first AI call
-> behind an explicit consent prompt. This is a **loop-buildable ship gap** tracked in
-> `ACCEPTANCE_AUDIT.md` (A11) and ROADMAP Track D — build the consent gate + a revoke control
-> before iOS submission.
+> **satisfies this**: a server-enforced consent gate (`require_ai_consent()`) blocks every
+> generative path (prep / salary / coach → `403 ai_consent_required`) BEFORE any Gemini call,
+> and job scoring degrades to a fully-local heuristic pre-consent, so nothing is sent to Gemini
+> without consent. Web + mobile show a consent prompt naming Google Gemini + the data before
+> first AI use, with a Settings review/revoke toggle (`POST`/`DELETE /api/ai-consent`). Shipped
+> in PR #181 (round-trip tested, `tests/test_ai_consent.py`); `ACCEPTANCE_AUDIT.md` A11 is
+> **PASS**. Re-verify against the live guideline text at submission.
 
 ---
 
