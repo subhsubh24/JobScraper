@@ -234,6 +234,15 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
 # Per-user/day ceiling on expensive LLM operations (wallet-drain defense).
 LLM_DAILY_CEILING = int(os.getenv("LLM_DAILY_CEILING", "25"))
 
+# Per-user/day ceiling on the JOB-SCORING embedding call (a SEPARATE, more generous brake).
+# Every new job triggers a paid Gemini embedding of its description in ``score_job`` — a path
+# the feature ceiling above does NOT cover, so an account with unlimited jobs (any paid tier)
+# could drive unbounded embedding spend. This caps the number of PAID scoring calls per user
+# per day; over the cap a job is still created but left UNSCORED (the same graceful outcome as
+# a scoring error) rather than blocking the add or burning money. Kept well above any real
+# daily job-add volume so it never bites a genuine user — only runaway/scripted abuse.
+SCORE_DAILY_CEILING = int(os.getenv("SCORE_DAILY_CEILING", "100"))
+
 
 def _consume_counter(
     db: Session, subject: str, bucket: str, limit: int, window_seconds: int
@@ -815,6 +824,21 @@ def create_job(
             detail="Free tier is limited to 5 tracked jobs. Upgrade to Pro for unlimited.",
         )
 
+    # Decide scoring eligibility BEFORE any DB writes. The embedding-based scorer makes a PAID
+    # Gemini call per job, so meter it under a per-user/day ceiling — unlimited job-adds must
+    # not drive unbounded embedding spend (wallet-drain defense). ``_consume_counter`` commits
+    # immediately (its cross-instance contract requires "check before real work"), so it MUST
+    # run BEFORE the job/Application writes below: otherwise its commit would split job
+    # creation into two transactions, and a failure in between (e.g. a slow Gemini call killed
+    # by the serverless budget) could orphan a JobPosting with no Application/usage row. We
+    # only consume a slot when a real paid call would fire (a Gemini key is present); the
+    # keyless heuristic path is free and always allowed. (Note: the very first scored job for a
+    # user makes 2 embedding calls — resume + JD — but consumes 1 slot; harmless, the resume
+    # embedding is cached thereafter.)
+    may_score = not llm_available() or _consume_counter(
+        db, user.id, "score_daily", SCORE_DAILY_CEILING, 86400
+    )
+
     job = JobPosting(
         user_id=user.id,
         title=data.title,
@@ -829,13 +853,22 @@ def create_job(
     db.add(job)
     db.flush()
 
-    # Score (heuristic fallback when no Gemini key — never crashes).
+    # Score (heuristic fallback when no Gemini key — never crashes). Over the ceiling the job
+    # is still created, just UNSCORED (the same graceful outcome as a scoring error) — never a
+    # blocked add. A False ``may_score`` here always means "key present but over the ceiling".
     scored = False
-    try:
-        JobScorer(db).score_job(job, user)
-        scored = True
-    except Exception:
-        logger.exception("Scoring failed for job %s; continuing unscored", job.id)
+    if may_score:
+        try:
+            JobScorer(db).score_job(job, user)
+            scored = True
+        except Exception:
+            logger.exception("Scoring failed for job %s; continuing unscored", job.id)
+    else:
+        logger.warning(
+            "Per-day scoring ceiling reached for user %s; job %s created unscored",
+            user.id,
+            job.id,
+        )
 
     # Track it: create the pipeline Application row in SAVED.
     db.add(Application(user_id=user.id, job_id=job.id, status=ApplicationStatus.SAVED))
