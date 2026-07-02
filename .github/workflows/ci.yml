@@ -26,6 +26,12 @@ jobs:
       - run: cd web && npm ci
       - run: cd mobile && npm ci
       - run: bash scripts/preflight.sh ci
+        # Real-AI round-trip: when GEMINI_API_KEY is set as an Actions secret, pytest's
+        # tests/test_llm_live.py exercises a real Gemini chat+embedding call (upgrading the
+        # `ai` capability from degraded_only -> real). Absent, the var is empty and that test
+        # skips (safe no-op) — so this can be wired ahead of the owner adding the secret.
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
 
   functional-journeys:
     name: functional journeys (web E2E)
