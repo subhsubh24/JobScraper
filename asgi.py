@@ -13,12 +13,13 @@ import time
 import uuid
 from datetime import datetime
 from typing import Dict, List, Literal, Optional, Tuple
+from urllib.parse import quote
 
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from pydantic import BaseModel, Field, model_validator
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
@@ -50,6 +51,8 @@ from src import analytics
 from src import billing
 from src import mobile_billing
 from src import referrals
+from src.email import EmailMessage, email_enabled, send_email
+from src.email.tokens import make_confirm_token, verify_confirm_token
 
 load_dotenv()
 setup_logging()
@@ -722,23 +725,62 @@ def delete_account(user: User = Depends(get_current_user), db: Session = Depends
 # A generic, identical response for both new and already-present emails: the endpoint must
 # never reveal whether an address is already on the list (enumeration defense, same posture
 # as register/login).
-_WAITLIST_OK = {"success": True, "message": "You're on the list — we'll be in touch."}
+def _waitlist_response() -> dict:
+    """Generic, enumeration-safe success. The message is IDENTICAL for new and existing
+    signups (never reveals membership) and only promises a confirmation email when a provider
+    is actually connected (``email_enabled()``) — otherwise it would be a fake-success claim
+    for an email that never leaves the system (SIDE-EFFECT INTEGRITY)."""
+    if email_enabled():
+        return {"success": True, "message": "You're on the list — check your email to confirm your spot."}
+    return {"success": True, "message": "You're on the list — we'll be in touch."}
+
+
+def _send_waitlist_confirm(email: str, request: Request) -> None:
+    """Best-effort double-opt-in email. NEVER raises — the captured row is the real
+    side-effect, and email must not be able to break signup (mirrors analytics.record_event).
+    With the default dry-run backend nothing is delivered and the visitor is NOT dead-ended:
+    the row is stored and the response makes no false 'check your email' claim."""
+    try:
+        base = _web_base_url(request)
+        token = make_confirm_token(email)
+        url = f"{base}/api/waitlist/confirm?email={quote(email)}&token={token}"
+        send_email(EmailMessage(
+            to=email,
+            subject="Confirm your Career Operator waitlist spot",
+            text_body=(
+                "Thanks for joining the Career Operator waitlist.\n\n"
+                f"Confirm your spot: {url}\n\n"
+                "If you didn't request this, you can ignore this email."
+            ),
+            html_body=(
+                "<p>Thanks for joining the <strong>Career Operator</strong> waitlist.</p>"
+                f'<p><a href="{url}">Confirm your spot</a></p>'
+                "<p>If you didn't request this, you can ignore this email.</p>"
+            ),
+        ))
+    except Exception:  # pragma: no cover - defensive: email is never allowed to break signup
+        logger.warning("waitlist confirm email dispatch failed", exc_info=True)
 
 
 @app.post("/api/waitlist/join", dependencies=[Depends(rate_limit("waitlist", 5, 3600))])
-def join_waitlist(data: WaitlistJoin, db: Session = Depends(get_db)):
-    """Capture a pre-launch waitlist signup.
+def join_waitlist(data: WaitlistJoin, request: Request, db: Session = Depends(get_db)):
+    """Capture a pre-launch waitlist signup + send a double-opt-in confirmation (Track H / F4.1).
 
-    NO email is sent (no provider is wired — gating on an unbuilt email loop would dead-end
-    the visitor; DECISION COROLLARY). The DB row IS the real, verifiable side-effect, which
-    makes visitor->signup measurable. Double-opt-in (confirmation email round-trip) lands
-    with a real/sandbox email provider under Track H / F4.1.
+    The DB row IS the primary, always-present side-effect (makes visitor->signup measurable);
+    it is stored regardless of email deliverability. A confirmation email is then dispatched
+    best-effort via the email abstraction: when a real provider is connected the recipient can
+    click the HMAC-signed link to set ``confirmed_at`` (double-opt-in); with the default
+    dry-run backend nothing is delivered, the visitor is NOT dead-ended, and the response makes
+    no false claim (DECISION COROLLARY — we never gate signup on an email that didn't send).
     """
     email = (data.email or "").strip().lower()
     if not _EMAIL_RE.match(email):
         raise HTTPException(status_code=400, detail="Enter a valid email address.")
     if db.query(Waitlist).filter(Waitlist.email == email).first():
-        return _WAITLIST_OK  # already on the list — indistinguishable from a fresh signup
+        # Already on the list — indistinguishable from a fresh signup; no resend (avoids an
+        # enumeration timing signal + a repeat-submit email-spam vector). The first email's
+        # confirm link still works.
+        return _waitlist_response()
     source = ((data.source or "").strip() or "organic")[:50]
     full_name = ((data.full_name or "").strip() or None)
     db.add(Waitlist(email=email, full_name=full_name, source=source))
@@ -746,9 +788,36 @@ def join_waitlist(data: WaitlistJoin, db: Session = Depends(get_db)):
         db.commit()
     except IntegrityError:
         # A concurrent request won the unique-email slot between the check and the insert.
-        # Still a success for the user, still no enumeration signal.
+        # Still a success for the user, still no enumeration signal, and the winning request
+        # already dispatched the confirm email.
         db.rollback()
-    return _WAITLIST_OK
+        return _waitlist_response()
+    _send_waitlist_confirm(email, request)
+    return _waitlist_response()
+
+
+@app.get("/api/waitlist/confirm", dependencies=[Depends(rate_limit("waitlist_confirm", 30, 3600))])
+def confirm_waitlist(
+    request: Request,
+    email: str = Query(..., max_length=255),
+    token: str = Query(..., max_length=128),
+    db: Session = Depends(get_db),
+):
+    """Complete waitlist double-opt-in from the emailed link, then redirect to a thank-you page.
+
+    Verifies the stateless HMAC token (bound to the email — a tampered address invalidates it),
+    then idempotently stamps ``confirmed_at``. An invalid/forged token or unknown email
+    redirects with ``status=invalid`` and grants nothing; a valid token always redirects to the
+    same thank-you route (no membership enumeration beyond the identical redirect)."""
+    dest = _web_base_url(request) + "/waitlist/confirmed"
+    e = (email or "").strip().lower()
+    if not _EMAIL_RE.match(e) or not verify_confirm_token(e, token):
+        return RedirectResponse(dest + "?status=invalid", status_code=303)
+    row = db.query(Waitlist).filter(Waitlist.email == e).first()
+    if row is not None and row.confirmed_at is None:
+        row.confirmed_at = datetime.utcnow()
+        db.commit()
+    return RedirectResponse(dest + "?status=ok", status_code=303)
 
 
 @app.post("/api/auth/verify-purchase", dependencies=[Depends(rate_limit("auth", 10))])

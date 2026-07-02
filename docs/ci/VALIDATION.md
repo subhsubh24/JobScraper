@@ -96,6 +96,20 @@ VALIDATION_CAPABILITIES:
     key_in_ci: false
     blocking: false           # non-critical: absence disables only the opt-in read endpoint; record_event no-ops safely
     owner_action: analytics-read-token
+  - id: email
+    service: "Email provider abstraction (Track H): waitlist double-opt-in confirmation"
+    env: [EMAIL_BACKEND]      # selector only (not a secret): dryrun (default) | capture (tests).
+                              # The confirm token reuses JWT_SECRET (declared under `auth`) — no new secret.
+    used_for: "dispatching the waitlist confirmation email + the double-opt-in round-trip"
+    validation: real          # the send + confirm round-trip is fully exercised in CI via the in-memory
+                              # capture backend (tests/journeys/test_waitlist_double_optin.py). Default prod
+                              # backend is dry-run: it degrades HONESTLY (row captured, no fake 'sent' claim),
+                              # so the app is fully functional with NO provider connected. Wiring a real ESP for
+                              # production deliverability is a future owner-connect; the flow does not depend on it.
+    covered_by: tests/journeys/test_waitlist_double_optin.py
+    key_in_ci: false
+    blocking: false           # non-critical: no provider -> honest dry-run; signup still works, no dead-end
+    owner_action: null
 ```
 
 When `GEMINI_API_KEY` is present in CI, `tests/test_llm_live.py` automatically exercises a real
