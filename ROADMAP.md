@@ -169,6 +169,14 @@ the guard tests, and **`FACTORY_STANDARD.md`**.
       surfaces it on every AI coach reply + generated prep pack on web AND mobile.
       `tests/test_content_report.py` (8) + `mobile/__tests__/report-button.test.tsx`. Re-verify
       against the live guidelines at submission.
+- [ ] **Third-party-AI consent gate (Apple 5.1.2(i), NEW — surfaced run 14)** — Apple's Nov-2025
+      guideline update (in effect for 2026 review) requires EXPLICIT, unbundled, revocable consent
+      BEFORE sending personal data to a third-party AI. Career Operator sends resume/JD/coach text
+      to Google Gemini with only a privacy-policy disclosure (no gate). Loop-buildable cross-stack
+      epic: a consent gate on first AI use (server-side flag + enforcement on the fit-score/prep/
+      coach/salary paths) + a Settings review/revoke toggle (web + mobile) + honest degrade when
+      declined + a round-trip test. Tracked in `docs/store/ACCEPTANCE_AUDIT.md` (A11 FAIL). The
+      dedicated next-run centerpiece (matches how the GenAI report affordance #142 was handled).
 - [ ] `docs/store/ACCEPTANCE_AUDIT.md` vs CURRENT Apple/Google guidelines, **ZERO open FAILs**
 
 ### E — World-class quality
