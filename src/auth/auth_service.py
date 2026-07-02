@@ -170,14 +170,14 @@ class AuthService:
         self.db.flush()
 
     # ============ TIER MANAGEMENT ============
-
-    def upgrade_to_premium(self, user: User, receipt_data: Optional[str] = None) -> User:
-        """Upgrade a user to premium tier."""
-        # In production, verify the App Store / Play Store receipt here
-        # For now, just upgrade
-        user.tier = UserTier.PREMIUM
-        self.db.flush()
-        return user
+    #
+    # There is deliberately NO `upgrade_to_premium()` here. Entitlement is granted ONLY by a
+    # signature-verified provider webhook (`src/billing.py` for Stripe, `src/mobile_billing.py`
+    # for RevenueCat), which is the single authority that writes `users.tier = PREMIUM`. An
+    # unguarded tier-flip helper (previously present with a "verify the receipt later" TODO) is
+    # a client-trusted-unlock booby-trap: a future caller could grant Premium with no payment
+    # proof, bypassing every verification path. It was removed; `test_no_unguarded_premium_unlock`
+    # is the tripwire that keeps it out.
 
     def check_usage_limits(self, user: User) -> dict:
         """Check if user has exceeded their free tier limits."""
