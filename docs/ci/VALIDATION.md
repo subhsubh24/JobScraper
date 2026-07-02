@@ -30,6 +30,11 @@ Contract (the loop MUST follow; reviewers + the gate enforce it):
   accepted gaps stay `false`. Every gap is ALSO surfaced as an urgent `OWNER_ACTION`
   (`validation-capability-<service>`) AND in the LOOP_HEALTH `validation` block — present in BOTH
   or it's invisible to the owner.
+- **Cadence:** `real` capabilities whose validation makes LIVE external calls (`ai`, `billing`)
+  are exercised by `live`-marked tests that run NIGHTLY (`.github/workflows/nightly.yml`), NOT
+  per-PR — so PRs stay fast + make no live calls. Per-PR runs the deterministic/mock layer; the
+  real layer is still CI-validated, just on a nightly cadence (a real break is caught nightly,
+  not on the PR).
 
 ```yaml
 VALIDATION_CAPABILITIES:

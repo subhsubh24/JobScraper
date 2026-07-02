@@ -9,7 +9,8 @@ product instead of drifting behind it.
 - **deterministic_evals** — golden/structure evals that pin behavior with a fake LLM (fast,
   key-free, run everywhere).
 - **real_output_eval** — judges the ACTUAL Gemini output (substantive / on-topic / structured);
-  runs in CI when `GEMINI_API_KEY` is set (skips locally without a key). Required for every
+  marked `live` and run NIGHTLY (`.github/workflows/nightly.yml`), NOT per-PR (deselected via
+  `pytest -m "not live"`), so PRs stay fast + make no live calls. Required for every
   AI-output feature (the "real on all features" ratchet).
 
 ```yaml

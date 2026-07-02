@@ -16,11 +16,11 @@ import pytest
 # key (e.g. running this file without conftest's blanking).
 LIVE_KEY = os.getenv("GEMINI_API_KEY_LIVE") or os.getenv("GEMINI_API_KEY") or ""
 
-pytestmark = pytest.mark.skipif(
+pytestmark = [pytest.mark.live, pytest.mark.skipif(
     not LIVE_KEY,
     reason="No real GEMINI_API_KEY in CI — real-AI validation skipped (degraded mode). "
     "See OWNER_ACTION validation-capability-gemini.",
-)
+)]
 
 
 def test_real_gemini_chat_responds(monkeypatch):
