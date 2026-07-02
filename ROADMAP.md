@@ -169,14 +169,18 @@ the guard tests, and **`FACTORY_STANDARD.md`**.
       surfaces it on every AI coach reply + generated prep pack on web AND mobile.
       `tests/test_content_report.py` (8) + `mobile/__tests__/report-button.test.tsx`. Re-verify
       against the live guidelines at submission.
-- [ ] **Third-party-AI consent gate (Apple 5.1.2(i), NEW — surfaced run 14)** — Apple's Nov-2025
-      guideline update (in effect for 2026 review) requires EXPLICIT, unbundled, revocable consent
-      BEFORE sending personal data to a third-party AI. Career Operator sends resume/JD/coach text
-      to Google Gemini with only a privacy-policy disclosure (no gate). Loop-buildable cross-stack
-      epic: a consent gate on first AI use (server-side flag + enforcement on the fit-score/prep/
-      coach/salary paths) + a Settings review/revoke toggle (web + mobile) + honest degrade when
-      declined + a round-trip test. Tracked in `docs/store/ACCEPTANCE_AUDIT.md` (A11 FAIL). The
-      dedicated next-run centerpiece (matches how the GenAI report affordance #142 was handled).
+- [x] **Third-party-AI consent gate (Apple 5.1.2(i))** — SHIPPED run 15 (PR #181, 2 Sonnet
+      reviewers + 2 fresh re-reviewers, all APPROVE). `users.ai_consent_at` (migration
+      `d4e7a1c9b8f2`) is a server-enforced, revocable gate: `require_ai_consent()` blocks the
+      generative paths (prep/salary/coach → 403 `ai_consent_required` BEFORE the Gemini call), and
+      job scoring degrades to a fully-local heuristic (`score_job(use_embeddings=False)` — fail
+      closed by default) so nothing is sent to Gemini pre-consent while the core loop still works.
+      `POST`/`DELETE /api/ai-consent` grant/revoke; web + mobile show a consent prompt naming
+      Google Gemini + the data before first AI use + a Settings review/revoke toggle; privacy policy
+      documents it. Round-trip tested (`tests/test_ai_consent.py`: each generative path blocked +
+      makes NO LLM call without consent; scoring works pre-consent; consent unlocks). maker≠checker
+      caught + fixed a fail-open scorer default (both reviewers, independently) before merge.
+      ACCEPTANCE_AUDIT A11 FAIL→PASS.
 - [ ] `docs/store/ACCEPTANCE_AUDIT.md` vs CURRENT Apple/Google guidelines, **ZERO open FAILs**
 
 ### E — World-class quality
