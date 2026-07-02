@@ -29,7 +29,11 @@ let mockUser: Record<string, unknown> = {
   prep_packs_remaining: 1,
 };
 jest.mock('@/contexts/auth', () => ({
-  useAuth: () => ({ user: mockUser, signOut: (...a: unknown[]) => mockSignOut(...a) }),
+  useAuth: () => ({
+    user: mockUser,
+    signOut: (...a: unknown[]) => mockSignOut(...a),
+    setUser: jest.fn(),
+  }),
 }));
 
 jest.mock('@/services/api', () => ({
@@ -37,6 +41,8 @@ jest.mock('@/services/api', () => ({
     apiUrl: 'https://api.example.com',
     referralStats: jest.fn(async () => ({ code: 'ABC123', total_referred: 2, bonus_prep_packs: 1 })),
     deleteAccount: jest.fn(async () => {}),
+    grantAiConsent: jest.fn(async () => ({ ...mockUser, ai_consent: true })),
+    revokeAiConsent: jest.fn(async () => ({ ...mockUser, ai_consent: false })),
   },
 }));
 

@@ -15,6 +15,9 @@ interface AuthState {
   }) => Promise<void>;
   signOut: () => Promise<void>;
   refresh: () => Promise<void>;
+  // Directly set the cached user (e.g. after an endpoint returns the updated user, like the
+  // AI-consent grant/revoke) — avoids a redundant /me round-trip.
+  setUser: (u: User | null) => void;
 }
 
 const AuthContext = createContext<AuthState | undefined>(undefined);
@@ -55,7 +58,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const value = useMemo<AuthState>(
-    () => ({ user, loading, signIn, signUp, signOut, refresh }),
+    () => ({ user, loading, signIn, signUp, signOut, refresh, setUser }),
     [user, loading, signIn, signUp, signOut, refresh],
   );
 

@@ -20,14 +20,16 @@ jest.mock('react-native-safe-area-context', () => {
 });
 
 let mockTier: 'free' | 'premium' = 'premium';
+let mockConsent = true;
 jest.mock('@/contexts/auth', () => ({
-  useAuth: () => ({ user: { id: 'u1', tier: mockTier } }),
+  useAuth: () => ({ user: { id: 'u1', tier: mockTier, ai_consent: mockConsent }, setUser: jest.fn() }),
 }));
 
 jest.mock('@/services/api', () => ({
   api: {
     coachSuggestions: jest.fn(async () => ['How do I negotiate salary?']),
     coachChat: jest.fn(async () => 'Lead with your strongest signal.'),
+    grantAiConsent: jest.fn(async () => ({ id: 'u1', tier: 'premium', ai_consent: true })),
   },
   ApiError: class ApiError extends Error {
     status: number;
@@ -44,6 +46,7 @@ import { api } from '@/services/api';
 afterEach(() => {
   jest.clearAllMocks();
   mockTier = 'premium';
+  mockConsent = true;
 });
 
 describe('CoachScreen', () => {
@@ -56,6 +59,19 @@ describe('CoachScreen', () => {
     // The screen loads suggestions on mount unconditionally; settle that async state inside
     // act() so it can't leak a post-test update.
     await waitFor(() => expect(api.coachSuggestions).toHaveBeenCalled());
+  });
+
+  it('gates a premium user who has NOT consented to third-party AI (no coach call, prompts consent)', async () => {
+    mockTier = 'premium';
+    mockConsent = false;
+    render(<CoachScreen />);
+    // The chat surface must NOT render; the consent prompt does (Apple 5.1.2(i)).
+    expect(screen.getByText('Enable AI features')).toBeTruthy();
+    expect(screen.queryByText('Send')).toBeNull();
+    fireEvent.press(screen.getByText('Turn on AI features'));
+    await waitFor(() => expect(api.grantAiConsent).toHaveBeenCalled());
+    // No message is sent to the AI until consent is granted.
+    expect(api.coachChat).not.toHaveBeenCalled();
   });
 
   it('lets a premium user pick a suggestion and renders the real coach reply', async () => {

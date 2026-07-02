@@ -108,18 +108,35 @@ class JobScorer:
                 found_skills.append(skill)
         return found_skills
 
-    def score_job(self, job: JobPosting, user: User) -> JobScore:
-        """Score a job for a user and save the result."""
-        # Get embeddings
-        try:
-            resume_embedding = self.ensure_user_embedding(user)
-            job_embedding = self.ensure_job_embedding(job)
+    def score_job(
+        self, job: JobPosting, user: User, use_embeddings: bool = False
+    ) -> JobScore:
+        """Score a job for a user and save the result.
 
-            # Calculate semantic similarity (0-1)
-            semantic_score = self.cosine_similarity(resume_embedding, job_embedding)
-        except Exception as e:
-            print(f"Embedding error: {e}")
-            semantic_score = 0.5  # Default if API fails
+        ``use_embeddings`` controls whether the semantic-similarity half uses the third-party
+        AI (Gemini) embeddings. When it is False the scorer runs purely LOCALLY — no personal
+        data leaves the server — using the neutral 0.5 semantic baseline plus the local skills
+        match. Callers pass True ONLY after confirming the user consented to third-party AI
+        sharing (Apple 5.1.2(i)) AND a key is present; the user still gets a real, honest fit
+        score without embeddings, just heuristic-only.
+
+        Default is False = FAIL CLOSED: a caller must OPT IN to sending data to the third party,
+        so a new or forgotten call site can never leak personal data to Gemini by omission.
+        """
+        # Get embeddings (only when allowed — see ``use_embeddings``).
+        if use_embeddings:
+            try:
+                resume_embedding = self.ensure_user_embedding(user)
+                job_embedding = self.ensure_job_embedding(job)
+
+                # Calculate semantic similarity (0-1)
+                semantic_score = self.cosine_similarity(resume_embedding, job_embedding)
+            except Exception as e:
+                print(f"Embedding error: {e}")
+                semantic_score = 0.5  # Default if API fails
+        else:
+            # Consent not granted (or no key): stay fully local, never call the third party.
+            semantic_score = 0.5
 
         # Extract skills
         resume_skills = set(self.extract_skills(user.resume_text or ""))
@@ -198,7 +215,17 @@ class JobScorer:
         return " | ".join(parts)
 
     def score_all_jobs(self, user: User) -> List[JobScore]:
-        """Score all unscored jobs for a user."""
+        """Score all unscored jobs for a user.
+
+        Consent-safe by construction: embeddings (a third-party Gemini call) are used ONLY when
+        a key is present AND the user granted third-party-AI consent (Apple 5.1.2(i)); otherwise
+        every job is scored with the fully-local heuristic. NOTE: this helper is not currently
+        wired to an HTTP route; a future caller that exposes it MUST also enforce the per-user/day
+        embedding spend ceiling (see ``create_job``'s ``_consume_counter`` in asgi.py) — this
+        batch path deliberately does not meter, so it must not be exposed unmetered.
+        """
+        use_embeddings = self.client is not None and user.ai_consent_at is not None
+
         # Get jobs without scores
         jobs = self.db.query(JobPosting).filter(
             JobPosting.user_id == user.id
@@ -209,7 +236,7 @@ class JobScorer:
         scores = []
         for job in jobs:
             try:
-                score = self.score_job(job, user)
+                score = self.score_job(job, user, use_embeddings=use_embeddings)
                 scores.append(score)
             except Exception as e:
                 print(f"Error scoring job {job.id}: {e}")

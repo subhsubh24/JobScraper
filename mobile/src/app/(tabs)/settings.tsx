@@ -4,6 +4,7 @@ import { Alert, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'rea
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button, Card } from '@/components/ui';
+import { AiConsentSetting } from '@/components/ai-consent';
 import { useAuth } from '@/contexts/auth';
 import { api } from '@/services/api';
 import { colors, spacing } from '@/theme';
@@ -133,6 +134,8 @@ export default function SettingsScreen() {
         {user?.tier !== 'premium' ? (
           <Button label="Upgrade to Premium" onPress={() => router.push('/paywall')} />
         ) : null}
+
+        <AiConsentSetting />
 
         <ReferAFriendCard />
 

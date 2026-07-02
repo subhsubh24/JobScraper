@@ -25,9 +25,13 @@ const API_URL: string =
 
 export class ApiError extends Error {
   status: number;
-  constructor(status: number, message: string) {
+  // Machine-readable error code when the API sends a structured `detail`
+  // (e.g. `ai_consent_required`) so callers can branch without matching on message text.
+  code?: string;
+  constructor(status: number, message: string, code?: string) {
     super(message);
     this.status = status;
+    this.code = code;
   }
 }
 
@@ -77,8 +81,19 @@ async function request<T>(path: string, opts: ReqOptions = {}): Promise<T> {
   }
   const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
   if (!res.ok) {
-    const detail = typeof data.detail === 'string' ? data.detail : 'Request failed';
-    throw new ApiError(res.status, detail);
+    // `detail` is usually a string, but some gates send a structured `{ code, message }`
+    // (e.g. ai_consent_required) so the client can branch on the code.
+    const d = data.detail;
+    let message = 'Request failed';
+    let code: string | undefined;
+    if (typeof d === 'string') {
+      message = d;
+    } else if (d && typeof d === 'object') {
+      const obj = d as { code?: string; message?: string };
+      code = obj.code;
+      if (typeof obj.message === 'string') message = obj.message;
+    }
+    throw new ApiError(res.status, message, code);
   }
   return data as T;
 }
@@ -125,6 +140,20 @@ export const api = {
   async referralStats(): Promise<ReferralStats> {
     const r = await request<{ referral: ReferralStats }>('/api/referrals/me');
     return r.referral;
+  },
+
+  // Grant explicit, revocable third-party-AI consent (Apple 5.1.2(i)). Returns the updated
+  // user (ai_consent=true) so the caller can sync auth state without a second /me round-trip.
+  async grantAiConsent(): Promise<User> {
+    const r = await request<{ user: User }>('/api/ai-consent', { method: 'POST' });
+    return r.user;
+  },
+
+  // Revoke third-party-AI consent — generative AI is blocked again and scoring drops to the
+  // local heuristic (no further data sent to the AI provider).
+  async revokeAiConsent(): Promise<User> {
+    const r = await request<{ user: User }>('/api/ai-consent', { method: 'DELETE' });
+    return r.user;
   },
 
   async logout(): Promise<void> {

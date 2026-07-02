@@ -85,7 +85,11 @@ def test_fit_score_real_embedding_path_produces_a_valid_score(db_session, monkey
     from src.ranking.scorer import JobScorer
 
     user, job = _seed(db_session)
-    score = JobScorer(db_session).score_job(job, user)
+    # This eval exists to exercise the REAL Gemini embedding path, so opt in explicitly.
+    # (score_job now defaults use_embeddings=False — fail-closed for third-party-AI consent,
+    # Apple 5.1.2(i) — so the embedding path must be requested deliberately, as the HTTP
+    # create_job route does only after a consent check.)
+    score = JobScorer(db_session).score_job(job, user, use_embeddings=True)
 
     assert score.overall_score is not None and 0 <= float(score.overall_score) <= 100, \
         f"invalid score: {score.overall_score!r}"

@@ -35,6 +35,11 @@ def _add_job(client, token):
     return r.json()["job"]["id"]
 
 
+def _grant_consent(client, token):
+    """Grant third-party-AI consent — required before any generative AI call (Apple 5.1.2(i))."""
+    assert client.post("/api/ai-consent", headers=_auth(token)).status_code == 200
+
+
 class _FakeWorkflows:
     """Stand-in for LLMWorkflows: returns a deterministic artifact-shaped object."""
 
@@ -58,6 +63,7 @@ def _llm_on(monkeypatch):
 
 def test_prep_pack_success_contract(client, _llm_on):
     token = _register(client)
+    _grant_consent(client, token)
     job_id = _add_job(client, token)
     r = client.post("/api/prep-packs/generate", headers=_auth(token), json={"job_id": job_id})
     assert r.status_code == 200, r.text
@@ -73,6 +79,7 @@ def test_prep_pack_success_contract(client, _llm_on):
 def test_prep_pack_free_tier_limit_enforced(client, _llm_on):
     """Free tier is 1 prep pack/month — the 2nd must be refused server-side (403)."""
     token = _register(client, "limited@example.com")
+    _grant_consent(client, token)
     job_id = _add_job(client, token)
     first = client.post("/api/prep-packs/generate", headers=_auth(token), json={"job_id": job_id})
     assert first.status_code == 200, first.text
@@ -83,6 +90,7 @@ def test_prep_pack_free_tier_limit_enforced(client, _llm_on):
 
 def test_prep_pack_unlimited_for_premium(client, _llm_on, db_session):
     token = _register(client, "premium@example.com")
+    _grant_consent(client, token)
     job_id = _add_job(client, token)
     db_session.query(User).update({User.tier: UserTier.PREMIUM})
     db_session.commit()

@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 
 export default function PrivacyPage() {
   return (
-    <LegalPage title="Privacy Policy" updated="June 28, 2026">
+    <LegalPage title="Privacy Policy" updated="July 2, 2026">
       <p>
         Career Operator (&ldquo;we,&rdquo; &ldquo;us&rdquo;) helps you run your job search:
         scoring roles against your background, generating interview prep, and tracking your
@@ -62,6 +62,15 @@ export default function PrivacyPage() {
           representations described above, which we store to power fit scoring. When no AI
           provider is configured, the product falls back to a non-AI heuristic where possible
           rather than failing. We do not use your data to train our own models.
+        </p>
+        <p className="mt-3">
+          <strong>Your consent &amp; control.</strong> We do not send your personal data to
+          Google (Gemini) until you explicitly enable AI features. You are asked before the
+          first time your data would be shared, and you can turn this off at any time in the
+          app&rsquo;s Settings under &ldquo;AI features.&rdquo; With AI features off, fit
+          scoring falls back to a fully on-server heuristic (nothing is sent to Google) and the
+          generative features (prep packs, salary coaching, the AI coach) are unavailable until
+          you turn it back on.
         </p>
       </Section>
 
