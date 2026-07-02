@@ -4,11 +4,13 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { LinkButton } from '@/components/ui';
 import { api } from '@/lib/api';
+import { useAuth } from '@/lib/auth';
 
 type Status = 'checking' | 'active' | 'pending';
 
 export default function BillingSuccessPage() {
   const [status, setStatus] = useState<Status>('checking');
+  const { setUser } = useAuth();
 
   useEffect(() => {
     let cancelled = false;
@@ -20,6 +22,10 @@ export default function BillingSuccessPage() {
         const user = await api.me();
         if (cancelled) return;
         if (user.tier === 'premium') {
+          // Sync the GLOBAL auth context, not just this page's local status — otherwise the
+          // header still shows "Upgrade" and the coach/paywall still gate as free after the
+          // client-side nav to /app (no hard reload), a confusing post-purchase dead-state.
+          setUser(user);
           setStatus('active');
           return;
         }
@@ -37,7 +43,7 @@ export default function BillingSuccessPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [setUser]);
 
   return (
     <main
