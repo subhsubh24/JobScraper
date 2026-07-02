@@ -10,7 +10,7 @@ submission. Everything else the factory builds.
 ```yaml
 OWNER_ACTIONS:
   project: jobscraper
-  as_of: 2026-07-01
+  as_of: 2026-07-02
   items:
     - id: site-gate
       title: "Pre-launch SITE GATE: set SITE_GATE_PASSWORD=deepster now; unset at launch"
@@ -64,8 +64,8 @@ OWNER_ACTIONS:
       title: "Connect + authorize marketing channels (email provider, analytics) to enable execute-mode"
       priority: normal
       status: open
-      why: "Growth Agent stays in prepare-mode until a connected, funded, authorized channel exists."
-      how: "Follow docs/growth/CONNECT.md (~20 min). Then the Growth Agent can queue/measure for real."
+      why: "Growth Agent stays in prepare-mode until a connected, funded, authorized channel exists. The email SEAM is now BUILT (PR #187, src/email): waitlist double-opt-in dispatches a confirmation email + a signed confirm link, but the default backend is DRY-RUN (logs, delivers nothing) — so no confirmation email actually leaves the system until a real provider is connected. The app is fully functional without it (the waitlist row is captured either way); this only activates confirmation delivery."
+      how: "Follow docs/growth/CONNECT.md (~20 min). To ACTIVATE waitlist-confirmation email delivery specifically: wire a real email provider behind the src/email abstraction (add a delivering backend + its key) AND set WEB_APP_URL to the live public origin (the confirm LINK is built ONLY from WEB_APP_URL — never the request Host, an anti-phishing measure — so double-opt-in emails are silently NOT sent until WEB_APP_URL is set). Then the Growth Agent can queue/measure for real."
     - id: analytics-read-token
       title: "OPTIONAL: set ANALYTICS_READ_TOKEN to enable the aggregate growth-metrics read endpoint"
       priority: normal
