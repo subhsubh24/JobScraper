@@ -33,9 +33,10 @@ def test_real_gemini_chat_responds(monkeypatch):
     resp = client.chat.completions.create(
         model=llm.chat_model(),
         messages=[{"role": "user", "content": "Reply with exactly the word: PONG"}],
-        max_tokens=5,
+        max_tokens=16,  # >5: a tight budget truncated the reply to 'P' — real call worked, assertion was too strict
     )
     text = (resp.choices[0].message.content or "").strip().upper()
+    assert text, "real Gemini chat returned empty content"
     assert "PONG" in text, f"real Gemini chat returned unexpected content: {text!r}"
 
 
