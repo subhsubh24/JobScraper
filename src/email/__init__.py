@@ -6,16 +6,20 @@ reports `delivered=False` — it NEVER claims an email was sent when no provider
 ESP) is a future wire-up gated on an owner-provided key; until then callers must degrade
 honestly and never gate a flow on an email that didn't leave the system (DECISION COROLLARY).
 
-Backends are selected by the `EMAIL_BACKEND` env var (`dryrun` default; `capture` for tests).
-Tests use the in-memory `CaptureBackend` (which simulates a connected provider) to exercise the
-real round-trip — dispatch → retrieve → follow the confirm link — so double-opt-in is proven
-end-to-end in CI without any live secret.
+Backends are selected by the `EMAIL_BACKEND` env var (`dryrun` default; `capture` for tests;
+`smtp` for real delivery). The real `SMTPBackend` reads its config from `SMTP_*` env vars and
+delivers over SMTP — but it is only selected when that config is present, and it reports
+`delivered=True` only after the server accepted the message, so `email_enabled()` and every
+"sent" claim stay honest. Tests use the in-memory `CaptureBackend` (which simulates a connected
+provider) to exercise the real round-trip — dispatch → retrieve → follow the confirm link — so
+double-opt-in is proven end-to-end in CI without any live secret.
 """
 from src.email.sender import (
     CaptureBackend,
     DryRunBackend,
     EmailMessage,
     EmailResult,
+    SMTPBackend,
     email_enabled,
     get_email_backend,
     send_email,
@@ -27,6 +31,7 @@ __all__ = [
     "EmailResult",
     "DryRunBackend",
     "CaptureBackend",
+    "SMTPBackend",
     "send_email",
     "email_enabled",
     "get_email_backend",
