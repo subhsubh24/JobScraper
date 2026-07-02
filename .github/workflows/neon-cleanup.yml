@@ -1,0 +1,36 @@
+name: Neon preview-branch cleanup
+# The Vercel<->Neon integration creates a `preview/<git-branch>` Neon DB branch per PR preview
+# and doesn't always delete it on merge, so they hit the plan's branch cap. This prunes ONLY
+# `preview/*` branches with no open PR (never production / protected / non-preview branches).
+# Run manually with dry_run=true first to preview.
+on:
+  schedule:
+    - cron: "0 9 * * *"   # 09:00 UTC daily (after nightly)
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "List what would be deleted without deleting"
+        type: boolean
+        default: false
+
+permissions:
+  pull-requests: read
+  contents: read
+
+jobs:
+  prune:
+    name: prune orphaned Neon preview branches
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Prune
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          NEON_PROJECT_ID: floral-thunder-09131717
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: python scripts/neon_prune_previews.py
