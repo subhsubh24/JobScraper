@@ -1,18 +1,18 @@
-"""Direct guards on the scorer's two silent-failure branches.
+"""Guard on the scorer's CONFIGURED-BUT-FAILING embedding branch (a silent-failure path).
 
-These branches are the ones that can corrupt a user-facing fit score WITHOUT raising — so a
-plain ``try/except`` around scoring would never catch them. They had no direct unit assertion
-(QUALITY_SCORECARD correctness top_gap: "zero-vector scorer guard has no direct unit
-assertion on the NaN/0.5 branch"). Both are pinned here:
+FACTORY_STANDARD §6: a whole class of bugs appears ONLY when an external dependency is
+CONFIGURED but its call FAILS at runtime — a different code path than the keyless/degraded one.
+The scorer's embedding branch is exactly this: when a client IS present, ``score_job`` calls
+Gemini for embeddings, and if that call raises it must degrade to the neutral 0.5 semantic
+baseline and still return a real, bounded score — never crash, never emit a ``nan`` fit score
+(a swallowed failure the caller's try/except would not catch).
 
-1. ``cosine_similarity`` on a zero-magnitude vector: the naive ``dot / (norm*norm)`` is 0/0 =
-   ``nan`` (NOT an exception), which would surface as a ``nan`` fit score. The guard must
-   return the neutral 0.5 instead.
-2. The DEPENDENCY-CONFIGURED-BUT-FAILING embedding path (FACTORY_STANDARD §6): a client IS
-   present but ``embeddings.create`` throws at runtime. ``score_job(use_embeddings=True)`` must
-   degrade to the neutral 0.5 semantic baseline and still return a real, bounded score — never
-   crash, never emit ``nan``. The keyless path passing is NOT evidence this configured-but-
-   erroring path degrades; we exercise it with a client whose call always raises.
+Prior coverage exercised the happy path (a live key, ``tests/evals/test_ai_output_evals.py``)
+and the keyless path, but NOT a client that is present yet errors mid-call. These tests close
+that gap with a client whose ``embeddings.create`` always raises.
+
+(The zero-vector ``cosine_similarity`` NaN guard is already pinned directly in
+``tests/evals/test_scoring_evals.py`` — not re-tested here.)
 """
 import math
 
@@ -53,35 +53,16 @@ def _job(db, user):
 
 
 class _AlwaysRaisingEmbeddings:
-    def create(self, *args, **kwargs):  # noqa: D401 - simulates a live provider error
+    def create(self, *args, **kwargs):  # noqa: D401 - simulates a live provider error mid-call
         raise RuntimeError("simulated Gemini embeddings 502")
 
 
 class _ErroringClient:
-    """A CONFIGURED client whose embedding call always fails at runtime (§6 configured-but-
-    failing path). ``client is not None`` so the scorer takes the embedding branch and must
-    catch the error, not the keyless short-circuit."""
+    """A CONFIGURED client (``client is not None``) whose embedding call always fails at
+    runtime. This makes ``score_job`` take the embedding branch and hit the error INSIDE the
+    call — the case a present-but-flaky provider produces in production."""
 
     embeddings = _AlwaysRaisingEmbeddings()
-
-
-def test_cosine_similarity_zero_vector_returns_neutral_not_nan(db_session):
-    scorer = JobScorer(db_session)
-    # A zero-magnitude vector makes the denominator 0 -> naive cosine is nan.
-    result = scorer.cosine_similarity([0.0, 0.0, 0.0], [1.0, 2.0, 3.0])
-    assert result == 0.5
-    assert not math.isnan(result)
-    # Symmetric: zero vector on the other side, and both-zero, are equally guarded.
-    assert scorer.cosine_similarity([1.0, 2.0, 3.0], [0.0, 0.0, 0.0]) == 0.5
-    assert scorer.cosine_similarity([0.0, 0.0], [0.0, 0.0]) == 0.5
-
-
-def test_cosine_similarity_normal_vectors_unaffected(db_session):
-    scorer = JobScorer(db_session)
-    # Identical unit-direction vectors -> cosine 1.0; orthogonal -> 0.0. The guard only fires
-    # on the zero-magnitude case, so real vectors are untouched.
-    assert scorer.cosine_similarity([1.0, 0.0], [1.0, 0.0]) == 1.0
-    assert scorer.cosine_similarity([1.0, 0.0], [0.0, 1.0]) == 0.0
 
 
 def test_score_job_degrades_when_configured_embedding_call_fails(db_session):
@@ -106,13 +87,13 @@ def test_score_job_degrades_when_configured_embedding_call_fails(db_session):
 
 def test_score_job_local_only_never_touches_configured_client(db_session):
     """use_embeddings=False must stay fully local even when a (failing) client is present —
-    fail-closed: no personal data leaves the server, so the erroring provider is never called."""
+    fail-closed: no personal data leaves the server, so the erroring provider is never called
+    (if it were, ``_ErroringClient`` would raise and this test would error)."""
     user = _user(db_session, email="scorer-local@example.com")
     job = _job(db_session, user)
 
     scorer = JobScorer(db_session)
-    scorer.client = _ErroringClient()  # would raise if the local path ever called it
+    scorer.client = _ErroringClient()  # a trap: any call to it raises
 
-    # No exception => the local branch never invoked the client.
     score = scorer.score_job(job, user, use_embeddings=False)
     assert score.overall_score == 70.0
