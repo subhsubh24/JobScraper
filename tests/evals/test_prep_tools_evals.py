@@ -6,9 +6,10 @@ we patch it with a fake client and assert each PrepArtifact is persisted with th
 contract for the two generators that previously had ZERO direct coverage (they were unrouted).
 
 It also pins the SIDE-EFFECT INTEGRITY behaviour of the shared ``_call_llm`` chokepoint:
-an empty/blank completion FAILS LOUD (never a persisted-but-blank "generated" artifact) and
-CLEARLY-unsafe output is replaced by the moderator's safe decline — both paths matter now that
-two more user-facing features flow through them.
+BOTH an empty/blank completion AND clearly-unsafe (moderator-flagged) output FAIL LOUD (raise)
+rather than becoming a persisted "generated" artifact — so the endpoint charges no usage and
+claims no success on either. Both paths matter now that two more user-facing features flow
+through them.
 """
 import pytest
 
