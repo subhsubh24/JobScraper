@@ -1,0 +1,31 @@
+name: DB migrate (manual, prod)
+# On-demand prod DB reconciliation using the DATABASE_URL secret. Manual only.
+#   diagnose  -> read-only: what's missing vs the models
+#   upgrade   -> alembic upgrade head (clean fix when the DB is behind)
+#   reconcile -> create_all + add missing columns/indexes + stamp head (additive-only)
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "diagnose | upgrade | reconcile"
+        type: choice
+        options: [diagnose, upgrade, reconcile]
+        default: diagnose
+
+jobs:
+  db:
+    name: db ops (${{ inputs.mode }})
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -r requirements-dev.txt
+      - name: Run db_ops
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          MODE: ${{ inputs.mode }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then echo "DATABASE_URL secret not set"; exit 1; fi
+          python scripts/db_ops.py
