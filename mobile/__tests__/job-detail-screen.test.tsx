@@ -27,6 +27,8 @@ const mockGetJob = jest.fn();
 const mockGeneratePrep = jest.fn();
 const mockUpdateStatus = jest.fn();
 const mockGenerateNeg = jest.fn();
+const mockGenerateLetter = jest.fn();
+const mockGenerateStudy = jest.fn();
 jest.mock('@/services/api', () => {
   class ApiError extends Error {
     status: number;
@@ -41,6 +43,8 @@ jest.mock('@/services/api', () => {
       generatePrepPack: (id: string) => mockGeneratePrep(id),
       updateJobStatus: (id: string, s: string) => mockUpdateStatus(id, s),
       generateSalaryNegotiation: (id: string, target: number) => mockGenerateNeg(id, target),
+      generateCoverLetter: (id: string) => mockGenerateLetter(id),
+      generateStudyPlan: (id: string, days: number) => mockGenerateStudy(id, days),
       grantAiConsent: jest.fn(async () => ({ ...mockUser, ai_consent: true })),
     },
     ApiError,
@@ -162,6 +166,61 @@ describe('JobDetailScreen', () => {
 
     expect(await screen.findByText('Enter your target salary (a positive number).')).toBeTruthy();
     expect(mockGenerateNeg).not.toHaveBeenCalled();
+  });
+
+  it('gates cover letter + study plan behind Pro for a free user (upsell, no generate buttons)', async () => {
+    mockUser = { tier: 'free', ai_consent: true };
+    render(<JobDetailScreen />);
+    await screen.findByText('Senior Backend Engineer');
+    expect(screen.getByText('Upgrade to Pro')).toBeTruthy();
+    expect(screen.queryByText('Generate cover letter')).toBeNull();
+    expect(screen.queryByText('Generate study plan')).toBeNull();
+
+    fireEvent.press(screen.getByText('Upgrade to Pro'));
+    expect(mockPush).toHaveBeenCalledWith('/paywall');
+  });
+
+  it('lets a Pro user generate a cover letter and renders it inline', async () => {
+    mockUser = { tier: 'premium', ai_consent: true };
+    mockGenerateLetter.mockResolvedValue({
+      title: 'Cover Letter: Senior Backend Engineer at Acme',
+      content: 'Dear Hiring Manager, I build reliable Python services.',
+    });
+    render(<JobDetailScreen />);
+    await screen.findByText('Senior Backend Engineer');
+
+    fireEvent.press(screen.getByText('Generate cover letter'));
+
+    expect(await screen.findByText('Cover Letter: Senior Backend Engineer at Acme')).toBeTruthy();
+    expect(mockGenerateLetter).toHaveBeenCalledWith('job-1');
+  });
+
+  it('lets a Pro user generate a study plan, passing the bounded day count through', async () => {
+    mockUser = { tier: 'premium', ai_consent: true };
+    mockGenerateStudy.mockResolvedValue({
+      title: '7-Day Study Plan: Senior Backend Engineer',
+      content: '## Day 1\nData structures.',
+    });
+    render(<JobDetailScreen />);
+    await screen.findByText('Senior Backend Engineer');
+
+    // Default days is 7 (the field's initial value) — pressing generate sends it as an int.
+    fireEvent.press(screen.getByText('Generate study plan'));
+
+    expect(await screen.findByText('7-Day Study Plan: Senior Backend Engineer')).toBeTruthy();
+    expect(mockGenerateStudy).toHaveBeenCalledWith('job-1', 7);
+  });
+
+  it('rejects an out-of-range study-plan day count client-side (no wasted LLM call)', async () => {
+    mockUser = { tier: 'premium', ai_consent: true };
+    render(<JobDetailScreen />);
+    await screen.findByText('Senior Backend Engineer');
+
+    fireEvent.changeText(screen.getByPlaceholderText('7'), '40');
+    fireEvent.press(screen.getByText('Generate study plan'));
+
+    expect(await screen.findByText('Enter how many days you have to prep (1–30).')).toBeTruthy();
+    expect(mockGenerateStudy).not.toHaveBeenCalled();
   });
 
   it('shows an honest error state when the job fails to load', async () => {

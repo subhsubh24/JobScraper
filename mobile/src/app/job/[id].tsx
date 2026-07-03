@@ -34,7 +34,16 @@ export default function JobDetailScreen() {
   const [negLoading, setNegLoading] = useState(false);
   const [neg, setNeg] = useState<{ title: string; content: string } | null>(null);
   const [negMsg, setNegMsg] = useState<string | null>(null);
+  const [letterLoading, setLetterLoading] = useState(false);
+  const [letter, setLetter] = useState<{ title: string; content: string } | null>(null);
+  const [letterMsg, setLetterMsg] = useState<string | null>(null);
+  const [studyLoading, setStudyLoading] = useState(false);
+  const [studyPlan, setStudyPlan] = useState<{ title: string; content: string } | null>(null);
+  const [studyMsg, setStudyMsg] = useState<string | null>(null);
+  const [studyDays, setStudyDays] = useState('7');
   const isCareerPlus = user?.career_plus === true;
+  // Pro (paid) tier: Pro AND Career+ are both PREMIUM. Gates the cover-letter + study-plan tools.
+  const isPaid = user?.tier === 'premium';
   // Third-party-AI consent gate (Apple 5.1.2(i)) — prep + salary send resume/JD to Gemini.
   const { ensureConsent, dialog: consentDialog } = useAiConsent();
 
@@ -84,6 +93,52 @@ export default function JobDetailScreen() {
       }
     } finally {
       setPrepLoading(false);
+    }
+  }
+
+  async function generateCoverLetter() {
+    if (!id) return;
+    setLetterMsg(null);
+    if (!(await ensureConsent())) return;
+    setLetterLoading(true);
+    try {
+      setLetter(await api.generateCoverLetter(id));
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 403) {
+        router.push('/paywall');
+      } else if (e instanceof ApiError) {
+        setLetterMsg(e.message); // 503 (AI not configured) and other API errors, honestly inline
+      } else {
+        setLetterMsg('Could not generate a cover letter. Please try again.');
+      }
+    } finally {
+      setLetterLoading(false);
+    }
+  }
+
+  async function generateStudyPlan() {
+    if (!id) return;
+    // Bound days client-side to match the server (1–30) so a bad value never burns an LLM call.
+    const days = Math.round(Number(studyDays));
+    if (!Number.isFinite(days) || days < 1 || days > 30) {
+      setStudyMsg('Enter how many days you have to prep (1–30).');
+      return;
+    }
+    setStudyMsg(null);
+    if (!(await ensureConsent())) return;
+    setStudyLoading(true);
+    try {
+      setStudyPlan(await api.generateStudyPlan(id, days));
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 403) {
+        router.push('/paywall');
+      } else if (e instanceof ApiError) {
+        setStudyMsg(e.message);
+      } else {
+        setStudyMsg('Could not generate a study plan. Please try again.');
+      }
+    } finally {
+      setStudyLoading(false);
     }
   }
 
@@ -214,6 +269,63 @@ export default function JobDetailScreen() {
         </Card>
       ) : null}
 
+      <Text style={styles.section}>Application tools</Text>
+      {isPaid ? (
+        <>
+          <Text style={styles.toolHint}>A tailored cover letter for this role, drawn from your resume.</Text>
+          <Button
+            label={letter ? 'Regenerate cover letter' : 'Generate cover letter'}
+            onPress={generateCoverLetter}
+            loading={letterLoading}
+          />
+          {letterMsg ? (
+            <Text style={styles.prepMsg} accessibilityRole="alert" accessibilityLiveRegion="polite">
+              {letterMsg}
+            </Text>
+          ) : null}
+          {letter ? (
+            <Card style={styles.prepCard}>
+              <Text style={styles.prepTitle}>{letter.title}</Text>
+              <Markdown content={letter.content} />
+              <ReportButton contentType="prep_pack" contentRef={id} contentExcerpt={letter.content} />
+            </Card>
+          ) : null}
+
+          <Text style={styles.toolHint}>A day-by-day study plan paced to the time before your interview.</Text>
+          <Field
+            label="Days to prep (1–30)"
+            keyboardType="numeric"
+            value={studyDays}
+            onChangeText={setStudyDays}
+            placeholder="7"
+          />
+          <Button
+            label={studyPlan ? 'Regenerate study plan' : 'Generate study plan'}
+            onPress={generateStudyPlan}
+            loading={studyLoading}
+          />
+          {studyMsg ? (
+            <Text style={styles.prepMsg} accessibilityRole="alert" accessibilityLiveRegion="polite">
+              {studyMsg}
+            </Text>
+          ) : null}
+          {studyPlan ? (
+            <Card style={styles.prepCard}>
+              <Text style={styles.prepTitle}>{studyPlan.title}</Text>
+              <Markdown content={studyPlan.content} />
+              <ReportButton contentType="prep_pack" contentRef={id} contentExcerpt={studyPlan.content} />
+            </Card>
+          ) : null}
+        </>
+      ) : (
+        <Card style={styles.upsellCard}>
+          <Text style={styles.upsellText}>
+            Tailored cover letters and study plans are a Pro feature.
+          </Text>
+          <Button label="Upgrade to Pro" onPress={() => router.push('/paywall')} />
+        </Card>
+      )}
+
       <Text style={styles.section}>Salary negotiation</Text>
       {isCareerPlus ? (
         <>
@@ -276,6 +388,7 @@ const styles = StyleSheet.create({
   statusChipTextActive: { color: colors.primaryText },
   errorWrap: { alignSelf: 'stretch' },
   prepMsg: { color: colors.danger, fontSize: 13, marginTop: spacing.sm },
+  toolHint: { color: colors.textMuted, fontSize: 13, marginBottom: spacing.sm, lineHeight: 18 },
   prepCard: { marginTop: spacing.md, gap: spacing.sm },
   prepTitle: { color: colors.text, fontSize: 16, fontWeight: '700' },
   upsellCard: { gap: spacing.md, alignItems: 'flex-start' },

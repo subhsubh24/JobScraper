@@ -69,6 +69,37 @@ def test_prep_pack_real_output_is_substantive_relevant_and_structured(db_session
         "prep pack lacks the requested markdown structure"
 
 
+def test_cover_letter_real_output_is_substantive_and_relevant(db_session, monkeypatch):
+    monkeypatch.setenv("GEMINI_API_KEY", LIVE_KEY)  # restore the real key (conftest blanked it)
+    from src.enrichment.llm_workflows import LLMWorkflows
+
+    user, job = _seed(db_session)
+    artifact = LLMWorkflows(db_session).generate_cover_letter(job, user)
+    content = artifact.content or ""
+
+    assert isinstance(artifact, PrepArtifact) and artifact.artifact_type == "cover_letter"
+    assert len(content) > 150, f"cover letter too short to be real output: {len(content)} chars"
+    low = content.lower()
+    assert any(t in low for t in ("acme", "backend", "python", "engineer", "role")), \
+        f"cover letter reads off-topic (not about the role): {content[:200]!r}"
+
+
+def test_study_plan_real_output_is_substantive_and_structured(db_session, monkeypatch):
+    monkeypatch.setenv("GEMINI_API_KEY", LIVE_KEY)
+    from src.enrichment.llm_workflows import LLMWorkflows
+
+    user, job = _seed(db_session)
+    artifact = LLMWorkflows(db_session).generate_study_plan(job, days=5)
+    content = artifact.content or ""
+
+    assert isinstance(artifact, PrepArtifact) and artifact.artifact_type == "study_plan"
+    assert len(content) > 200, f"study plan too short to be real output: {len(content)} chars"
+    low = content.lower()
+    assert "day" in low, f"study plan lacks any day-by-day structure: {content[:200]!r}"
+    assert any(t in low for t in ("backend", "python", "system", "practice", "study", "interview")), \
+        f"study plan reads off-topic: {content[:200]!r}"
+
+
 def test_coach_real_answer_is_substantive_and_on_topic(db_session, monkeypatch):
     monkeypatch.setenv("GEMINI_API_KEY", LIVE_KEY)
     from src.ai_coach.career_coach import CareerCoach

@@ -35,7 +35,9 @@ export default function JobDetailPage() {
   const router = useRouter();
   const { user } = useAuth();
   const isCareerPlus = user?.career_plus === true;
-  // Third-party-AI consent gate (Apple 5.1.2(i)) — prep + salary send resume/JD to Gemini.
+  // Pro (paid) tier: Pro AND Career+ are both PREMIUM. Gates the cover-letter + study-plan tools.
+  const isPaid = user?.tier === 'premium';
+  // Third-party-AI consent gate (Apple 5.1.2(i)) — every prep tool sends resume/JD to Gemini.
   const { ensureConsent, dialog: consentDialog } = useAiConsent();
   const [job, setJob] = useState<Job | null>(null);
   const [loading, setLoading] = useState(true);
@@ -48,6 +50,13 @@ export default function JobDetailPage() {
   const [negLoading, setNegLoading] = useState(false);
   const [negMsg, setNegMsg] = useState<string | null>(null);
   const [targetSalary, setTargetSalary] = useState('');
+  const [letter, setLetter] = useState<{ title: string; content: string } | null>(null);
+  const [letterLoading, setLetterLoading] = useState(false);
+  const [letterMsg, setLetterMsg] = useState<string | null>(null);
+  const [studyPlan, setStudyPlan] = useState<{ title: string; content: string } | null>(null);
+  const [studyLoading, setStudyLoading] = useState(false);
+  const [studyMsg, setStudyMsg] = useState<string | null>(null);
+  const [studyDays, setStudyDays] = useState('7');
 
   const load = useCallback(async () => {
     try {
@@ -87,6 +96,42 @@ export default function JobDetailPage() {
       else setPrepMsg(e instanceof ApiError ? e.message : 'Could not generate.');
     } finally {
       setPrepLoading(false);
+    }
+  }
+
+  async function generateCoverLetter() {
+    setLetterMsg(null);
+    if (!(await ensureConsent())) return;
+    setLetterLoading(true);
+    try {
+      setLetter(await api.generateCoverLetter(id));
+    } catch (e) {
+      // A free user should never reach here (the UI gates it), but the server is the source of
+      // truth — a 403 routes to pricing rather than dead-ends.
+      if (e instanceof ApiError && e.status === 403) router.push('/pricing');
+      else setLetterMsg(e instanceof ApiError ? e.message : 'Could not generate.');
+    } finally {
+      setLetterLoading(false);
+    }
+  }
+
+  async function generateStudyPlan() {
+    // Bound days client-side to match the server (1–30) so a bad value never burns an LLM call.
+    const days = Math.round(Number(studyDays));
+    if (!Number.isFinite(days) || days < 1 || days > 30) {
+      setStudyMsg('Enter how many days you have to prep (1–30).');
+      return;
+    }
+    setStudyMsg(null);
+    if (!(await ensureConsent())) return;
+    setStudyLoading(true);
+    try {
+      setStudyPlan(await api.generateStudyPlan(id, days));
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 403) router.push('/pricing');
+      else setStudyMsg(e instanceof ApiError ? e.message : 'Could not generate.');
+    } finally {
+      setStudyLoading(false);
     }
   }
 
@@ -182,6 +227,86 @@ export default function JobDetailPage() {
             <h3 className="mb-2 font-semibold">{prep.title}</h3>
             <Markdown content={prep.content} />
             <ReportButton contentType="prep_pack" contentRef={id} contentExcerpt={prep.content} />
+          </Card>
+        )}
+      </div>
+
+      <div>
+        <h2 className="mb-2 text-lg font-semibold">Application tools</h2>
+        {isPaid ? (
+          <div className="space-y-6">
+            <div>
+              <p className="mb-2 text-sm text-slate-400">
+                A tailored cover letter for this role, drawn from your resume.
+              </p>
+              <Button onClick={generateCoverLetter} disabled={letterLoading}>
+                {letterLoading ? 'Generating…' : letter ? 'Regenerate cover letter' : 'Generate cover letter'}
+              </Button>
+              {letterMsg && <p role="alert" className="mt-2 text-sm text-amber-400">{letterMsg}</p>}
+              {letterLoading && !letter && (
+                <Card className="mt-4 space-y-3" aria-busy="true" aria-label="Generating cover letter">
+                  <Skeleton className="h-5 w-48" />
+                  <Skeleton className="h-4 w-full" />
+                  <Skeleton className="h-4 w-11/12" />
+                  <Skeleton className="h-4 w-4/5" />
+                </Card>
+              )}
+              {letter && (
+                <Card className="mt-4">
+                  <h3 className="mb-2 font-semibold">{letter.title}</h3>
+                  <Markdown content={letter.content} />
+                  <ReportButton contentType="prep_pack" contentRef={id} contentExcerpt={letter.content} />
+                </Card>
+              )}
+            </div>
+
+            <div>
+              <p className="mb-2 text-sm text-slate-400">
+                A day-by-day study plan paced to the time you have before the interview.
+              </p>
+              <div className="mb-3 max-w-xs">
+                <Field
+                  label="Days to prep (1–30)"
+                  type="number"
+                  min={1}
+                  max={30}
+                  inputMode="numeric"
+                  value={studyDays}
+                  onChange={(e) => setStudyDays(e.target.value)}
+                  placeholder="7"
+                />
+              </div>
+              <Button onClick={generateStudyPlan} disabled={studyLoading}>
+                {studyLoading ? 'Generating…' : studyPlan ? 'Regenerate study plan' : 'Generate study plan'}
+              </Button>
+              {studyMsg && <p role="alert" className="mt-2 text-sm text-amber-400">{studyMsg}</p>}
+              {studyLoading && !studyPlan && (
+                <Card className="mt-4 space-y-3" aria-busy="true" aria-label="Generating study plan">
+                  <Skeleton className="h-5 w-48" />
+                  <Skeleton className="h-4 w-full" />
+                  <Skeleton className="h-4 w-11/12" />
+                  <Skeleton className="h-4 w-4/5" />
+                </Card>
+              )}
+              {studyPlan && (
+                <Card className="mt-4">
+                  <h3 className="mb-2 font-semibold">{studyPlan.title}</h3>
+                  <Markdown content={studyPlan.content} />
+                  <ReportButton contentType="prep_pack" contentRef={id} contentExcerpt={studyPlan.content} />
+                </Card>
+              )}
+            </div>
+          </div>
+        ) : (
+          <Card className="flex flex-col items-start gap-3">
+            <div className="flex items-center gap-2">
+              <LockIcon />
+              <p className="text-slate-300">
+                Tailored <span className="font-semibold text-indigo-300">cover letters</span> and{' '}
+                <span className="font-semibold text-indigo-300">study plans</span> are a Pro feature.
+              </p>
+            </div>
+            <Button onClick={() => router.push('/pricing')}>Upgrade to Pro</Button>
           </Card>
         )}
       </div>

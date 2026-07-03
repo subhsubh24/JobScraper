@@ -28,12 +28,14 @@ logger = logging.getLogger("career_operator.analytics")
 
 # The CLOSED set of product events we count. An allowlist keeps the table bounded and stops
 # an unbounded ``event_type`` (a future caller typo) from ever creating rows. The first three
-# are the activation funnel; the last two measure engagement depth on the paid features.
+# are the activation funnel; the rest measure engagement depth on the paid AI prep features.
 EVENT_TYPES = (
     "signup",
     "job_added",
     "fit_score_generated",
     "prep_pack_generated",
+    "cover_letter_generated",
+    "study_plan_generated",
     "coach_message",
 )
 _EVENT_TYPE_SET = frozenset(EVENT_TYPES)
