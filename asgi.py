@@ -659,7 +659,21 @@ def register(data: UserCreate, request: Request, db: Session = Depends(get_db)):
         logger.warning("referral processing failed during signup; continuing", exc_info=True)
         db.refresh(user)
     # Privacy-safe aggregate metric (best-effort, post-commit; counts only, no PII).
-    analytics.record_event(db, "signup")
+    # Defense-in-depth (FACTORY_STANDARD §32): the account is already committed above, so NO
+    # non-essential side-effect may turn a successful signup into a 500. record_event() is
+    # already contractually never-raising, but we also guard the call site so a future
+    # regression in it can never hard-block account creation.
+    try:
+        analytics.record_event(db, "signup")
+    except Exception:  # noqa: BLE001 — analytics is non-critical; never surface to signup
+        # Mirror the referral block: a failed statement poisons the Postgres transaction, so
+        # ROLL BACK before returning — otherwise the very next query (user_public → usage
+        # limits, below) would raise on the dirty transaction and 500 the request anyway,
+        # re-introducing the exact hard-block this guard exists to prevent. refresh() re-loads
+        # the (already-committed) user onto the clean session.
+        db.rollback()
+        logger.warning("analytics record_event failed during signup; continuing", exc_info=True)
+        db.refresh(user)
     return {"success": True, "token": token, "user": user_public(user, db)}
 
 
