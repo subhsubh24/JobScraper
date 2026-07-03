@@ -130,10 +130,13 @@ VALIDATION_CAPABILITIES:
     key_in_ci: false
     blocking: false           # DECISION COROLLARY: disabled by default (no TURNSTILE_SECRET) -> pure no-op,
                               # so no pre-launch form is gated and nothing dead-ends. Rate limits are the
-                              # always-on baseline. Live enforcement needs the owner's Turnstile keys + the
-                              # deployed client widgets (web sitekey; native mobile widget follow-up) —
-                              # OWNER_ACTION connect-captcha.
-    owner_action: connect-captcha
+                              # always-on baseline. CONNECT ORDER (owner, tracked in PENDING_OPS
+                              # `connect-captcha`): the NATIVE mobile app sends NO captcha_token, so enabling
+                              # TURNSTILE_SECRET BEFORE a mobile Turnstile/challenge flow ships would 403 every
+                              # native register/login. Set the secret ONLY after BOTH the web sitekey and a
+                              # mobile widget are deployed. (owner_action stays null here — non-blocking
+                              # connect step, same pattern as `email`; the gate never blocks unrelated work.)
+    owner_action: null
 ```
 
 When `GEMINI_API_KEY` is present in CI, `tests/test_llm_live.py` automatically exercises a real

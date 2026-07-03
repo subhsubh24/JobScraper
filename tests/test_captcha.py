@@ -141,6 +141,28 @@ def test_register_passes_with_good_captcha_when_enabled(client, monkeypatch):
     assert r.json()["token"]
 
 
+def test_login_rejected_with_bad_captcha_when_enabled(client, monkeypatch):
+    """Login is the credential-stuffing target — prove it enforces the captcha too, so a bad
+    token is rejected even WITH the right password (the 403 fires ahead of the lockout logic)."""
+    # Seed a real account (captcha disabled during setup so registration succeeds).
+    monkeypatch.delenv("TURNSTILE_SECRET", raising=False)
+    r = client.post(
+        "/api/auth/register",
+        json={"email": "login-capt@example.com", "password": "password123"},
+    )
+    assert r.status_code == 200, r.text
+
+    # Now enable captcha; a login with an invalid token is rejected even with the RIGHT password.
+    monkeypatch.setenv("TURNSTILE_SECRET", "sekret")
+    _patch_siteverify(monkeypatch, {"success": False})
+    r = client.post(
+        "/api/auth/login",
+        json={"email": "login-capt@example.com", "password": "password123", "captcha_token": "nope"},
+    )
+    assert r.status_code == 403
+    assert "captcha" in r.json()["detail"].lower()
+
+
 def test_waitlist_rejected_with_missing_captcha_when_enabled(client, monkeypatch):
     monkeypatch.setenv("TURNSTILE_SECRET", "sekret")
 

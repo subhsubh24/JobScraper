@@ -11,11 +11,17 @@ owner has connected it):
 - DECISION COROLLARY (FACTORY_STANDARD §6): we do NOT introduce a hard gate whose dependency
   isn't wired. Until the owner sets ``TURNSTILE_SECRET`` the seam is a NO-OP —
   ``captcha_enabled()`` is False and ``verify_captcha()`` returns True — so pre-launch flows on
-  BOTH web and native mobile work unchanged (no dead-end, no breakage). Enforcement turns on
-  only once the owner connects the secret AND deploys the client widgets that produce the token
-  (web sitekey ``NEXT_PUBLIC_TURNSTILE_SITEKEY``; native mobile widget is a follow-up — see
-  PENDING_OPS). The rate limiter on these endpoints is the always-on baseline defense; captcha
-  is defense-in-depth against distributed/automated signup+login floods that rotate IPs.
+  BOTH web and native mobile work unchanged (no dead-end, no breakage). The rate limiter on
+  these endpoints is the always-on baseline defense; captcha is defense-in-depth against
+  distributed/automated signup+login floods that rotate IPs.
+
+- !! CONNECT ORDER — READ BEFORE SETTING ``TURNSTILE_SECRET`` (tracked in PENDING_OPS
+  ``connect-captcha``): the WEB client sends a token once ``NEXT_PUBLIC_TURNSTILE_SITEKEY`` is
+  set, but the NATIVE MOBILE app sends NO ``captcha_token`` (no native widget ships in this
+  change — it is a native/owner follow-up). Because enforcement fails CLOSED, turning on
+  ``TURNSTILE_SECRET`` BEFORE a mobile challenge flow exists would 403 EVERY native mobile
+  register + login — a full mobile-auth outage. Enable the secret ONLY after BOTH the web
+  sitekey AND a mobile widget are deployed.
 
 - FAIL CLOSED when enforcement is ON: a missing token, an invalid token, or a verifier
   error/timeout all reject (return False). Because the whole path is gated on the owner having
