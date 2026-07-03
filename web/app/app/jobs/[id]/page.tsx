@@ -121,7 +121,7 @@ export default function JobDetailPage() {
   if (error || !job)
     return (
       <div className="space-y-4">
-        <p className="text-red-400">{error ?? 'Job not found.'}</p>
+        <p role="alert" className="text-red-400">{error ?? 'Job not found.'}</p>
         <Button variant="secondary" onClick={() => router.push('/app')}>Back to pipeline</Button>
       </div>
     );
@@ -160,7 +160,7 @@ export default function JobDetailPage() {
             </button>
           ))}
         </div>
-        {statusMsg && <p className="mt-2 text-sm text-amber-400">{statusMsg}</p>}
+        {statusMsg && <p role="alert" className="mt-2 text-sm text-amber-400">{statusMsg}</p>}
       </div>
 
       <div>
@@ -168,7 +168,7 @@ export default function JobDetailPage() {
         <Button onClick={generatePrep} disabled={prepLoading}>
           {prepLoading ? 'Generating…' : 'Generate prep pack'}
         </Button>
-        {prepMsg && <p className="mt-2 text-sm text-amber-400">{prepMsg}</p>}
+        {prepMsg && <p role="alert" className="mt-2 text-sm text-amber-400">{prepMsg}</p>}
         {prepLoading && !prep && (
           <Card className="mt-4 space-y-3" aria-busy="true" aria-label="Generating prep pack">
             <Skeleton className="h-5 w-48" />
@@ -204,7 +204,7 @@ export default function JobDetailPage() {
             <Button onClick={generateNegotiation} disabled={negLoading}>
               {negLoading ? 'Generating…' : 'Generate negotiation guide'}
             </Button>
-            {negMsg && <p className="mt-1 text-sm text-amber-400">{negMsg}</p>}
+            {negMsg && <p role="alert" className="mt-1 text-sm text-amber-400">{negMsg}</p>}
             {negLoading && !neg && (
               <Card className="space-y-3" aria-busy="true" aria-label="Generating negotiation guide">
                 <Skeleton className="h-5 w-56" />
