@@ -15,7 +15,7 @@ Good-better-best + annual (annual ≈ 2 months free):
 | Tier | Monthly | Annual | Who | Key gates |
 |---|---|---|---|---|
 | **Free** | $0 | — | Trial / casual | 5 tracked jobs, 1 prep pack/mo, no AI coach |
-| **Pro** | $12 | $96 | Active seeker | Unlimited jobs, 10 prep packs/mo, AI cover letters + study plans, AI coach (fair-use: 25 AI actions/day, shared across AI features) |
+| **Pro** | $12 | $96 | Active seeker | Unlimited jobs, unlimited prep packs, AI cover letters + study plans, AI coach (fair-use: 25 AI actions/day, shared across AI features) |
 | **Career+** | $24 | $192 | Senior / urgent | Everything in Pro + AI salary-negotiation coaching |
 
 Blended realized revenue per paying user assumed **~$110/yr** (mix of monthly churn +
