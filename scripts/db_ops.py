@@ -66,8 +66,13 @@ def _reconcile(engine):
         for tname, col in mc:
             coltype = col.type.compile(dialect=engine.dialect)
             nullable = "" if col.nullable else " NOT NULL"
-            conn.execute(text(f'ALTER TABLE {tname} ADD COLUMN IF NOT EXISTS "{col.name}" {coltype}{nullable}'))
-            print(f"  + column {tname}.{col.name} {coltype}{nullable}")
+            default = ""
+            if col.server_default is not None:  # required so a NOT NULL add works on populated rows
+                arg = getattr(col.server_default, "arg", None)
+                default = f" DEFAULT {getattr(arg, 'text', arg)}"
+            conn.execute(text(
+                f'ALTER TABLE {tname} ADD COLUMN IF NOT EXISTS "{col.name}" {coltype}{default}{nullable}'))
+            print(f"  + column {tname}.{col.name} {coltype}{default}{nullable}")
     for tbl in Base.metadata.tables.values():  # missing indexes (e.g. a new unique column)
         for idx in tbl.indexes:
             try:
