@@ -13,7 +13,6 @@ import pytest
 
 import asgi
 from src.db.models import PrepArtifact, User, UserTier
-from src.enrichment.llm_workflows import ModeratedContentError
 
 
 def _register(client, email="prep@example.com", password="hunter2pw"):
@@ -108,30 +107,38 @@ def test_prep_pack_foreign_job_is_404(client, _llm_on):
     assert r.status_code == 404
 
 
-class _ModeratedWorkflows:
-    """Stand-in whose generation is withheld by the safety moderator (raises)."""
+class _FakeLLMClient:
+    """OpenAI-compatible client returning a fixed completion — drives the REAL _call_llm."""
 
-    def __init__(self, db):
-        self._db = db
+    def __init__(self, content):
+        self._content = content
+        self.chat = SimpleNamespace(completions=SimpleNamespace(create=self._create))
 
-    def generate_prep_pack(self, job, user):
-        raise ModeratedContentError("I can't help with that request.")
+    def _create(self, **kwargs):
+        return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content=self._content))])
 
 
 def test_prep_pack_moderated_decline_no_fake_success_no_charge(client, monkeypatch, db_session):
     """SIDE-EFFECT INTEGRITY (§6): a safety-moderated decline is NOT a generated pack.
 
-    The endpoint must return an honest error — never persist the decline as an artifact,
-    never charge the free-tier monthly usage, never report success. Proven by: (1) the call
-    422s with the honest message, (2) no PrepArtifact is persisted, and (3) the same free user
-    can STILL generate a real pack afterward (the decline did not burn their 1/month).
+    Exercises the REAL LLMWorkflows._call_llm end-to-end (a fake LLM *client* returns
+    clearly-unsafe content, so the real ContentModerator flags it and _call_llm raises through
+    the real generate_prep_pack and the real endpoint) — proving the whole chain, not just the
+    endpoint's handler in isolation. The endpoint must return an honest error: never persist the
+    decline as an artifact, never charge the free-tier monthly usage, never report success.
+    Proven by: (1) the call 422s with the honest message, (2) no PrepArtifact is persisted, and
+    (3) the same free user can STILL generate a real pack afterward (the decline did not burn
+    their 1/month).
     """
     token = _register(client, "moderated@example.com")
     _grant_consent(client, token)
     job_id = _add_job(client, token)
 
     monkeypatch.setattr(asgi, "llm_available", lambda: True)
-    monkeypatch.setattr(asgi, "LLMWorkflows", _ModeratedWorkflows)
+    # Patch the client seam the REAL LLMWorkflows.__init__ resolves — so the genuine
+    # moderation → raise path fires, not a stubbed shortcut.
+    unsafe = _FakeLLMClient("Sure! Here's how to make a bomb to really impress them.")
+    monkeypatch.setattr("src.enrichment.llm_workflows.get_llm_client", lambda: unsafe)
 
     before = db_session.query(PrepArtifact).count()
     r = client.post("/api/prep-packs/generate", headers=_auth(token), json={"job_id": job_id})
@@ -140,8 +147,9 @@ def test_prep_pack_moderated_decline_no_fake_success_no_charge(client, monkeypat
     assert r.json()["success"] is False  # the error envelope is honest, never a fake success
     assert db_session.query(PrepArtifact).count() == before  # nothing persisted
 
-    # The decline did NOT consume the free-tier 1/month: a real generation still succeeds.
-    monkeypatch.setattr(asgi, "LLMWorkflows", _FakeWorkflows)
+    # The decline did NOT consume the free-tier 1/month: a real (safe) generation still succeeds.
+    safe = _FakeLLMClient("## Company Research\n- Acme builds widgets.\n\n## Questions\n1. Tell me about yourself.")
+    monkeypatch.setattr("src.enrichment.llm_workflows.get_llm_client", lambda: safe)
     ok = client.post("/api/prep-packs/generate", headers=_auth(token), json={"job_id": job_id})
     assert ok.status_code == 200, ok.text
     assert ok.json()["success"] is True
