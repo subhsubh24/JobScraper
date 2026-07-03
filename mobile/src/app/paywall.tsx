@@ -13,7 +13,6 @@ const PRO_FEATURES = [
   'AI interview prep packs',
   'AI cover letters & study plans',
   'AI Career Coach',
-  'Priority fit scoring',
 ];
 // The Career+-exclusive (a real, additive feature — no tier ever lost it).
 const CAREERPLUS_FEATURE = 'AI salary-negotiation coaching';
