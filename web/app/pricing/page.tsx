@@ -10,7 +10,6 @@ const PRO_FEATURES = [
   'AI interview prep packs',
   'AI cover letters & study plans',
   'AI Career Coach',
-  'Priority fit scoring',
 ];
 
 // Career+ is a strict SUPERSET of Pro. Salary-negotiation coaching is the real, additive
