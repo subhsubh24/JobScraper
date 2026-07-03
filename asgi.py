@@ -45,7 +45,7 @@ from src.db.models import (
     UserTier,
     Waitlist,
 )
-from src.enrichment.llm_workflows import LLMWorkflows
+from src.enrichment.llm_workflows import LLMWorkflows, ModeratedContentError
 from src.llm import llm_available
 from src.ranking.scorer import JobScorer
 from src import analytics
@@ -1287,6 +1287,16 @@ def import_jobs_preview(
     }
 
 
+# Honest response when the safety moderator withholds a user-facing generation. A moderated
+# decline is NOT the artifact the user requested, so the LLMWorkflows endpoints surface it as a
+# 422 (no artifact persisted, no usage charged, no success claimed) rather than dressing the
+# decline text up as the deliverable — see ModeratedContentError (§6, no fake success).
+_MODERATED_DECLINE_DETAIL = (
+    "The generated content was withheld by a safety filter and could not be returned. "
+    "Please try again or revise the job details."
+)
+
+
 # ---------------------------------------------------------------------------
 # Prep packs (LLM — degrades gracefully)
 # ---------------------------------------------------------------------------
@@ -1324,6 +1334,12 @@ def generate_prep_pack(
     check_llm_ceiling(user, db)
     try:
         artifact: PrepArtifact = LLMWorkflows(db).generate_prep_pack(job, user)
+    except ModeratedContentError:
+        # A rare safety-filter decline is NOT a generated pack: do not persist it, do not
+        # charge the monthly usage below, do not claim success (§6, no fake success). The
+        # raise happens before any artifact is added and before increment_prep_usage.
+        logger.info("Prep pack withheld by content moderation")
+        raise HTTPException(status_code=422, detail=_MODERATED_DECLINE_DETAIL)
     except Exception:
         logger.exception("Prep pack generation failed")
         raise HTTPException(status_code=502, detail="AI provider error generating prep pack")
@@ -1388,6 +1404,11 @@ def generate_salary_negotiation_guide(
         artifact: PrepArtifact = LLMWorkflows(db).generate_salary_negotiation(
             job, data.target_salary
         )
+    except ModeratedContentError:
+        # A moderated decline is not a generated script — return honestly, don't persist it
+        # or claim success (§6, no fake success).
+        logger.info("Salary negotiation guide withheld by content moderation")
+        raise HTTPException(status_code=422, detail=_MODERATED_DECLINE_DETAIL)
     except Exception:
         logger.exception("Salary negotiation generation failed")
         raise HTTPException(status_code=502, detail="AI provider error generating negotiation guide")
@@ -1446,6 +1467,11 @@ def generate_cover_letter_endpoint(
     check_llm_ceiling(user, db)
     try:
         artifact: PrepArtifact = LLMWorkflows(db).generate_cover_letter(job, user)
+    except ModeratedContentError:
+        # A moderated decline is not a generated letter — return honestly, don't persist it
+        # or claim success (§6, no fake success).
+        logger.info("Cover letter withheld by content moderation")
+        raise HTTPException(status_code=422, detail=_MODERATED_DECLINE_DETAIL)
     except Exception:
         logger.exception("Cover letter generation failed")
         raise HTTPException(status_code=502, detail="AI provider error generating cover letter")
@@ -1502,6 +1528,11 @@ def generate_study_plan_endpoint(
     check_llm_ceiling(user, db)
     try:
         artifact: PrepArtifact = LLMWorkflows(db).generate_study_plan(job, data.days)
+    except ModeratedContentError:
+        # A moderated decline is not a generated plan — return honestly, don't persist it
+        # or claim success (§6, no fake success).
+        logger.info("Study plan withheld by content moderation")
+        raise HTTPException(status_code=422, detail=_MODERATED_DECLINE_DETAIL)
     except Exception:
         logger.exception("Study plan generation failed")
         raise HTTPException(status_code=502, detail="AI provider error generating study plan")

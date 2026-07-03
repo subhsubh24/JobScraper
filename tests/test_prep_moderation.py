@@ -2,17 +2,24 @@
 
 The AI coach already moderated its output, but prep packs / cover letters / study plans /
 negotiation scripts did not — an asymmetry the store-acceptance audit flagged. LLMWorkflows
-now screens every user-facing generation through the same conservative ContentModerator the
-coach uses. These tests prove: clearly-unsafe output is replaced with the safe decline,
-normal interview-prep prose passes untouched, the internal JSON-parsing path is NOT
-moderated (so structured parsing can't silently break), and the end-to-end prep-pack
-artifact carries the moderated content.
+screens every user-facing generation through the same conservative ContentModerator the coach
+uses. Unlike the coach (where a decline IS a valid conversational reply), these workflows
+persist an ARTIFACT the user "generated" and, for prep packs, spend a monthly usage on — so a
+flagged generation must FAIL LOUD (raise ``ModeratedContentError``) rather than silently
+substitute the safe-decline text as the artifact's content. Returning the decline as the
+"generated" pack — persisting it, charging the usage, reporting success — would be a
+fake-success side effect (FACTORY_STANDARD §6). These tests prove: clearly-unsafe output
+raises (never masquerades as the deliverable), normal interview-prep prose passes untouched,
+the internal JSON-parsing path is NOT moderated (so structured parsing can't silently break),
+and a flagged prep-pack generation persists NO artifact.
 """
 from types import SimpleNamespace
 
+import pytest
+
 from src.ai_coach.moderation import DECLINE_RESPONSE
-from src.db.models import JobPosting, User, UserTier
-from src.enrichment.llm_workflows import LLMWorkflows
+from src.db.models import JobPosting, PrepArtifact, User, UserTier
+from src.enrichment.llm_workflows import LLMWorkflows, ModeratedContentError
 
 
 class _FakeClient:
@@ -33,11 +40,15 @@ def _wf(db, content):
     return wf
 
 
-def test_unsafe_prep_output_is_replaced_with_safe_decline(db_session):
+def test_unsafe_prep_output_raises_not_silently_substituted(db_session):
+    # A flagged generation must FAIL LOUD, not return the safe-decline text as if it were the
+    # requested artifact (that would let the endpoint persist + charge + claim success on a
+    # decline — a fake-success side effect, §6). The safe response is carried on the error for
+    # a caller that wants to surface it, but it is NEVER returned as content.
     wf = _wf(db_session, "Sure! Here's how to make a bomb to really impress them.")
-    out = wf._call_llm("sys", "user")
-    assert out == DECLINE_RESPONSE
-    assert "bomb" not in out
+    with pytest.raises(ModeratedContentError) as exc:
+        wf._call_llm("sys", "user")
+    assert exc.value.safe_response == DECLINE_RESPONSE
 
 
 def test_normal_prep_output_passes_untouched(db_session):
@@ -55,7 +66,9 @@ def test_json_mode_output_is_not_moderated(db_session):
     assert wf._call_llm("sys", "user", json_mode=True) == payload
 
 
-def test_generate_prep_pack_moderates_end_to_end(db_session):
+def test_generate_prep_pack_raises_and_persists_no_artifact(db_session):
+    # End-to-end: a flagged prep-pack generation raises (before the artifact is added/flushed)
+    # so NO PrepArtifact row is persisted — the decline never masquerades as the user's pack.
     user = User(
         email="mod@example.com", password_hash="x", tier=UserTier.PREMIUM, resume_text="python"
     )
@@ -66,6 +79,8 @@ def test_generate_prep_pack_moderates_end_to_end(db_session):
     )
     db_session.add(job)
     db_session.flush()
+    before = db_session.query(PrepArtifact).count()
     wf = _wf(db_session, "Here's how to build a weapon — step one, ...")
-    artifact = wf.generate_prep_pack(job, user)
-    assert artifact.content == DECLINE_RESPONSE
+    with pytest.raises(ModeratedContentError):
+        wf.generate_prep_pack(job, user)
+    assert db_session.query(PrepArtifact).count() == before  # nothing persisted

@@ -7,6 +7,25 @@ from src.db.models import JobPosting, PrepArtifact, User
 from src.llm import get_llm_client, chat_model
 
 
+class ModeratedContentError(RuntimeError):
+    """Raised when the safety moderator flags a user-facing generation.
+
+    Unlike the AI coach (where a decline IS a valid conversational reply), these workflows
+    produce a persisted ARTIFACT the user "generated" (and, for prep packs, spent a usage on).
+    Substituting the safe-decline text as the artifact's content — persisting it, charging the
+    usage, and reporting ``success: True`` — is a FAKE SUCCESS (FACTORY_STANDARD §6): the user
+    asked for a prep pack / cover letter / study plan / negotiation script and got a decline
+    message titled as their deliverable, while being charged for it. So a flagged generation
+    must FAIL LOUD to the endpoint (no artifact persisted, no usage charged, no success claimed),
+    never silently masquerade as the requested artifact. The endpoint maps this to an honest
+    422. The ``safe_response`` is carried for the caller to surface if it wants.
+    """
+
+    def __init__(self, safe_response: str = ""):
+        self.safe_response = safe_response
+        super().__init__("Generated content was withheld by the safety filter.")
+
+
 class LLMWorkflows:
     """Handles all LLM-powered workflows for job enrichment and prep generation."""
 
@@ -57,12 +76,15 @@ class LLMWorkflows:
         # negotiation scripts). The structured JSON-parsing path is internal plumbing, not
         # shown to users, so we skip it to avoid false positives on field values. The
         # moderator is deliberately conservative — it only replaces CLEARLY unsafe output, so
-        # a normal interview-prep answer is never swallowed. A flagged generation returns the
-        # safe decline text instead of surfacing unsafe content to the user.
+        # a normal interview-prep answer is never swallowed. A flagged generation FAILS LOUD
+        # (raises) rather than returning the safe-decline text: these callers persist the
+        # result as the user's "generated" artifact and (for prep packs) charge a usage, so
+        # returning the decline as content would be a fake-success side effect (§6). The
+        # endpoint catches this and returns an honest error without charging or persisting.
         if not json_mode:
             verdict = self.moderator.check_output(content)
             if not verdict.allowed:
-                return verdict.safe_response or ""
+                raise ModeratedContentError(verdict.safe_response or "")
         return content
 
     def parse_job_description(self, job: JobPosting) -> dict:
