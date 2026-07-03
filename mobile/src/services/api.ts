@@ -239,6 +239,28 @@ export const api = {
     return r.artifact;
   },
 
+  // Generate a tailored cover letter for a job — a Pro+ feature (Pro AND Career+). Throws
+  // ApiError(403) if the user isn't paid (server is the source of truth; the client uses the
+  // `premium` tier only to decide whether to OFFER it) and ApiError(503) when the server has no
+  // LLM key — the caller surfaces either honestly, never a fake result.
+  async generateCoverLetter(jobId: string): Promise<{ title: string; content: string }> {
+    const r = await request<{ artifact: { title: string; content: string } }>(
+      '/api/prep/cover-letter',
+      { method: 'POST', body: { job_id: jobId } },
+    );
+    return r.artifact;
+  },
+
+  // Generate a day-by-day study plan for a job — a Pro+ feature. `days` is bounded 1–30
+  // server-side (a 422 outside that range); same honest 403/503 contract as generateCoverLetter.
+  async generateStudyPlan(jobId: string, days: number): Promise<{ title: string; content: string }> {
+    const r = await request<{ artifact: { title: string; content: string } }>(
+      '/api/prep/study-plan',
+      { method: 'POST', body: { job_id: jobId, days } },
+    );
+    return r.artifact;
+  },
+
   // Report/flag an AI-generated response for moderator review (store GenAI/UGC requirement).
   // Awaits the REAL POST /api/report and throws ApiError on failure so the caller can surface
   // it honestly — the success state is only shown once the server records the row.

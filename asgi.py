@@ -520,6 +520,20 @@ class SalaryNegotiationRequest(BaseModel):
     target_salary: int = Field(ge=0, le=10_000_000)
 
 
+class CoverLetterRequest(BaseModel):
+    # Same bounded job id contract as PrepPackRequest — the endpoint scopes the lookup to the
+    # caller, so an over-length value just misses; 422 at the boundary is the honest failure.
+    job_id: str = Field(min_length=1, max_length=64)
+
+
+class StudyPlanRequest(BaseModel):
+    job_id: str = Field(min_length=1, max_length=64)
+    # A day-by-day study plan. Bounded 1–30: <1 is meaningless and >30 would inflate the LLM
+    # prompt/response without adding value (an interview is never 30+ days of daily cramming) —
+    # the bound is an honest abuse guard on a paid, LLM-backed generation, not a product limit.
+    days: int = Field(default=7, ge=1, le=30)
+
+
 class ImportPreviewRequest(BaseModel):
     careers_url: str = Field(min_length=4, max_length=500)
 
@@ -1379,6 +1393,121 @@ def generate_salary_negotiation_guide(
         raise HTTPException(status_code=502, detail="AI provider error generating negotiation guide")
 
     db.commit()
+    return {
+        "success": True,
+        "artifact": {
+            "id": artifact.id,
+            "title": artifact.title,
+            "content": artifact.content,
+        },
+    }
+
+
+# ---------------------------------------------------------------------------
+# Cover letter generation (Pro+; LLM — degrades gracefully)
+# ---------------------------------------------------------------------------
+@app.post("/api/prep/cover-letter", dependencies=[Depends(rate_limit("llm", 10))])
+def generate_cover_letter_endpoint(
+    data: CoverLetterRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Generate a tailored cover letter for a tracked job — a Pro+ feature.
+
+    This is ADDITIVE: the generator (``LLMWorkflows.generate_cover_letter``) existed but had no
+    endpoint, so exposing it at Pro takes nothing from any existing user (no dark pattern). The
+    gate is ``user.tier != PREMIUM`` (Pro AND Career+ are both PREMIUM), checked BEFORE any LLM
+    work so a free user always gets a clean 403, never a 503. Honest degradation: no LLM key ->
+    503, never a fake/blank letter (SIDE-EFFECT INTEGRITY §6). Consent (Apple 5.1.2(i)) + the
+    per-user/day LLM ceiling are enforced before the resume/JD is sent to Gemini.
+    """
+    if user.tier != UserTier.PREMIUM:
+        raise HTTPException(
+            status_code=403,
+            detail="Cover letters are a Pro feature. Upgrade to Pro or Career+ to unlock them.",
+        )
+
+    job = (
+        db.query(JobPosting)
+        .filter(JobPosting.id == data.job_id, JobPosting.user_id == user.id)
+        .first()
+    )
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    if not llm_available():
+        # Truthful graceful degradation — not a crash, not a fake result.
+        raise HTTPException(
+            status_code=503,
+            detail="AI cover-letter generation requires the server's GEMINI_API_KEY to be configured.",
+        )
+
+    require_ai_consent(user)
+    check_llm_ceiling(user, db)
+    try:
+        artifact: PrepArtifact = LLMWorkflows(db).generate_cover_letter(job, user)
+    except Exception:
+        logger.exception("Cover letter generation failed")
+        raise HTTPException(status_code=502, detail="AI provider error generating cover letter")
+
+    db.commit()
+    analytics.record_event(db, "cover_letter_generated")  # aggregate metric (best-effort, no PII)
+    return {
+        "success": True,
+        "artifact": {
+            "id": artifact.id,
+            "title": artifact.title,
+            "content": artifact.content,
+        },
+    }
+
+
+# ---------------------------------------------------------------------------
+# Study plan generation (Pro+; LLM — degrades gracefully)
+# ---------------------------------------------------------------------------
+@app.post("/api/prep/study-plan", dependencies=[Depends(rate_limit("llm", 10))])
+def generate_study_plan_endpoint(
+    data: StudyPlanRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Generate a day-by-day interview study plan for a tracked job — a Pro+ feature.
+
+    Distinct from the prep pack's fixed 48-hour section: ``days`` (1–30) lets a candidate with a
+    week or more before the interview get a paced plan the cram sheet can't give. Same Pro+ gate,
+    consent, ceiling, and honest-degradation contract as the cover-letter endpoint above.
+    """
+    if user.tier != UserTier.PREMIUM:
+        raise HTTPException(
+            status_code=403,
+            detail="Study plans are a Pro feature. Upgrade to Pro or Career+ to unlock them.",
+        )
+
+    job = (
+        db.query(JobPosting)
+        .filter(JobPosting.id == data.job_id, JobPosting.user_id == user.id)
+        .first()
+    )
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    if not llm_available():
+        # Truthful graceful degradation — not a crash, not a fake result.
+        raise HTTPException(
+            status_code=503,
+            detail="AI study-plan generation requires the server's GEMINI_API_KEY to be configured.",
+        )
+
+    require_ai_consent(user)
+    check_llm_ceiling(user, db)
+    try:
+        artifact: PrepArtifact = LLMWorkflows(db).generate_study_plan(job, data.days)
+    except Exception:
+        logger.exception("Study plan generation failed")
+        raise HTTPException(status_code=502, detail="AI provider error generating study plan")
+
+    db.commit()
+    analytics.record_event(db, "study_plan_generated")  # aggregate metric (best-effort, no PII)
     return {
         "success": True,
         "artifact": {

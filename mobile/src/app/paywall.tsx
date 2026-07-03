@@ -11,6 +11,7 @@ import { colors, radius, spacing } from '@/theme';
 const PRO_FEATURES = [
   'Unlimited tracked jobs',
   'AI interview prep packs',
+  'AI cover letters & study plans',
   'AI Career Coach',
   'Priority fit scoring',
 ];
