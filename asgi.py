@@ -28,6 +28,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from src.api.errors import error_body
 from src.api.ip_extraction import get_client_ip
 from src.api.logging_config import request_id_var, setup_logging
+from src.security.captcha import verify_captcha
 
 from src.ai_coach.career_coach import CareerCoach
 from src.auth.auth_service import AuthService
@@ -428,11 +429,16 @@ class UserCreate(BaseModel):
     # (~8k words) is generous for any real resume while killing multi-MB abuse.
     resume_text: Optional[str] = Field(default=None, max_length=50000)
     referral_code: Optional[str] = Field(default=None, max_length=32)
+    # Cloudflare Turnstile solution from the client widget. Optional at the schema layer so the
+    # seam stays a no-op until the owner connects Turnstile (see src/security/captcha.py); once
+    # TURNSTILE_SECRET is set the endpoint rejects a request whose token is missing/invalid.
+    captcha_token: Optional[str] = Field(default=None, max_length=4096)
 
 
 class UserLogin(BaseModel):
     email: str
     password: str
+    captcha_token: Optional[str] = Field(default=None, max_length=4096)
 
 
 class JobCreate(BaseModel):
@@ -522,6 +528,7 @@ class WaitlistJoin(BaseModel):
     email: str = Field(min_length=5, max_length=255)
     full_name: Optional[str] = Field(default=None, max_length=255)
     source: Optional[str] = Field(default=None, max_length=50)
+    captcha_token: Optional[str] = Field(default=None, max_length=4096)
 
 
 # Cap the preview so one request can't fan out into a huge payload / long fetch.
@@ -612,10 +619,22 @@ def get_current_user(
 
 
 # ---------------------------------------------------------------------------
+# Bot/abuse protection for public forms (Track F). No-op until the owner connects Turnstile
+# (see src/security/captcha.py); once enabled, a request whose captcha token is missing or
+# invalid is rejected with a generic 403 (never reveals account existence — enumeration-safe,
+# same posture as the auth error responses).
+# ---------------------------------------------------------------------------
+def _enforce_captcha(token: Optional[str], request: Request) -> None:
+    if not verify_captcha(token, get_client_ip(request)):
+        raise HTTPException(status_code=403, detail="Captcha verification failed. Please try again.")
+
+
+# ---------------------------------------------------------------------------
 # Auth endpoints
 # ---------------------------------------------------------------------------
 @app.post("/api/auth/register", dependencies=[Depends(rate_limit("auth", 10))])
-def register(data: UserCreate, db: Session = Depends(get_db)):
+def register(data: UserCreate, request: Request, db: Session = Depends(get_db)):
+    _enforce_captcha(data.captcha_token, request)
     auth = AuthService(db)
     try:
         user, token = auth.register(data.email, data.password, data.full_name)
@@ -645,7 +664,8 @@ def register(data: UserCreate, db: Session = Depends(get_db)):
 
 
 @app.post("/api/auth/login", dependencies=[Depends(rate_limit("auth", 10))])
-def login(data: UserLogin, db: Session = Depends(get_db)):
+def login(data: UserLogin, request: Request, db: Session = Depends(get_db)):
+    _enforce_captcha(data.captcha_token, request)
     email_key = (data.email or "").lower()
     # Per-account lockout. Same generic 429 whether or not the account exists, so it can't
     # be used to enumerate emails.
@@ -788,7 +808,7 @@ def _send_waitlist_confirm(email: str) -> None:
 
 
 @app.post("/api/waitlist/join", dependencies=[Depends(rate_limit("waitlist", 5, 3600))])
-def join_waitlist(data: WaitlistJoin, db: Session = Depends(get_db)):
+def join_waitlist(data: WaitlistJoin, request: Request, db: Session = Depends(get_db)):
     """Capture a pre-launch waitlist signup + send a double-opt-in confirmation (Track H / F4.1).
 
     The DB row IS the primary, always-present side-effect (makes visitor->signup measurable);
@@ -798,6 +818,7 @@ def join_waitlist(data: WaitlistJoin, db: Session = Depends(get_db)):
     dry-run backend nothing is delivered, the visitor is NOT dead-ended, and the response makes
     no false claim (DECISION COROLLARY — we never gate signup on an email that didn't send).
     """
+    _enforce_captcha(data.captcha_token, request)
     email = (data.email or "").strip().lower()
     if not _EMAIL_RE.match(email):
         raise HTTPException(status_code=400, detail="Enter a valid email address.")
