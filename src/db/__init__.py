@@ -22,6 +22,30 @@ _engine_kwargs = {
 # leak/exhaust connections — use NullPool so connections are opened/closed per request.
 # Point DATABASE_URL at a pooled Postgres (e.g. Neon/Supabase pgBouncer) in production.
 _is_serverless = bool(os.getenv("VERCEL") or os.getenv("AWS_LAMBDA_FUNCTION_NAME"))
+
+
+def _assert_persistent_db(database_url: str, is_serverless: bool) -> None:
+    """FAIL LOUD, never silently lose data (FACTORY_STANDARD §28 + DEEP_DIAGNOSIS rule (b)).
+
+    The DATABASE_URL default is a local SQLite file, but SQLite has NO persistence on a
+    serverless filesystem — every cold start gets a fresh, empty, ephemeral disk. Booting on
+    Vercel/Lambda against that default would look healthy while WIPING every user's data on
+    each cold start (silent data loss, far worse than an outage). A serverless deploy with a
+    non-Postgres DATABASE_URL must refuse to boot rather than run on disappearing storage.
+    (Owner sets DATABASE_URL to a pooled Postgres — PENDING_OPS.)
+    """
+    if is_serverless and not database_url.startswith("postgresql"):
+        scheme = database_url.split(":", 1)[0]  # scheme only — never echo embedded creds
+        raise RuntimeError(
+            f"DATABASE_URL must be a postgresql:// URL on serverless (VERCEL / AWS_LAMBDA) — "
+            f"got {scheme}://…. SQLite has no persistence on serverless (each cold start "
+            "wipes the disk = silent data loss); set DATABASE_URL to a pooled Postgres "
+            "(e.g. Neon/Supabase pgBouncer) in the deploy env."
+        )
+
+
+_assert_persistent_db(DATABASE_URL, _is_serverless)
+
 if _is_serverless and DATABASE_URL.startswith("postgresql"):
     _engine_kwargs["poolclass"] = NullPool
 
