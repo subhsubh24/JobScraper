@@ -78,8 +78,12 @@ def test_tampered_signature_is_rejected():
     svc = _svc()
     token = svc.create_token(_user())
     header, payload, sig = token.split(".")
-    # Flip the last character of the signature — a constant-time comparison must reject it.
-    forged_sig = sig[:-1] + ("A" if sig[-1] != "A" else "B")
+    # Mutate the FIRST signature character. The last base64url char of a 32-byte HMAC only
+    # carries 4 meaningful bits (the other 2 are zero padding), so flipping it can decode to
+    # the SAME bytes and leave the token genuinely valid — a time-dependent false failure,
+    # since the signature varies with the token's iat. The first char always maps to real
+    # high bits of byte 0, so changing it deterministically alters the signature bytes.
+    forged_sig = ("B" if sig[0] == "A" else "A") + sig[1:]
     assert svc.verify_token(f"{header}.{payload}.{forged_sig}") is None
 
 
