@@ -112,6 +112,7 @@ export const api = {
     full_name?: string;
     resume_text?: string;
     referral_code?: string;
+    captcha_token?: string;
   }): Promise<User> {
     const r = await request<AuthResponse>('/api/auth/register', {
       method: 'POST',
@@ -122,10 +123,10 @@ export const api = {
     return r.user;
   },
 
-  async login(email: string, password: string): Promise<User> {
+  async login(email: string, password: string, captchaToken?: string): Promise<User> {
     const r = await request<AuthResponse>('/api/auth/login', {
       method: 'POST',
-      body: { email, password },
+      body: { email, password, captcha_token: captchaToken },
       auth: false,
     });
     setToken(r.token);
@@ -251,10 +252,10 @@ export const api = {
 
   // Join the pre-launch waitlist. Public (no auth). The backend never reveals whether the
   // email is already on the list, so the caller always treats a resolved promise as success.
-  async joinWaitlist(email: string, source?: string): Promise<void> {
+  async joinWaitlist(email: string, source?: string, captchaToken?: string): Promise<void> {
     await request<{ success: boolean; message: string }>('/api/waitlist/join', {
       method: 'POST',
-      body: { email, source },
+      body: { email, source, captcha_token: captchaToken },
       auth: false,
     });
   },

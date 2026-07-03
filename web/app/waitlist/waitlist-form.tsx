@@ -3,12 +3,14 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { Button, Card, ErrorText } from '@/components/ui';
+import { Turnstile, captchaConfigured } from '@/components/turnstile';
 import { api, ApiError } from '@/lib/api';
 
 // The interactive capture box. Kept as a separate client component so the page shell can be
 // a server component that exports metadata (SEO + OG) for this acquisition surface.
 export function WaitlistForm() {
   const [email, setEmail] = useState('');
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [joined, setJoined] = useState(false);
@@ -21,9 +23,13 @@ export function WaitlistForm() {
       setError('Enter a valid email address.');
       return;
     }
+    if (captchaConfigured && !captchaToken) {
+      setError('Please complete the captcha.');
+      return;
+    }
     setLoading(true);
     try {
-      await api.joinWaitlist(value, 'waitlist_page');
+      await api.joinWaitlist(value, 'waitlist_page', captchaToken ?? undefined);
       setJoined(true);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Something went wrong. Try again.');
@@ -69,8 +75,9 @@ export function WaitlistForm() {
                 className="w-full rounded-lg border border-slate-700 bg-slate-800/60 px-3 py-2.5 text-slate-100 outline-none focus:border-indigo-500"
               />
             </label>
+            <Turnstile onToken={setCaptchaToken} />
             <ErrorText>{error}</ErrorText>
-            <Button type="submit" disabled={loading} className="w-full">
+            <Button type="submit" disabled={loading || (captchaConfigured && !captchaToken)} className="w-full">
               {loading ? 'Joining…' : 'Join the waitlist'}
             </Button>
             <p className="text-xs text-slate-500">

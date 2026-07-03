@@ -115,6 +115,30 @@ VALIDATION_CAPABILITIES:
     blocking: false           # non-critical: no provider -> honest dry-run; signup still works, no dead-end.
                               # Real production deliverability needs the owner's SMTP_* config (OWNER_ACTION connect-marketing).
     owner_action: null
+  - id: captcha
+    service: "Cloudflare Turnstile bot/abuse protection on public forms (Track F)"
+    env: [TURNSTILE_SECRET]   # server-side secret ONLY (never in a client); the public sitekey is a
+                              # separate NEXT_PUBLIC_TURNSTILE_SITEKEY the web widget uses.
+    used_for: "verifying the client captcha token on register / login / waitlist"
+    validation: mock          # The verification LOGIC is fully exercised without a live secret: the
+                              # siteverify round-trip is mocked (tests/test_captcha.py) across the
+                              # disabled-no-op, enabled-valid, enabled-invalid, missing/oversized-token,
+                              # and verifier-error (fail-closed) branches, PLUS HTTP tests proving
+                              # register/login/waitlist enforce it when enabled and are unchanged when
+                              # disabled. Analogous to billing's mocked webhook-signature coverage.
+    covered_by: tests/test_captcha.py
+    key_in_ci: false
+    blocking: false           # DECISION COROLLARY: disabled by default (no TURNSTILE_SECRET) -> pure no-op,
+                              # so no pre-launch form is gated and nothing dead-ends. Rate limits are the
+                              # always-on baseline. CONNECT ORDER (owner — a `connect-captcha` OWNER_ACTION
+                              # covering this is filed in PENDING_OPS via the accompanying bookkeeping PR):
+                              # the NATIVE mobile app sends NO captcha_token, so enabling TURNSTILE_SECRET
+                              # BEFORE a mobile Turnstile/challenge flow ships would 403 every native
+                              # register/login; setting it without the web NEXT_PUBLIC_TURNSTILE_SITEKEY would
+                              # 403 the web forms too. Set the secret ONLY after BOTH the web sitekey and a
+                              # mobile widget are deployed. (owner_action stays null here — non-blocking
+                              # connect step, same pattern as `email`; the gate never blocks unrelated work.)
+    owner_action: null
 ```
 
 When `GEMINI_API_KEY` is present in CI, `tests/test_llm_live.py` automatically exercises a real

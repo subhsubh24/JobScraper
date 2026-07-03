@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Button, Card, ErrorText, Field } from '@/components/ui';
+import { Turnstile, captchaConfigured } from '@/components/turnstile';
 import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 
@@ -32,6 +33,7 @@ export default function RegisterPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [resume, setResume] = useState('');
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   // Read the referral code once at mount (not at submit) so we can both acknowledge the
@@ -49,6 +51,10 @@ export default function RegisterPage() {
       setError('Password must be at least 8 characters.');
       return;
     }
+    if (captchaConfigured && !captchaToken) {
+      setError('Please complete the captcha.');
+      return;
+    }
     setLoading(true);
     try {
       setUser(
@@ -58,6 +64,7 @@ export default function RegisterPage() {
           full_name: fullName.trim() || undefined,
           resume_text: resume.trim() || undefined,
           referral_code: ref,
+          captcha_token: captchaToken ?? undefined,
         }),
       );
       router.push(postSignupPath());
@@ -93,8 +100,9 @@ export default function RegisterPage() {
               className="w-full rounded-lg border border-slate-700 bg-slate-800/60 px-3 py-2.5 text-slate-100 outline-none focus:border-indigo-500"
             />
           </label>
+          <Turnstile onToken={setCaptchaToken} />
           <ErrorText>{error}</ErrorText>
-          <Button type="submit" disabled={loading} className="w-full">
+          <Button type="submit" disabled={loading || (captchaConfigured && !captchaToken)} className="w-full">
             {loading ? 'Creating…' : 'Create account'}
           </Button>
         </form>
