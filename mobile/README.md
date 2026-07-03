@@ -46,6 +46,8 @@ src/
   wired to the real API with real loading/empty/error states.
 - ⏳ In-app purchase (RevenueCat/StoreKit/Play Billing) — Track C, needs owner store
   accounts + product IDs.
-- ⏳ Account-deletion server endpoint — Track D (required before store submission).
-- ⏳ Component/integration test suite + native device runs — Track E / human checklist.
+- ✅ Account deletion — `DELETE /api/auth/me` cascade-deletes the account + all owned data
+  (PR #36; ACCEPTANCE_AUDIT A8 = PASS); mobile Settings "Delete account" calls it for real.
+- ✅ Component/integration test suite (jest-expo — API client + Pipeline/Job-detail/paywall
+  screens + prep markdown). ⏳ Native signed device runs remain Track E / human-CI.
 - ⏳ Real rendered store assets (icon/screenshots/feature graphic) — Track D.
