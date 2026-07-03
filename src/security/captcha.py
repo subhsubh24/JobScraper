@@ -15,13 +15,15 @@ owner has connected it):
   these endpoints is the always-on baseline defense; captcha is defense-in-depth against
   distributed/automated signup+login floods that rotate IPs.
 
-- !! CONNECT ORDER — READ BEFORE SETTING ``TURNSTILE_SECRET`` (tracked in PENDING_OPS
-  ``connect-captcha``): the WEB client sends a token once ``NEXT_PUBLIC_TURNSTILE_SITEKEY`` is
-  set, but the NATIVE MOBILE app sends NO ``captcha_token`` (no native widget ships in this
-  change — it is a native/owner follow-up). Because enforcement fails CLOSED, turning on
+- !! CONNECT ORDER — READ BEFORE SETTING ``TURNSTILE_SECRET`` (an owner-facing
+  ``connect-captcha`` OWNER_ACTION covering this is filed in PENDING_OPS via the accompanying
+  bookkeeping PR): the WEB client sends a token once ``NEXT_PUBLIC_TURNSTILE_SITEKEY`` is set,
+  but the NATIVE MOBILE app sends NO ``captcha_token`` (no native widget ships in this change —
+  it is a native/owner follow-up). Because enforcement fails CLOSED, turning on
   ``TURNSTILE_SECRET`` BEFORE a mobile challenge flow exists would 403 EVERY native mobile
-  register + login — a full mobile-auth outage. Enable the secret ONLY after BOTH the web
-  sitekey AND a mobile widget are deployed.
+  register + login — a full mobile-auth outage. Likewise, setting ``TURNSTILE_SECRET`` without
+  the web ``NEXT_PUBLIC_TURNSTILE_SITEKEY`` would 403 the web forms too. Enable the secret ONLY
+  after BOTH the web sitekey AND a mobile widget are deployed.
 
 - FAIL CLOSED when enforcement is ON: a missing token, an invalid token, or a verifier
   error/timeout all reject (return False). Because the whole path is gated on the owner having
