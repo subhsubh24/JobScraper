@@ -29,7 +29,8 @@ interface TurnstileApi {
 }
 
 declare global {
-  // eslint-disable-next-line no-var
+  // `var` is required here: ambient global augmentation of `globalThis` (let/const don't
+  // attach to the global type). ESLint's no-var is not triggered inside `declare global`.
   var turnstile: TurnstileApi | undefined;
 }
 
