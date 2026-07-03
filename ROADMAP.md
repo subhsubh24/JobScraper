@@ -239,7 +239,19 @@ the guard tests, and **`FACTORY_STANDARD.md`**.
       login lockout (5 fails → 15-min 429, keyed by email so it never enumerates); register/
       login already return generic errors; verify-purchase is idempotent (always 501). Tests
       prove lockout blocks the correct password, no enumeration, and resets on success (PR #36)
-- [ ] CAPTCHA on public forms (signup/waitlist)
+- [x] CAPTCHA on public forms (signup/waitlist) — bot-protection SEAM shipped (PR #226, 2
+      Sonnet reviewers ×2 cycles; maker≠checker caught + fixed a dangling owner_action that
+      risked a mobile-auth outage). Cloudflare Turnstile is verified SERVER-SIDE on
+      register/login/waitlist (`src/security/captcha.py`, `TURNSTILE_SECRET` server-only, 5s
+      timeout, FAIL CLOSED when enabled); the web forms render the widget when
+      `NEXT_PUBLIC_TURNSTILE_SITEKEY` is set. DISABLED by default → pre-launch no-op that
+      degrades honestly (DECISION COROLLARY); per-IP rate limits stay the always-on baseline.
+      Round-trip tested with a mocked siteverify (`tests/test_captcha.py`, 12) + declared in
+      VALIDATION.md (`captcha`, mock). Live Turnstile keys + the NATIVE mobile widget are
+      Human-Core (PENDING_OPS `connect-captcha`) — do NOT set the secret before the mobile
+      widget ships or native auth 403s. (Security A→A+ also wants login-lockout cross-instance;
+      the loop deliberately kept lockout in-memory citing CAPTCHA as the real targeted-abuse
+      fix — that half is now shipped.)
 - [x] CORS locked to known origins + security headers — `asgi.py` no longer falls back to
       `allow_origins=["*"]`; `resolve_cors_origins()` returns explicit `ALLOWED_ORIGINS`
       when set, `[]` in production (same-origin web + native mobile both still work), and the
