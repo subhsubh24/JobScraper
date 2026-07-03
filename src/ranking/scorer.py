@@ -1,11 +1,14 @@
 """Job scoring algorithm using embeddings and heuristics."""
 import json
+import logging
 from typing import List
 import numpy as np
 from sqlalchemy.orm import Session
 
 from src.db.models import JobPosting, JobScore, User
 from src.llm import get_llm_client, embedding_model
+
+logger = logging.getLogger("career_operator.scorer")
 
 
 class JobScorer:
@@ -131,8 +134,13 @@ class JobScorer:
 
                 # Calculate semantic similarity (0-1)
                 semantic_score = self.cosine_similarity(resume_embedding, job_embedding)
-            except Exception as e:
-                print(f"Embedding error: {e}")
+            except Exception:
+                # Degrade to the neutral baseline, but LOG it (structured, request-id
+                # correlated) instead of a bare print to stdout — a swallowed print is a
+                # silent failure the same way the zero-vector nan would be.
+                logger.warning(
+                    "embedding failed during scoring; using neutral 0.5 baseline", exc_info=True
+                )
                 semantic_score = 0.5  # Default if API fails
         else:
             # Consent not granted (or no key): stay fully local, never call the third party.
@@ -238,8 +246,8 @@ class JobScorer:
             try:
                 score = self.score_job(job, user, use_embeddings=use_embeddings)
                 scores.append(score)
-            except Exception as e:
-                print(f"Error scoring job {job.id}: {e}")
+            except Exception:
+                logger.warning("failed to score job %s; skipping", job.id, exc_info=True)
 
         return scores
 
