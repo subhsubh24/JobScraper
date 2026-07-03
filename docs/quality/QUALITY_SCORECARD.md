@@ -6,114 +6,113 @@
 > evidence. Grading method: 9 fresh, independent, adversarial per-dimension grader
 > subagents (none wrote the product code), each running its own signal.
 
-## Grade — 2026-07-01 (2nd independent audit)
+## Grade — 2026-07-03 (3rd independent audit)
 
 **Overall: B** · **Ship gate met: NO** (2 of 7 ship-critical dimensions are below the A
-ship bar). Since the 2026-06-29 baseline (C) the factory closed **both** named security
-gaps and the design visual-proof gap: **security B→A** (CORS now locked to same-origin by
-default, rate-limit + LLM spend-ceiling now Postgres-backed cross-instance, both with
-passing tests) and **design-taste B→A** (24 real rendered screenshots committed, web/mobile
-accent converged on `#6366F1`, bespoke brand icon replaces the Expo template). Five of seven
-ship-critical dimensions now clear the A ship bar. The product is held **below the ship bar
-overall** only by the two remaining pre-launch C's — **store-readiness** (rendered store
-assets + mobile IAP still absent; 4 open ACCEPTANCE_AUDIT FAILs) and **business-case
-strength** (honest $57.5K < $100K floor; Career+ is dead config, team/B2B2C tier absent).
-Neither is a broken artifact.
+ship bar). Real, evidence-backed progress since the 2026-07-01 audit: **three dimensions
+reached A+** (functional-reality, correctness, artifact-integrity) and **performance moved
+B→A**. Seven of nine dimensions now clear the A ship bar; two of the non-critical/critical
+mix are exemplary. The product is still held **below the ship bar overall** by the *same
+two* pre-launch C's — **store-readiness** (rendered store assets + mobile IAP still absent;
+4 open ACCEPTANCE_AUDIT FAILs) and **business-case strength** (honest $57.5K < $100K floor;
+the highest-ARPA floor-lever — a team/B2B2C seat tier — remains unbuilt). Neither is a broken
+artifact; both are honestly disclosed. What genuinely improved: the prior correctness nits
+are now *fixed with direct tests* (job dedup/idempotency guard + a direct zero-vector scorer
+assertion), the CAPTCHA seam and Career+ real differentiated entitlement landed, and the
+aggregate query paths gained pagination + verified embedding caching.
 
 | Dimension | Ship-critical | Grade | Δ | One-line basis |
 |---|---|---|---|---|
-| functional-reality | ✅ | **A** | = | 9 journey tests assert the real fit-score OUTPUT/tier flip (not HTTP<400); 258 backend pass; web E2E asserts the numeric score renders in-browser; honest degradation on every LLM path. |
-| correctness | ✅ | **A** | = | SSRF guard iterates all resolved IPs, zero-vector→0.5 NaN guard, Postgres cross-instance limiter (`SELECT…FOR UPDATE`), request-id error envelope, bounded retries/timeouts, truthful degradation. |
-| security | ✅ | **A** | ▲ | Both prior B-gaps fixed: CORS locked to same-origin default (never `*`), rate-limit + spend-ceiling Postgres cross-instance — verified by `test_cors.py` + `test_rate_counter.py`. Signed Stripe/RevenueCat, no committed secrets. Held off A+ only by no CAPTCHA + in-memory login lockout. |
-| design-taste | ✅ | **A** | ▲ | 24 real non-zero rendered screenshots committed; UI clears the DESIGNER QUESTION (single focal point, restrained single accent, content-first, real SVG icons, no slop); genuine a11y; accent converged; bespoke icon. Held off A+ by zero *native-mobile* screenshots + a 390px header collision. |
-| store-readiness | ✅ | **C** | = | Vercel deploy config genuinely A-level, but 4 open ACCEPTANCE_AUDIT FAILs (A3/A4/G4/G7): no rendered store assets (`docs/store/assets/` absent), no store screenshots, mobile IAP (StoreKit/Play Billing) not integrated. |
-| artifact-integrity | ✅ | **A** | = | 8 spot-checked ticked boxes (referral, cross-instance limiter, PMF analytics, N+1 fix, coach multi-turn) each backed by real artifact + test; docs state gaps plainly; screenshots are real non-zero PNGs, not placeholders. |
-| business-case-strength | ✅ | **C** | = | Honest, un-gamed $57.5K vs $100K floor (`floor_met_year1=false`); referral loop now BUILT (correctly uncredited), but Career+ ($24) still grants identical `PREMIUM` (dead tier), team/B2B2C absent, annual-first unbuilt. Readiness rejected on business-case grounds. |
-| tests-evals | — | **A** | = | 258 backend pass @ 90.64% cov (floor 75); greenhouse.py + llm_workflows.py now 100% (were 53%/61%); 23 evals pin real golden numbers; 10 mobile jest suites + 3 web Playwright assert real outcomes; omit-list is confirmed-dead code only. |
-| performance | — | **B** | ~ | N+1 genuinely eliminated on all three paths (`selectinload` verified) + `/api/jobs` gained pagination; held at B by `/api/analytics/pipeline` still unbounded `.all()`+in-Python sort and no embedding cache. |
+| functional-reality | ✅ | **A+** | ▲ | 15 journey tests (was 9) assert the real fit-score VALUE, tier flip, honest 501/503 degradation; web E2E asserts the numeric score renders in-DOM (`core-journey.spec.ts:58`); billing entitlement round-trip covered both grant + refuse. |
+| correctness | ✅ | **A+** | ▲ | All 3 prior gaps fixed + tested: job dedup/idempotency guard (`asgi.py:1035`, `test_job_idempotency.py` 6 tests), direct zero-vector→0.5 assertion (`test_scoring_evals.py:135`); SSRF guard, `SELECT…FOR UPDATE` limiter, request-id envelope all tested; residual risks documented not hidden. |
+| security | ✅ | **A** | = | Server-side auth/entitlement from signature-verified Stripe/RevenueCat webhooks; CORS never `*`; Postgres cross-instance spend ceiling; SSRF-guarded lawful ingestion; zero committed secrets. Held off A+ by a no-op-until-connected CAPTCHA seam (`captcha.py:69`) + still-in-memory per-instance login lockout (`asgi.py:320`). |
+| design-taste | ✅ | **A** | = | Live web surfaces are designer-grade (single focal point, restrained single `#6366F1` accent, real SVG icons, genuine focus-visible a11y, honest empty states); accent converged web↔mobile. Header collision now FIXED in code (`layout.tsx:38`). Held off A+ by zero true native-mobile screenshots + stale committed `-mobile` PNGs that still depict the fixed collision. |
+| store-readiness | ✅ | **C** | = | Vercel Services deploy config is genuinely A-level (`vercel.json`, env/routing contract), but 4 open ACCEPTANCE_AUDIT FAILs (A3/A4/G4/G7): no rendered store assets (`docs/store/assets/` absent), no store screenshots, mobile IAP (StoreKit/RevenueCat + Play Billing) not integrated (`paywall.tsx:41,119` are deferral comments only). |
+| artifact-integrity | ✅ | **A+** | ▲ | Every spot-checked box (Career+ entitlement, cover-letter/study-plan Pro endpoints, CAPTCHA seam, dedup, fail-loud-serverless, signup no-hard-block) maps to a real, tested artifact on main; docs honestly disclose no-op/degraded states + the unmet $57.5K floor; 24 screenshots are real non-zero PNGs. |
+| business-case-strength | ✅ | **C** | = | Honest, un-gamed $57.5K vs $100K floor (`floor_met_year1=false`, executed `analysis/arr_base.py`). Levers MORE built than prior audit: Career+ ($24) now a REAL webhook-verified differentiated gate (salary-negotiation exclusive) + cover-letter/study-plan Pro value-adds — but on any defensible pre-launch mix these diversify, not floor-flip. The team/B2B2C seat tier (highest ARPA) remains unbuilt. Readiness rejected on business-case grounds. |
+| tests-evals | — | **A** | = | 387 backend pass (was 258) @ 92.75% cov (floor 75); 31 evals pin real golden scores (70.0/30.0/56.67, `test_scoring_evals.py:46`); 15 journeys; state-adaptive + fail-loud negative-path assertions; omit list is grep-confirmed-dead code only; 9 skips are `live`-marked env-gates (fail-loud in the nightly lane), not hidden failures. Nits: per-PR prep-pack eval is `_FakeLLM` structure-only (real content eval is nightly `live`-marked); floor 75 sits ~18pts under actual. |
+| performance | — | **A** | ▲ | N+1 eliminated on all aggregate paths (`selectinload` triads); `/api/jobs` paginated (`limit`≤500 + `offset`); resume AND JD embeddings DB-cached (`ensure_user_embedding`/`ensure_job_embedding` — the prior "no embedding cache" nit was wrong); dual DB-backed LLM + scoring spend ceilings. Held off A+ by one low-severity unbounded-but-fully-batched aggregate: `/api/analytics/pipeline` (`asgi.py:1616`) `.all()`+in-Python top-5 sort. |
 
-### Mechanical signals (auditor-run this audit)
+### Mechanical signals (auditor-run this audit, HEAD `4b180a2`)
 - `flake8 .` → clean · `python3 -c "import asgi"` → ok
-- `pytest -q --cov` → **258 passed, 2 skipped, 90.64% cov** (setup.cfg floor 75) · `pytest tests/journeys` → **9 passed** · `pytest tests/evals` → **23 passed**
-- `scripts/check_quality.py parse` → OK (all grades valid) · `readiness` → FAIL (ship-critical below A) · `scripts/check_blocks.py` → OK, `floor_met_year1=false`, `engine_pct=0`
-- CORS `asgi.py:103-136` returns `[]` in prod (never `*`); cross-instance limiter `asgi.py:238-295` (`RateCounter` + `SELECT…FOR UPDATE`); `check_llm_ceiling` on both LLM endpoints; no tracked secrets (`git ls-files` → only `.env.example`)
-- web/mobile `tsc`/`lint`/`jest`/Playwright not re-run locally (node_modules absent by design) — relied on committed artifacts + required CI on main HEAD `c7ae017`
-- `web/e2e/__screenshots__/` → 24 real non-zero PNGs (20–95 KB) · `docs/store/assets/` absent · ACCEPTANCE_AUDIT 4 open FAILs (A3/A4/G4/G7)
+- `pytest -q --cov` → **387 passed, 9 skipped, 92.75% cov** (setup.cfg floor 75) · `pytest tests/journeys` → **15 passed** · `pytest tests/evals` → **31 passed**
+- `scripts/check_quality.py parse` → OK (all grades valid) · `readiness` → **FAIL** (`store-readiness` is C) · `scripts/check_blocks.py` → OK, `floor_met_year1=false`, `engine_pct=0`
+- Idempotency guard `asgi.py:1035-1051` (+ `test_job_idempotency.py`); zero-vector scorer assertion `test_scoring_evals.py:135`; CAPTCHA seam `src/security/captcha.py` (no-op until `TURNSTILE_SECRET`); Career+ entitlement `src/billing.py:45-67` + `/api/prep/salary-negotiation` 403 gate `asgi.py:1363`; CORS `[]` in prod; no tracked secrets (`git ls-files | grep -iE '\.env$|secret|pem|credential'` → empty)
+- 9 subagent graders each ran their own signal + cited file/line (maker ≠ checker)
+- `web/e2e/__screenshots__/` → 24 real non-zero PNGs (mobile ones are web-at-390px, stale re: the fixed header) · `docs/store/assets/` absent · ACCEPTANCE_AUDIT 4 open FAILs (A3/A4/G4/G7)
+- web/mobile `tsc`/`lint`/`jest`/Playwright not re-run locally (node_modules absent by design) — relied on committed artifacts + required CI on main HEAD `4b180a2`
 
 ### Top gaps to drive to A+ (ordered; ship-critical below-A first)
-1. **business-case-strength (C, ship-critical):** floor not met ($57.5K < $100K). Build **Career+ ($24) as a real entitlement** (`careerplus_*` currently grants identical `PREMIUM`; `UserTier` is binary FREE/PREMIUM) and a **team/seat B2B2C tier** (no org/seat model exists). `floor_met_year1` must flip true on honest math.
-2. **store-readiness (C, ship-critical):** commit **rendered store assets** (1024×500 feature graphic, ≥2 store screenshots as real image files) and integrate **mobile IAP** (StoreKit/RevenueCat + Play Billing client) to clear FAILs A3/A4/G4/G7. (Live keys/signed build/submission stay owner Human-Core.)
-3. **design-taste (A→A+):** commit **actual native-mobile screenshots** (current `-mobile` PNGs are the web app at 390px) and fix the 390px header collision (email overlaps the Settings nav in `app-dashboard-empty-mobile.png`).
-4. **security (A→A+):** add **CAPTCHA/bot-protection** on public forms (login/register/waitlist) and move the **per-account login lockout to the cross-instance store** (rate counters are already shared; lockout is still in-memory per-instance).
-5. **performance (B):** paginate/limit `/api/analytics/pipeline` (asgi.py:1151, still unbounded `.all()`+sort) and add an **embedding cache** for the repeated resume text (scorer.py:24).
-6. **correctness (A→A+):** add **dedup/idempotency on persisted jobs** (`create_job` inserts unconditionally) and a **direct unit test on the zero-vector scorer branch**.
+1. **business-case-strength (C, ship-critical):** floor not met ($57.5K < $100K). Career+ is now a *real* differentiated tier (no longer dead config) and cover-letter/study-plan Pro value-adds shipped — genuine progress — but the honest median still doesn't cross the floor. Build the **team/B2B2C seat (org) tier** (no `Organization`/seat model exists in `src/` — highest ARPA, lowest CAC/seat) and/or **annual-first/founder-pricing enforcement** (priced in the table, not enforced in code). `floor_met_year1` must flip true on honest math.
+2. **store-readiness (C, ship-critical):** commit **rendered store assets** (1024×500 no-alpha feature graphic, ≥2 store screenshots as real image files, brand icon) and integrate **mobile IAP** (StoreKit/RevenueCat + Play Billing client, with restore-purchases) to clear FAILs A3/A4/G4/G7. (Live keys/signed build/submission stay owner Human-Core.)
+3. **design-taste (A→A+):** **regenerate the committed visual-verification screenshots** (the `-mobile` PNGs are stale and still depict the header collision the code already fixed at `layout.tsx:38` — the repo's design evidence currently contradicts the shipped UI) and add **true native-mobile captures** (Expo/Detox/Maestro) — every current `-mobile` PNG is the web app at a 390px viewport.
+4. **security (A→A+):** activate real bot-protection (the CAPTCHA seam is a no-op until `TURNSTILE_SECRET` + web sitekey + a native widget ship — owner-gated) and move the **per-account login lockout to the cross-instance store** (rate counters are already shared; lockout is still in-memory per-instance, `asgi.py:320`).
+5. **performance (A→A+):** replace `/api/analytics/pipeline`'s unbounded `.all()`+in-Python top-5 (`asgi.py:1616`) with a SQL `GROUP BY` for status counts + a separate `ORDER BY overall_score DESC LIMIT 5`.
+6. **tests-evals (A→A+):** add a per-PR (deterministic-fixture) content-quality assertion for the prep-pack (today's per-PR eval is `_FakeLLM` structure-only; the real-output check is nightly `live`-marked) and tighten the coverage floor toward actual (75 vs 92.75%).
 
 ```yaml
 QUALITY_SCORECARD:
-  as_of: 2026-07-01
+  as_of: 2026-07-03
   overall: B
   ship_gate_met: false
   method: 9 independent adversarial per-dimension grader subagents (maker != checker); each ran its own mechanical signal + cited file/line evidence
   dimensions:
     - name: functional-reality
-      grade: A
+      grade: A+
       ship_critical: true
       top_gaps:
-        - "Committed web screenshots exist but the browser journey's visual outcome rests on the required CI check (node_modules absent locally; could not re-render)."
+        - "Browser E2E visual outcome (numeric score renders in-DOM) is CI-gated, not locally reproducible (web node_modules absent) — corroborated statically via the exact selector<->render match; backend 15/15 journeys independently run."
     - name: correctness
-      grade: A
+      grade: A+
       ship_critical: true
       top_gaps:
-        - "No dedup/idempotency on persisted jobs: create_job (asgi.py:807) inserts unconditionally — POST /api/jobs twice creates duplicate rows; ATS import is preview-only."
-        - "LLM daily-ceiling slot consumed even when the provider call fails 502 (asgi.py:1037,1078) — documented as deliberate wallet-drain defense, but no refund on our upstream error."
-        - "Zero-vector scorer guard (scorer.py:43) has no direct unit assertion on the NaN/0.5 branch."
+        - "Outbound ATS fetches have timeouts but no retry/backoff on transient upstream 429/5xx — they degrade honestly to last_error rather than backing off."
+        - "LLM daily-ceiling slot is intentionally not refunded on a 502 (documented wallet-drain defense) — can burn a legitimate user's allowance under a flaky provider."
     - name: security
       grade: A
       ship_critical: true
       top_gaps:
-        - "No CAPTCHA/bot-protection on public forms (login/register/waitlist) — mitigated by rate limits, but automated floods still count toward per-account lockout."
-        - "Per-account login lockout is still in-memory/per-instance (asgi.py:307) — less effective on serverless than the now-shared rate counters."
+        - "CAPTCHA is a built but NO-OP seam (src/security/captcha.py:69) — does not protect public forms until the owner sets TURNSTILE_SECRET + web sitekey + a native mobile widget; today's live bot defense is rate-limiting only."
+        - "Per-account login lockout is still in-memory/per-instance (asgi.py:320) — less effective on serverless than the now-shared rate counters."
     - name: design-taste
       grade: A
       ship_critical: true
       top_gaps:
-        - "Zero screenshots of the ACTUAL native mobile app — every '-mobile' PNG is the web app at a 390px viewport (visual-verification.spec.ts width:390); native mobile visual proof remains zero."
-        - "390px web render shows a header layout collision (account email overlaps the Settings nav) in app-dashboard-empty-mobile.png — a real responsive polish bug."
+        - "Committed -mobile screenshots are STALE: they still depict the 390px header collision that the code already fixed (layout.tsx:38) — the repo's design evidence contradicts the shipped UI; regenerate them."
+        - "Zero screenshots of the ACTUAL native mobile app — every '-mobile' PNG is the web app at a 390px viewport (visual-verification.spec.ts:20); native mobile visual proof remains zero."
     - name: store-readiness
       grade: C
       ship_critical: true
       top_gaps:
         - "No rendered store assets committed: docs/store/assets/ absent — no 1024x500 feature graphic, no store screenshot image files (A3/G7 FAIL)."
-        - "Mobile IAP not integrated: StoreKit/RevenueCat (A4) + Play Billing (G4) — required before submission; restore-purchases (A5) also blocked."
-        - "Deploy config depends on Vercel experimentalServices (Services preset) — real but flagged possibly plan-gated; documented two-project fallback exists."
+        - "Mobile IAP not integrated: StoreKit/RevenueCat (A4) + Play Billing (G4) — only deferral comments in paywall.tsx:41,119; restore-purchases (A5) also blocked."
+        - "Deploy config depends on Vercel experimentalServices (Services preset) — real + A-level, but the store half carries the FAILs; documented two-project fallback exists."
     - name: artifact-integrity
-      grade: A
+      grade: A+
       ship_critical: true
       top_gaps: []
     - name: business-case-strength
       grade: C
       ship_critical: true
       top_gaps:
-        - "Career+ ($24) entitlement tier — UserTier still binary FREE/PREMIUM; careerplus_* billing grants identical PREMIUM, no differentiated gates built (dead config despite plan ids)."
-        - "Team/coach/B2B2C seat tier — no org/seat/team model in src/ at all (highest-ARPA, lowest-CAC lever, entirely absent)."
-        - "Annual-first paywall + founder pricing — priced in the table but no enforcement/default-annual flow built."
-        - "AI-prep value expansion (voice mock / company dossiers) — named Career+ upgrade wedge, not built."
+        - "Team/coach/B2B2C seat tier — no org/seat/team model in src/ at all (highest-ARPA, lowest-CAC lever, entirely absent); the one lever most likely to flip the floor."
+        - "Annual-first paywall + founder pricing — priced in the table but no enforcement/default-annual flow built in code."
+        - "Career+ ($24) is now a REAL differentiated gate (salary-negotiation exclusive, webhook-verified) — genuine progress — but on any defensible pre-launch mix it diversifies, not floor-flips ($57.5K < $100K stands)."
     - name: tests-evals
       grade: A
       ship_critical: false
       top_gaps:
-        - "Prep-pack eval is still structure/persistence-only with a _FakeLLM — no golden content-quality assertion on generated prep material."
-        - "Coverage floor (75) sits ~15pts below actual (90.6%) — a loose ratchet that wouldn't catch a meaningful regression before the gate."
+        - "Per-PR prep-pack eval is _FakeLLM structure/persistence-only (test_prep_pack_evals.py:12) — the real content-quality check (test_ai_output_evals.py:55) is pytest.mark.live, deselected per-PR/nightly-only."
+        - "Coverage floor (75) sits ~18pts below actual (92.75%) — an honest but loose ratchet."
     - name: performance
-      grade: B
+      grade: A
       ship_critical: false
       top_gaps:
-        - "/api/analytics/pipeline (asgi.py:1151) still runs unbounded .all()+in-Python sort — got the eager-load half of the fix but not the pagination/limit half /api/jobs received."
-        - "No embedding cache: scorer.get_embedding (scorer.py:24) re-embeds identical resume text every call, burning quota against the daily ceiling."
+        - "/api/analytics/pipeline (asgi.py:1616) still runs an unbounded .all()+in-Python top-5 sort (fully batched, no N+1) — should be a SQL GROUP BY + ORDER BY ... LIMIT 5; low-severity."
   top_gaps:
-    - "business-case-strength C: floor not met ($57.5K<$100K); Career+ is dead config (identical PREMIUM), team/B2B2C tier absent."
+    - "business-case-strength C: floor not met ($57.5K<$100K); Career+ now real but not a floor-flip; team/B2B2C seat tier (highest ARPA) still unbuilt."
     - "store-readiness C: rendered store assets + screenshots missing; mobile IAP (StoreKit/Play Billing) not integrated; 4 open ACCEPTANCE_AUDIT FAILs."
-    - "design-taste A->A+: no native-mobile screenshots (all '-mobile' PNGs are web at 390px); 390px header collision bug."
-    - "security A->A+: no CAPTCHA on public forms; login lockout still in-memory per-instance."
-    - "performance B: unbounded .all() on /api/analytics/pipeline; no embedding cache."
+    - "design-taste A->A+: committed -mobile screenshots are stale (show the already-fixed header collision); still no true native-mobile captures."
+    - "security A->A+: CAPTCHA seam is no-op until owner connects; login lockout still in-memory per-instance."
+    - "performance A->A+: unbounded-but-batched .all()+in-Python sort on /api/analytics/pipeline."
 ```

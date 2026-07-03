@@ -95,3 +95,55 @@ screenshots are the web app at 390px (zero native-mobile visual proof) + a 390px
 
 **Issues:** updated #92 (business-case) + #93 (store-readiness), both still C. Closed #94
 (security) + #95 (design-taste) — both reached A this audit; recorded the fix evidence.
+
+## 2026-07-03 — 3rd independent audit
+
+**Overall: B (=) · ship_gate_met: false.** No overall grade change, but real, evidence-backed
+internal improvement: **three dimensions reached A+** and **performance moved B→A**. The ship
+gate is still blocked by the *same two* pre-launch C's (store-readiness, business-case), so
+overall is correctly held at B — the improvement is inside the passing dims, not on the two
+blockers.
+
+Per-dimension (Δ vs 2026-07-01): functional-reality **A+** (▲ from A), correctness **A+**
+(▲ from A), security **A** (=), design-taste **A** (=), store-readiness **C** (=),
+artifact-integrity **A+** (▲ from A), business-case-strength **C** (=), tests-evals **A** (=),
+performance **A** (▲ from B).
+
+Method: 9 fresh independent adversarial grader subagents (maker ≠ checker), each ran its own
+signal + cited file/line. Auditor pre-ran the gate at HEAD `4b180a2`: flake8 clean, **387
+backend pass @ 92.75% cov** (was 258 @ 90.64%; floor 75), **15 journeys** (was 9), **31 evals**
+(was 23), scorecard parses, `readiness`→FAIL (store-readiness C), `floor_met_year1=false`,
+`engine_pct=0`. web/mobile tsc/lint/jest/Playwright not re-runnable locally (node_modules absent)
+— relied on committed artifacts + required CI on main HEAD `4b180a2`.
+
+**What genuinely improved this run:**
+- **correctness A→A+** — BOTH prior named nits now fixed WITH direct tests: job dedup/idempotency
+  guard (`asgi.py:1035`, returns `{"duplicate":True}` before the cap + score-slot; `test_job_idempotency.py`
+  6 tests) and a direct zero-vector→0.5 scorer assertion (`test_scoring_evals.py:135`).
+- **functional-reality A→A+** — 15 journeys (was 9) assert the real fit-score VALUE + tier flip +
+  honest 501/503 degradation; billing entitlement round-trip covered both grant AND refuse.
+- **artifact-integrity A→A+** — every spot-checked box (Career+, cover-letter/study-plan Pro
+  endpoints, CAPTCHA seam, dedup, fail-loud-serverless #228, signup no-hard-block #216) maps to a
+  real tested artifact; docs honestly disclose no-op/degraded states + the unmet floor.
+- **performance B→A** — `/api/jobs` paginated; resume AND JD embeddings are DB-cached
+  (`ensure_user_embedding`/`ensure_job_embedding`) — the prior "no embedding cache" nit was WRONG;
+  only one low-severity batched-unbounded aggregate remains (`/api/analytics/pipeline` `.all()`+sort).
+- **security** — CAPTCHA seam now BUILT (`src/security/captcha.py`, wired on register/login/waitlist)
+  though a NO-OP until owner sets `TURNSTILE_SECRET`; login lockout still in-memory per-instance. Stays A.
+
+**Standing ship-critical gaps (still C — these block the ship gate):**
+1. **business-case-strength (C):** honest $57.5K < $100K. Career+ ($24) is now a REAL differentiated
+   webhook-verified gate (salary-negotiation exclusive) + cover-letter/study-plan Pro value-adds —
+   genuine lever progress — but not a floor-flip on any defensible mix. **Team/B2B2C seat (org) tier
+   is still entirely unbuilt** (highest ARPA) — the primary remaining floor-lever.
+2. **store-readiness (C):** unchanged — no rendered store assets (`docs/store/assets/` absent), no
+   store screenshots, mobile IAP (StoreKit/Play Billing) still only deferral comments (`paywall.tsx:41,119`)
+   → 4 open ACCEPTANCE_AUDIT FAILs (A3/A4/G4/G7). Vercel deploy config itself is A-level.
+
+**New named nit surfaced this run (non-blocking):** design — the committed `-mobile` screenshots are
+STALE; they still depict the 390px header collision that the code already FIXED (`layout.tsx:38`), so
+the repo's design evidence contradicts the shipped UI. Regenerate them (holds design at A, off A+).
+
+**Issues:** #92 (business-case) + #93 (store-readiness) both remain the correct open ship-critical
+issues (both still C) — updated with this audit's fresh evidence rather than duplicated. No dimension
+regressed below A that lacked an issue; no new ship-critical issue needed.
