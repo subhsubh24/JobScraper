@@ -121,3 +121,41 @@ def test_prep_pack_rejects_oversized_job_id(client):
         json={"job_id": "z" * 65},
     )
     assert r.status_code == 422, r.text
+
+
+def test_salary_negotiation_rejects_zero_target(client):
+    """target_salary=0 is refused at the schema (422) BEFORE the handler — so a direct API
+    caller can never burn a paid LLM call generating a nonsensical "$0" guide. Body
+    validation runs after auth, so a valid token is enough to reach it (the Career+ tier gate
+    is inside the handler, which never runs on an invalid body)."""
+    token = _register(client, "zero-salary@example.com")
+    r = client.post(
+        "/api/prep/salary-negotiation",
+        headers=_auth(token),
+        json={"job_id": "abc123", "target_salary": 0},
+    )
+    assert r.status_code == 422, r.text
+
+
+def test_salary_negotiation_rejects_negative_target(client):
+    token = _register(client, "neg-target@example.com")
+    r = client.post(
+        "/api/prep/salary-negotiation",
+        headers=_auth(token),
+        json={"job_id": "abc123", "target_salary": -5000},
+    )
+    assert r.status_code == 422, r.text
+
+
+def test_salary_negotiation_accepts_positive_target(client):
+    """A positive target passes schema validation — proven by NOT getting a 422. A free user
+    then hits the Career+ tier gate (403), which confirms the request cleared validation and
+    reached the handler; the bound never breaks a real (positive) request."""
+    token = _register(client, "ok-target@example.com")
+    r = client.post(
+        "/api/prep/salary-negotiation",
+        headers=_auth(token),
+        json={"job_id": "abc123", "target_salary": 150000},
+    )
+    assert r.status_code != 422, r.text
+    assert r.status_code == 403, r.text  # free user: Career+ gate, validation passed

@@ -517,7 +517,11 @@ class CheckoutRequest(BaseModel):
 
 class SalaryNegotiationRequest(BaseModel):
     job_id: str = Field(min_length=1, max_length=64)
-    target_salary: int = Field(ge=0, le=10_000_000)
+    # gt=0 (not ge=0): a target of 0 is not a real negotiation goal — it would burn a paid
+    # LLM call (and a slot of the user's daily ceiling) generating a nonsensical "$0" guide
+    # and return success:true. Reject it server-side so a direct API caller can't do that; the
+    # web client already guards, but the server is the source of truth (Track F input bounds).
+    target_salary: int = Field(gt=0, le=10_000_000)
 
 
 class CoverLetterRequest(BaseModel):
