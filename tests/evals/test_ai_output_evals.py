@@ -100,6 +100,28 @@ def test_study_plan_real_output_is_substantive_and_structured(db_session, monkey
         f"study plan reads off-topic: {content[:200]!r}"
 
 
+def test_tailored_resume_real_output_is_grounded_and_structured(db_session, monkeypatch):
+    """The tailored résumé must be substantive, structured, and — critically — GROUNDED in the
+    candidate's REAL résumé (it references the genuine skills present in the source), not a
+    fabricated history. The seeded résumé names Python/FastAPI/AWS/Kubernetes; a real tailored
+    output surfaces those true skills for a matching backend role."""
+    monkeypatch.setenv("GEMINI_API_KEY", LIVE_KEY)
+    from src.enrichment.llm_workflows import LLMWorkflows
+
+    user, job = _seed(db_session)  # résumé: Python/FastAPI/PostgreSQL/AWS/Docker/Kubernetes
+    artifact = LLMWorkflows(db_session).generate_tailored_resume(job, user)
+    content = artifact.content or ""
+    low = content.lower()
+
+    assert isinstance(artifact, PrepArtifact) and artifact.artifact_type == "tailored_resume"
+    assert len(content) > 200, f"tailored résumé too short to be real output: {len(content)} chars"
+    # Grounded in the REAL résumé: at least two of the source's genuine skills survive the rewrite
+    # (a fabricated or off-topic résumé would not echo the candidate's actual stack).
+    real_skills = [s for s in ("python", "fastapi", "postgres", "aws", "docker", "kubernetes") if s in low]
+    assert len(real_skills) >= 2, \
+        f"tailored résumé does not reference the candidate's real skills (grounding check): {content[:200]!r}"
+
+
 def test_coach_real_answer_is_substantive_and_on_topic(db_session, monkeypatch):
     monkeypatch.setenv("GEMINI_API_KEY", LIVE_KEY)
     from src.ai_coach.career_coach import CareerCoach

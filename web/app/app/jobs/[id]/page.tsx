@@ -57,6 +57,9 @@ export default function JobDetailPage() {
   const [studyLoading, setStudyLoading] = useState(false);
   const [studyMsg, setStudyMsg] = useState<string | null>(null);
   const [studyDays, setStudyDays] = useState('7');
+  const [resume, setResume] = useState<{ title: string; content: string } | null>(null);
+  const [resumeLoading, setResumeLoading] = useState(false);
+  const [resumeMsg, setResumeMsg] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -132,6 +135,21 @@ export default function JobDetailPage() {
       else setStudyMsg(e instanceof ApiError ? e.message : 'Could not generate.');
     } finally {
       setStudyLoading(false);
+    }
+  }
+
+  async function generateTailoredResume() {
+    setResumeMsg(null);
+    if (!(await ensureConsent())) return;
+    setResumeLoading(true);
+    try {
+      setResume(await api.generateTailoredResume(id));
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 403) router.push('/pricing');
+      // 400 (no saved résumé), 503 (no key), and other API errors surface honestly inline.
+      else setResumeMsg(e instanceof ApiError ? e.message : 'Could not generate.');
+    } finally {
+      setResumeLoading(false);
     }
   }
 
@@ -237,6 +255,32 @@ export default function JobDetailPage() {
           <div className="space-y-6">
             <div>
               <p className="mb-2 text-sm text-slate-400">
+                Your résumé rewritten for this role — your real experience reordered and reworded
+                to match the posting. Never invents anything you didn&apos;t do.
+              </p>
+              <Button onClick={generateTailoredResume} disabled={resumeLoading}>
+                {resumeLoading ? 'Tailoring…' : resume ? 'Regenerate tailored résumé' : 'Generate tailored résumé'}
+              </Button>
+              {resumeMsg && <p role="alert" className="mt-2 text-sm text-amber-400">{resumeMsg}</p>}
+              {resumeLoading && !resume && (
+                <Card className="mt-4 space-y-3" aria-busy="true" aria-label="Tailoring résumé">
+                  <Skeleton className="h-5 w-48" />
+                  <Skeleton className="h-4 w-full" />
+                  <Skeleton className="h-4 w-11/12" />
+                  <Skeleton className="h-4 w-4/5" />
+                </Card>
+              )}
+              {resume && (
+                <Card className="mt-4">
+                  <h3 className="mb-2 font-semibold">{resume.title}</h3>
+                  <Markdown content={resume.content} />
+                  <ReportButton contentType="prep_pack" contentRef={id} contentExcerpt={resume.content} />
+                </Card>
+              )}
+            </div>
+
+            <div>
+              <p className="mb-2 text-sm text-slate-400">
                 A tailored cover letter for this role, drawn from your resume.
               </p>
               <Button onClick={generateCoverLetter} disabled={letterLoading}>
@@ -302,7 +346,8 @@ export default function JobDetailPage() {
             <div className="flex items-center gap-2">
               <LockIcon />
               <p className="text-slate-300">
-                Tailored <span className="font-semibold text-indigo-300">cover letters</span> and{' '}
+                Tailored <span className="font-semibold text-indigo-300">résumés</span>,{' '}
+                <span className="font-semibold text-indigo-300">cover letters</span>, and{' '}
                 <span className="font-semibold text-indigo-300">study plans</span> are a Pro feature.
               </p>
             </div>

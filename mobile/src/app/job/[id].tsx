@@ -41,6 +41,9 @@ export default function JobDetailScreen() {
   const [studyPlan, setStudyPlan] = useState<{ title: string; content: string } | null>(null);
   const [studyMsg, setStudyMsg] = useState<string | null>(null);
   const [studyDays, setStudyDays] = useState('7');
+  const [resumeLoading, setResumeLoading] = useState(false);
+  const [resume, setResume] = useState<{ title: string; content: string } | null>(null);
+  const [resumeMsg, setResumeMsg] = useState<string | null>(null);
   const isCareerPlus = user?.career_plus === true;
   // Pro (paid) tier: Pro AND Career+ are both PREMIUM. Gates the cover-letter + study-plan tools.
   const isPaid = user?.tier === 'premium';
@@ -139,6 +142,26 @@ export default function JobDetailScreen() {
       }
     } finally {
       setStudyLoading(false);
+    }
+  }
+
+  async function generateTailoredResume() {
+    if (!id) return;
+    setResumeMsg(null);
+    if (!(await ensureConsent())) return;
+    setResumeLoading(true);
+    try {
+      setResume(await api.generateTailoredResume(id));
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 403) {
+        router.push('/paywall');
+      } else if (e instanceof ApiError) {
+        setResumeMsg(e.message); // 400 (no saved résumé), 503 (no key), other errors — honestly inline
+      } else {
+        setResumeMsg('Could not generate a tailored résumé. Please try again.');
+      }
+    } finally {
+      setResumeLoading(false);
     }
   }
 
@@ -272,6 +295,28 @@ export default function JobDetailScreen() {
       <Text style={styles.section}>Application tools</Text>
       {isPaid ? (
         <>
+          <Text style={styles.toolHint}>
+            Your résumé rewritten for this role — your real experience reordered and reworded to match the
+            posting. Never invents anything you didn&apos;t do.
+          </Text>
+          <Button
+            label={resume ? 'Regenerate tailored résumé' : 'Generate tailored résumé'}
+            onPress={generateTailoredResume}
+            loading={resumeLoading}
+          />
+          {resumeMsg ? (
+            <Text style={styles.prepMsg} accessibilityRole="alert" accessibilityLiveRegion="polite">
+              {resumeMsg}
+            </Text>
+          ) : null}
+          {resume ? (
+            <Card style={styles.prepCard}>
+              <Text style={styles.prepTitle}>{resume.title}</Text>
+              <Markdown content={resume.content} />
+              <ReportButton contentType="prep_pack" contentRef={id} contentExcerpt={resume.content} />
+            </Card>
+          ) : null}
+
           <Text style={styles.toolHint}>A tailored cover letter for this role, drawn from your resume.</Text>
           <Button
             label={letter ? 'Regenerate cover letter' : 'Generate cover letter'}
@@ -320,7 +365,7 @@ export default function JobDetailScreen() {
       ) : (
         <Card style={styles.upsellCard}>
           <Text style={styles.upsellText}>
-            Tailored cover letters and study plans are a Pro feature.
+            Tailored résumés, cover letters, and study plans are a Pro feature.
           </Text>
           <Button label="Upgrade to Pro" onPress={() => router.push('/paywall')} />
         </Card>

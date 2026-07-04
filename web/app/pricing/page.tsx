@@ -8,7 +8,7 @@ import { api, ApiError, getToken } from '@/lib/api';
 const PRO_FEATURES = [
   'Unlimited tracked jobs',
   'AI interview prep packs',
-  'AI cover letters & study plans',
+  'AI tailored résumés, cover letters & study plans',
   'AI Career Coach',
 ];
 

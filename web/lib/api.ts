@@ -258,6 +258,18 @@ export const api = {
     ).artifact;
   },
 
+  // Rewrite the user's saved résumé tailored to a job — a Pro+ feature. Same honest 403/503
+  // contract as coverLetter, plus ApiError(400) when the user has no saved résumé to tailor
+  // (the server refuses rather than fabricate one) — the caller surfaces each honestly.
+  async generateTailoredResume(jobId: string): Promise<{ title: string; content: string }> {
+    return (
+      await request<{ artifact: { title: string; content: string } }>('/api/prep/tailored-resume', {
+        method: 'POST',
+        body: { job_id: jobId },
+      })
+    ).artifact;
+  },
+
   // Report/flag an AI-generated response (coach reply or prep pack) for moderator review.
   // Awaits the REAL POST /api/report and throws ApiError on failure so the caller can
   // surface it honestly — the success state is only shown once the server records the row.
