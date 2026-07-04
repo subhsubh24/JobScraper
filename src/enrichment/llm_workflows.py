@@ -312,6 +312,52 @@ never invent anything.
 
         return artifact
 
+    def generate_learning_plan(
+        self, gap_skills: list[str], job_titles: list[str], user: User
+    ) -> str:
+        """Generate a prioritised learning plan for the user's TOP cross-pipeline skill gaps.
+
+        Returns the plan as markdown CONTENT — deliberately NOT persisted as a ``PrepArtifact``.
+        A ``PrepArtifact`` is job-scoped (``job_id`` is required), but this plan is cross-pipeline
+        (it spans ALL the user's jobs) and is cheaply regenerable from the deterministic heatmap,
+        so we return it for the user to read / copy / download rather than storing a mislabelled
+        job-scoped row. The endpoint computes ``gap_skills`` server-side (never trusted from the
+        client) and bounds them (top ~10), and only skill NAMES + job TITLES are sent to the model
+        — never the full résumé or JD text — so the third-party payload stays small and bounded.
+
+        HONESTY on resources: the prompt names REPUTABLE, well-known resource TYPES + sources and
+        is explicitly told NOT to fabricate specific URLs or invent course titles. A dead or
+        invented link is exactly the "obviously-AI / inaccurate" output real users penalise
+        (VISION "honest > flashy"); commonly-findable named resources are more useful and honest
+        than confident fake URLs. Output is moderated by the shared ``_call_llm`` chokepoint, so a
+        flagged plan FAILS LOUD (``ModeratedContentError``) instead of masquerading as a result.
+        """
+        system_prompt = """You are a pragmatic technical learning coach. Given a job-seeker's TOP
+recurring skill gaps (skills their target jobs repeatedly demand but their résumé lacks), produce
+a prioritised, realistic learning plan.
+
+RULES — non-negotiable:
+- Cover ONLY the skills provided. Do NOT invent additional skills, employers, or certifications.
+- Order the skills by priority (most-demanded first, as given) and propose a sensible weekly
+  sequence the reader can actually follow.
+- For EACH skill give: (a) why it matters for their target roles, (b) a concrete learning path
+  (fundamentals → hands-on practice → a small portfolio proof), and (c) a realistic time estimate
+  to job-ready competence.
+- Recommend REPUTABLE, widely-known resources by NAME and TYPE — e.g. "the official <tool> docs",
+  "freeCodeCamp", "a well-reviewed Coursera or Udemy course on <topic>", "build a small project
+  that <does X>". Do NOT fabricate specific URLs and do NOT invent exact course titles — name
+  real, commonly-findable resource categories the reader can search for. Honesty over specificity.
+Return clean, well-structured markdown with one heading per skill and a short intro. No preamble."""
+
+        titles = ", ".join(t for t in job_titles[:8] if t) or "various roles"
+        skills = ", ".join(gap_skills)
+        user_prompt = f"""The candidate is targeting roles like: {titles}.
+Their top recurring skill gaps, most-demanded first: {skills}.
+
+Write the prioritised learning plan following the RULES."""
+
+        return self._call_llm(system_prompt, user_prompt)
+
     def generate_salary_negotiation(self, job: JobPosting, target_salary: int) -> PrepArtifact:
         """Generate salary negotiation scripts and strategies."""
         system_prompt = """You are a salary negotiation expert. Provide specific scripts and strategies.

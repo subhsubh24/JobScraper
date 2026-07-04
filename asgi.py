@@ -46,6 +46,7 @@ from src.db.models import (
     Waitlist,
 )
 from src.enrichment.llm_workflows import LLMWorkflows, ModeratedContentError
+from src.insights.skill_gaps import analyze_skill_gaps
 from src.llm import llm_available
 from src.ranking.scorer import JobScorer
 from src import analytics
@@ -1715,6 +1716,115 @@ def report_content(
     db.add(report)
     db.commit()
     return {"success": True, "message": "Thanks — this response has been flagged for review."}
+
+
+# ---------------------------------------------------------------------------
+# Cross-pipeline insights: skill-gap heatmap (free) + AI learning plan (Pro)
+# ---------------------------------------------------------------------------
+# How many of the user's jobs the analysis considers. The heatmap is fully local (no LLM), so
+# this is a CPU/allocation guard against a pathological account with thousands of jobs, not a
+# wallet-drain guard — the LLM learning plan only ever receives the top ~10 skill NAMES + ≤8 job
+# titles (never JD/résumé text), so its third-party payload is bounded regardless of this cap.
+_SKILL_GAP_JOB_CAP = 500
+
+
+@app.get("/api/insights/skill-gaps", dependencies=[Depends(rate_limit("suggest", 30))])
+def skill_gap_heatmap(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Cross-pipeline skill-gap heatmap — FREE, fully local (no LLM, no data leaves the server).
+
+    Reuses the scorer's heuristic skill extractor on BOTH the résumé and every tracked JD, so the
+    two sides share one vocabulary. Honest empty states: "no jobs yet" / "no résumé yet" are
+    surfaced in the payload (``total_jobs`` / ``has_resume``), never errored — this is the free
+    retention hook, and the (Pro, LLM) learning plan is a separate call.
+    """
+    jobs = (
+        db.query(JobPosting)
+        .filter(JobPosting.user_id == user.id)
+        .order_by(JobPosting.created_at.desc())
+        .limit(_SKILL_GAP_JOB_CAP)
+        .all()
+    )
+    analysis = analyze_skill_gaps(jobs, user.resume_text or "", JobScorer(db).extract_skills)
+    return {"success": True, "analysis": analysis.to_dict()}
+
+
+@app.post("/api/insights/learning-plan", dependencies=[Depends(rate_limit("llm", 10))])
+def generate_learning_plan_endpoint(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Generate an AI learning plan for the user's TOP cross-pipeline skill gaps — a Pro+ feature.
+
+    Same Pro+ gate / consent / ceiling / honest-degradation contract as the other AI generators.
+    The gaps are recomputed SERVER-SIDE from the user's own jobs (never trusted from the client),
+    and only the top-10 gap skill names + job titles reach the model. NOT persisted: the plan is
+    cross-pipeline (not job-scoped) and cheaply regenerable, so it is returned for copy/download.
+    Guard order puts the actionable 400s (no jobs / no résumé / no gaps — states the user can fix)
+    BEFORE the 503 key check and BEFORE consuming a daily LLM slot.
+    """
+    if user.tier != UserTier.PREMIUM:
+        raise HTTPException(
+            status_code=403,
+            detail="AI learning plans are a Pro feature. Upgrade to Pro or Career+ to unlock them.",
+        )
+
+    jobs = (
+        db.query(JobPosting)
+        .filter(JobPosting.user_id == user.id)
+        .order_by(JobPosting.created_at.desc())
+        .limit(_SKILL_GAP_JOB_CAP)
+        .all()
+    )
+    if not jobs:
+        raise HTTPException(
+            status_code=400,
+            detail="Track some jobs first — your learning plan is built from the skills your saved jobs demand.",
+        )
+    if not (user.resume_text or "").strip():
+        raise HTTPException(
+            status_code=400,
+            detail="Add your résumé in Settings first — the plan compares your skills against your tracked jobs.",
+        )
+
+    analysis = analyze_skill_gaps(jobs, user.resume_text or "", JobScorer(db).extract_skills)
+    top_gaps = [g.skill for g in analysis.gaps[:10]]
+    if not top_gaps:
+        raise HTTPException(
+            status_code=400,
+            detail="No skill gaps found — your résumé already covers the skills your tracked jobs demand.",
+        )
+
+    if not llm_available():
+        raise HTTPException(
+            status_code=503,
+            detail="AI learning plans require the server's GEMINI_API_KEY to be configured.",
+        )
+
+    require_ai_consent(user)
+    check_llm_ceiling(user, db)
+    job_titles = [j.title for j in jobs if j.title]
+    try:
+        content = LLMWorkflows(db).generate_learning_plan(top_gaps, job_titles, user)
+    except ModeratedContentError:
+        # A moderated decline is not a learning plan — return honestly, persist nothing (§6).
+        logger.info("Learning plan withheld by content moderation")
+        raise HTTPException(status_code=422, detail=_MODERATED_DECLINE_DETAIL)
+    except Exception:
+        logger.exception("Learning plan generation failed")
+        raise HTTPException(status_code=502, detail="AI provider error generating learning plan")
+
+    analytics.record_event(db, "learning_plan_generated")  # aggregate metric (best-effort, no PII)
+    return {
+        "success": True,
+        "artifact": {
+            "title": "Your cross-pipeline learning plan",
+            "content": content,
+            "skills": top_gaps,
+        },
+    }
 
 
 # ---------------------------------------------------------------------------
