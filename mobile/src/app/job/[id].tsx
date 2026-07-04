@@ -29,21 +29,21 @@ export default function JobDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [prepLoading, setPrepLoading] = useState(false);
-  const [prep, setPrep] = useState<{ title: string; content: string } | null>(null);
+  const [prep, setPrep] = useState<{ id: string; title: string; content: string } | null>(null);
   const [prepMsg, setPrepMsg] = useState<string | null>(null);
   const [targetSalary, setTargetSalary] = useState('');
   const [negLoading, setNegLoading] = useState(false);
-  const [neg, setNeg] = useState<{ title: string; content: string } | null>(null);
+  const [neg, setNeg] = useState<{ id: string; title: string; content: string } | null>(null);
   const [negMsg, setNegMsg] = useState<string | null>(null);
   const [letterLoading, setLetterLoading] = useState(false);
-  const [letter, setLetter] = useState<{ title: string; content: string } | null>(null);
+  const [letter, setLetter] = useState<{ id: string; title: string; content: string } | null>(null);
   const [letterMsg, setLetterMsg] = useState<string | null>(null);
   const [studyLoading, setStudyLoading] = useState(false);
-  const [studyPlan, setStudyPlan] = useState<{ title: string; content: string } | null>(null);
+  const [studyPlan, setStudyPlan] = useState<{ id: string; title: string; content: string } | null>(null);
   const [studyMsg, setStudyMsg] = useState<string | null>(null);
   const [studyDays, setStudyDays] = useState('7');
   const [resumeLoading, setResumeLoading] = useState(false);
-  const [resume, setResume] = useState<{ title: string; content: string } | null>(null);
+  const [resume, setResume] = useState<{ id: string; title: string; content: string } | null>(null);
   const [resumeMsg, setResumeMsg] = useState<string | null>(null);
   const isCareerPlus = user?.career_plus === true;
   // Pro (paid) tier: Pro AND Career+ are both PREMIUM. Gates the cover-letter + study-plan tools.
@@ -291,7 +291,7 @@ export default function JobDetailScreen() {
           <Text style={styles.prepTitle}>{prep.title}</Text>
           <Markdown content={prep.content} />
           <ArtifactActions text={prep.content} title={prep.title} />
-          <ReportButton contentType="prep_pack" contentRef={id} contentExcerpt={prep.content} />
+          <ReportButton contentType="prep_pack" contentRef={prep.id} contentExcerpt={prep.content} />
         </Card>
       ) : null}
 
@@ -317,7 +317,7 @@ export default function JobDetailScreen() {
               <Text style={styles.prepTitle}>{resume.title}</Text>
               <Markdown content={resume.content} />
               <ArtifactActions text={resume.content} title={resume.title} />
-              <ReportButton contentType="prep_pack" contentRef={id} contentExcerpt={resume.content} />
+              <ReportButton contentType="prep_pack" contentRef={resume.id} contentExcerpt={resume.content} />
             </Card>
           ) : null}
 
@@ -337,7 +337,7 @@ export default function JobDetailScreen() {
               <Text style={styles.prepTitle}>{letter.title}</Text>
               <Markdown content={letter.content} />
               <ArtifactActions text={letter.content} title={letter.title} />
-              <ReportButton contentType="prep_pack" contentRef={id} contentExcerpt={letter.content} />
+              <ReportButton contentType="prep_pack" contentRef={letter.id} contentExcerpt={letter.content} />
             </Card>
           ) : null}
 
@@ -364,7 +364,7 @@ export default function JobDetailScreen() {
               <Text style={styles.prepTitle}>{studyPlan.title}</Text>
               <Markdown content={studyPlan.content} />
               <ArtifactActions text={studyPlan.content} title={studyPlan.title} />
-              <ReportButton contentType="prep_pack" contentRef={id} contentExcerpt={studyPlan.content} />
+              <ReportButton contentType="prep_pack" contentRef={studyPlan.id} contentExcerpt={studyPlan.content} />
             </Card>
           ) : null}
         </>
@@ -398,7 +398,7 @@ export default function JobDetailScreen() {
               <Text style={styles.prepTitle}>{neg.title}</Text>
               <Markdown content={neg.content} />
               <ArtifactActions text={neg.content} title={neg.title} />
-              <ReportButton contentType="prep_pack" contentRef={id} contentExcerpt={neg.content} />
+              <ReportButton contentType="prep_pack" contentRef={neg.id} contentExcerpt={neg.content} />
             </Card>
           ) : null}
         </>
