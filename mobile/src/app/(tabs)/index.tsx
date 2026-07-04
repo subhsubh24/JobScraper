@@ -155,7 +155,7 @@ function JobRow({ job }: { job: Job }) {
         </View>
       </View>
       <View style={styles.scoreWrap}>
-        <Text style={[styles.scoreNum, { color: scoreColor(job.score) }]}>
+        <Text style={[styles.scoreNum, { color: scoreColor(job.score == null ? job.score : Math.round(job.score)) }]}>
           {job.score == null ? '—' : Math.round(job.score)}
         </Text>
         <Text style={styles.scoreLabel}>fit</Text>

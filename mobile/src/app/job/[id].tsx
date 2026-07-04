@@ -168,8 +168,9 @@ export default function JobDetailScreen() {
 
   async function generateNegotiation() {
     if (!id) return;
-    // Round BEFORE validating: "0.4" is > 0 but rounds to 0, which the backend (ge=0) would
-    // accept — burning an LLM call on a nonsensical "$0" guide. Validate the value we send.
+    // Round BEFORE validating: "0.4" is > 0 but rounds to 0, which we must reject client-side
+    // to match the backend (target_salary is gt=0) and avoid a pointless round-trip. Validate
+    // the value we actually send.
     const parsed = Math.round(Number(targetSalary));
     if (!Number.isFinite(parsed) || parsed <= 0) {
       setNegMsg('Enter your target salary (a positive number).');
@@ -236,7 +237,7 @@ export default function JobDetailScreen() {
       </Text>
 
       <Card style={styles.scoreCard}>
-        <Text style={[styles.scoreNum, { color: scoreColor(job.score) }]}>
+        <Text style={[styles.scoreNum, { color: scoreColor(job.score == null ? job.score : Math.round(job.score)) }]}>
           {job.score == null ? '—' : Math.round(job.score)}
           <Text style={styles.scoreOutOf}> / 100</Text>
         </Text>
