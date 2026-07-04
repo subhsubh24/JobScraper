@@ -89,11 +89,24 @@ consent gate; DoD = real generation + surfaced in web AND mobile + a downloadabl
       (clipboard) + Download (.md) via `<ArtifactActions>` (PR #258, 2 Sonnet reviewers) and mobile
       "Copy or share" via React Native's built-in `Share` sheet — no native dep, Expo SDK-56-safe
       (PR #257, 2 Sonnet reviewers). Both causally honest (no fake "copied"); box now `[x]`.
-- [ ] **Cross-pipeline skill-gap heatmap + learning plan** — the market's `/upskill`. Analyze the gap
-      between the user's profile and ALL their tracked jobs (not one posting) → a prioritized
-      skill-gap ranking (frequency across the pipeline × the user's absence) + a learning plan with
-      web-searched resources + time estimates. New endpoint + a web/mobile view; a strong
-      retention/planning surface. Deterministic eval on the ranking math + a real-output eval on the plan.
+- [x] **Cross-pipeline skill-gap heatmap + learning plan** — the market's `/upskill`. SHIPPED
+      (run 25, PR #261, 2 Sonnet reviewers APPROVE). `src/insights/skill_gaps.py` ranks the gap
+      between the user's résumé and ALL their tracked jobs — **frequency across the pipeline ×
+      absence from the résumé** — as a PURE, deterministic, KEY-FREE function (reuses the scorer's
+      one skill extractor on both sides so the comparison shares a vocabulary; no embeddings, no
+      Gemini call, no data leaves the server). `GET /api/insights/skill-gaps` is the FREE heatmap
+      (no tier gate, no consent, works with no key) with honest empty states — the retention hook;
+      `POST /api/insights/learning-plan` is the Pro+ AI plan (same tier→jobs/résumé/gaps-400→503→
+      consent→ceiling→moderation contract as the other generators; gaps recomputed SERVER-SIDE,
+      never client-trusted; only ≤10 skill names + ≤8 titles reach the model; NOT persisted →
+      returned for copy/download). Web `/app/insights` (data-driven demand bars + strengths +
+      consent-gated plan) + a mobile "Skill gaps" tab. Deterministic ranking eval
+      (`tests/evals/test_skill_gap_evals.py`) + a nightly real-output plan eval; EVAL_COVERAGE +
+      analytics allowlist updated. **DECISION (honest > flashy):** the plan ships LLM-suggested
+      REPUTABLE, findable resource types/names + time estimates rather than the literal
+      "web-searched resources" — a per-skill WebSearch in the serverless request path is fragile
+      (latency + fabricated/dead-link risk = exactly the "obviously-AI/inaccurate" output real users
+      penalise); the prompt is hard-told not to invent URLs/course titles. Equivalent value, honest.
 - [ ] **Drafter→reviewer pass on generated artifacts (product-side maker≠checker)** — before returning a
       cover letter / tailored résumé / study plan, run ONE independent LLM critique (on-brand? honest,
       no fabricated claims? tailored to THIS job? strong?) and revise once. Raises output quality;

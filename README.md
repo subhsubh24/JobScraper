@@ -32,6 +32,9 @@ It ships as three surfaces over one backend:
   plans**, each rendered as markdown with one-tap copy/download.
 - **Salary-negotiation coaching (Career+)** — scripts and strategy for a specific offer.
 - **AI career coach** — a chat coach with a conservative safety guardrail (Pro).
+- **Cross-pipeline skill-gap heatmap** — across ALL your tracked jobs (not one posting),
+  which skills they demand most that your résumé is missing, ranked by frequency. Free and
+  fully local; a Pro AI **learning plan** turns the top gaps into a prioritised path.
 - **Pipeline CRM** — track jobs through stages with fit scores surfaced inline.
 - **ATS import preview** — preview live listings from a Greenhouse/Lever careers URL
   (SSRF-guarded), or an honest empty/unreachable state.
