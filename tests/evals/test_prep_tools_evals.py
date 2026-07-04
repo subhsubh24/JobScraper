@@ -88,6 +88,35 @@ def test_generate_study_plan_persists_artifact_with_day_count(db_session):
     assert len(rows) == 1 and rows[0].artifact_type == "study_plan"
 
 
+def test_generate_tailored_resume_persists_artifact(db_session):
+    user, job = _seed(db_session)
+    wf = LLMWorkflows(db_session)
+    wf.client = _FakeLLM("## Ada Dev\nSenior engineer — Python, React. Tailored for the Backend role.")
+
+    artifact = wf.generate_tailored_resume(job, user)
+
+    assert isinstance(artifact, PrepArtifact)
+    assert artifact.artifact_type == "tailored_resume"
+    assert artifact.job_id == job.id
+    assert "Backend Engineer" in artifact.title and "Acme" in artifact.title
+    assert artifact.content and "Ada Dev" in artifact.content
+    assert artifact.model_used
+
+    rows = db_session.query(PrepArtifact).filter(PrepArtifact.job_id == job.id).all()
+    assert len(rows) == 1 and rows[0].artifact_type == "tailored_resume"
+
+
+def test_tailored_resume_blank_completion_fails_loud(db_session):
+    """An empty completion must raise (honest 502 upstream), never persist a blank 'tailored'
+    résumé and report success — SIDE-EFFECT INTEGRITY (§6)."""
+    user, job = _seed(db_session)
+    wf = LLMWorkflows(db_session)
+    wf.client = _FakeLLM("   ")  # whitespace-only == empty
+    with pytest.raises(RuntimeError):
+        wf.generate_tailored_resume(job, user)
+    assert db_session.query(PrepArtifact).filter(PrepArtifact.job_id == job.id).count() == 0
+
+
 def test_cover_letter_blank_completion_fails_loud(db_session):
     """An empty LLM completion must raise (honest 502 upstream), never persist a blank
     'generated' cover letter and report success — SIDE-EFFECT INTEGRITY (§6)."""

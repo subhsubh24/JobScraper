@@ -251,6 +251,67 @@ Resume: {user.resume_text or 'Experienced professional'}
 
         return artifact
 
+    def generate_tailored_resume(self, job: JobPosting, user: User) -> PrepArtifact:
+        """Rewrite the user's OWN résumé, tailored to a specific posting.
+
+        The single hardest constraint here is HONESTY: a tailored résumé must reorder, emphasize,
+        and rephrase the candidate's REAL experience to mirror the job's language — it must NEVER
+        invent an employer, title, date, degree, or skill the source résumé doesn't contain.
+        Fabricated experience is worse than useless: it gets the candidate caught (VISION "honest >
+        flashy"; the real user complaint that AI output is "obviously AI"/inaccurate). The endpoint
+        guarantees ``user.resume_text`` is present before calling this (you cannot tailor nothing —
+        tailoring an empty résumé would force the model to fabricate a whole history), so the prompt
+        can lean on it as the sole source of truth.
+        """
+        system_prompt = """You are an expert résumé editor. You rewrite a candidate's EXISTING
+résumé so it is tailored to ONE specific job posting.
+
+ABSOLUTE RULES — these are non-negotiable and override everything else:
+- Use ONLY the experience, employers, job titles, dates, education, and skills that appear in the
+  candidate's source résumé. NEVER invent, add, or exaggerate an employer, role, title, date,
+  degree, certification, metric, or skill that is not already in the source. If the source does
+  not contain something the job wants, DO NOT fabricate it — instead surface the genuinely-relevant
+  experience the candidate DOES have.
+- You may REORDER sections/bullets to put the most relevant experience first, REPHRASE bullets to
+  mirror the job's language and keywords (only where the underlying fact is true), and TIGHTEN
+  wording. That is the whole job.
+- Keep it truthful and ATS-friendly: clear section headings, concise bullet points, real keywords
+  from the posting that genuinely match the candidate.
+
+Return the tailored résumé as clean, well-structured markdown (name/summary, skills, experience
+with bullets, education). Do not add a preamble or commentary — output only the résumé."""
+
+        user_prompt = f"""Tailor this candidate's résumé to the job below.
+
+TARGET JOB:
+Title: {job.title}
+Company: {job.company_name}
+Location: {job.location}
+Description: {job.description or 'N/A'}
+Requirements: {job.requirements or 'N/A'}
+
+CANDIDATE'S CURRENT RÉSUMÉ (the ONLY source of truth — do not add anything not present here):
+{user.resume_text}
+
+Rewrite the résumé tailored to this posting, following the ABSOLUTE RULES. Emphasize the experience
+and skills that match this role; mirror the posting's terminology where it is genuinely accurate;
+never invent anything.
+"""
+
+        content = self._call_llm(system_prompt, user_prompt)
+
+        artifact = PrepArtifact(
+            job_id=job.id,
+            artifact_type="tailored_resume",
+            title=f"Tailored Résumé: {job.title} at {job.company_name}",
+            content=content,
+            model_used=self.MODEL,
+        )
+        self.db.add(artifact)
+        self.db.flush()
+
+        return artifact
+
     def generate_salary_negotiation(self, job: JobPosting, target_salary: int) -> PrepArtifact:
         """Generate salary negotiation scripts and strategies."""
         system_prompt = """You are a salary negotiation expert. Provide specific scripts and strategies.

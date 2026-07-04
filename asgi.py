@@ -534,6 +534,12 @@ class StudyPlanRequest(BaseModel):
     days: int = Field(default=7, ge=1, le=30)
 
 
+class TailoredResumeRequest(BaseModel):
+    # Same bounded job id contract as the other prep tools — the endpoint scopes the lookup to
+    # the caller, so an over-length value just misses; 422 at the boundary is the honest failure.
+    job_id: str = Field(min_length=1, max_length=64)
+
+
 class ImportPreviewRequest(BaseModel):
     careers_url: str = Field(min_length=4, max_length=500)
 
@@ -1539,6 +1545,78 @@ def generate_study_plan_endpoint(
 
     db.commit()
     analytics.record_event(db, "study_plan_generated")  # aggregate metric (best-effort, no PII)
+    return {
+        "success": True,
+        "artifact": {
+            "id": artifact.id,
+            "title": artifact.title,
+            "content": artifact.content,
+        },
+    }
+
+
+# ---------------------------------------------------------------------------
+# Tailored résumé generation (Pro+; LLM — degrades gracefully)
+# ---------------------------------------------------------------------------
+@app.post("/api/prep/tailored-resume", dependencies=[Depends(rate_limit("llm", 10))])
+def generate_tailored_resume_endpoint(
+    data: TailoredResumeRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Rewrite the user's résumé tailored to a tracked job — a Pro+ feature.
+
+    Same Pro+ gate / consent / ceiling / honest-degradation contract as the cover-letter and
+    study-plan endpoints. One EXTRA guard unique to this feature: it requires a saved résumé.
+    Unlike a cover letter (which can be written from a name), a "tailored résumé" with no source
+    résumé would force the model to FABRICATE an entire work history — the exact dishonesty this
+    feature must never produce (VISION "honest > flashy"). So a paid user with an empty
+    ``resume_text`` gets an honest 400 telling them to add their résumé first, never an invented
+    one. The generator's prompt then treats the saved résumé as the sole source of truth.
+    """
+    if user.tier != UserTier.PREMIUM:
+        raise HTTPException(
+            status_code=403,
+            detail="Tailored résumés are a Pro feature. Upgrade to Pro or Career+ to unlock them.",
+        )
+
+    job = (
+        db.query(JobPosting)
+        .filter(JobPosting.id == data.job_id, JobPosting.user_id == user.id)
+        .first()
+    )
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    if not (user.resume_text or "").strip():
+        # Cannot tailor a résumé that doesn't exist — refuse honestly rather than fabricate one.
+        raise HTTPException(
+            status_code=400,
+            detail="Add your résumé in Settings before generating a tailored résumé.",
+        )
+
+    if not llm_available():
+        # Truthful graceful degradation — not a crash, not a fake result.
+        raise HTTPException(
+            status_code=503,
+            detail="AI résumé tailoring requires the server's GEMINI_API_KEY to be configured.",
+        )
+
+    require_ai_consent(user)
+    check_llm_ceiling(user, db)
+    try:
+        artifact: PrepArtifact = LLMWorkflows(db).generate_tailored_resume(job, user)
+    except ModeratedContentError:
+        # A moderated decline is not a generated résumé — return honestly, don't persist it
+        # or claim success (§6, no fake success).
+        logger.info("Tailored résumé withheld by content moderation")
+        raise HTTPException(status_code=422, detail=_MODERATED_DECLINE_DETAIL)
+    except Exception:
+        logger.exception("Tailored résumé generation failed")
+        raise HTTPException(status_code=502, detail="AI provider error generating tailored résumé")
+
+    db.commit()
+    analytics.record_event(db, "tailored_resume_generated")  # aggregate metric (best-effort, no PII)
     return {
         "success": True,
         "artifact": {

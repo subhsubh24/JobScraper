@@ -11,7 +11,7 @@ import { colors, radius, spacing } from '@/theme';
 const PRO_FEATURES = [
   'Unlimited tracked jobs',
   'AI interview prep packs',
-  'AI cover letters & study plans',
+  'AI tailored résumés, cover letters & study plans',
   'AI Career Coach',
 ];
 // The Career+-exclusive (a real, additive feature — no tier ever lost it).
