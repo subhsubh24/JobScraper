@@ -22,7 +22,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse
 from pydantic import BaseModel, Field, model_validator
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.orm import Session, joinedload, selectinload
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from src.api.errors import error_body
@@ -1170,8 +1170,17 @@ def get_job(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
+    # job_public() reads application + score + company. For a SINGLE row, joinedload pulls all
+    # three in ONE query (a LEFT JOIN) instead of the object plus three lazy-load round-trips —
+    # 4 queries → 1 on the most-hit authed endpoint. (selectinload wouldn't help here: it issues
+    # a separate query per relationship regardless of row count, so for one row it's still 3+1.)
     job = (
         db.query(JobPosting)
+        .options(
+            joinedload(JobPosting.application),
+            joinedload(JobPosting.score),
+            joinedload(JobPosting.company),
+        )
         .filter(JobPosting.id == job_id, JobPosting.user_id == user.id)
         .first()
     )

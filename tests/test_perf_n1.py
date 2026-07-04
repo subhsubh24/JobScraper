@@ -86,6 +86,25 @@ def test_list_jobs_is_not_n_plus_one(db_session):
     assert res5["jobs"][0]["status"] == ApplicationStatus.APPLIED.value
 
 
+def test_get_job_detail_loads_relationships_in_one_query(db_session):
+    """``GET /api/jobs/{id}`` serializes a SINGLE job via ``job_public``, which reads its
+    application + score + company. Without eager-loading that's the object fetch plus three
+    lazy-load round-trips (4 queries); ``joinedload`` pulls all three in ONE query. This pins
+    the hot-path detail endpoint at a single DB round-trip so the lazy-loads can't creep back."""
+    user = _seed_user_with_jobs(db_session, 1, "perf-detail@example.com")
+    job_id = db_session.query(JobPosting).filter(JobPosting.user_id == user.id).first().id
+    db_session.expire_all()  # force fresh loads so the count reflects real fetches
+    _ = user.id  # reload the user OUTSIDE the measured region (in prod it's already loaded by
+    #              the auth dependency) so the count reflects only the job-detail fetch
+    n, res = _count_queries(db_session, lambda: asgi.get_job(job_id=job_id, user=user, db=db_session))
+
+    assert n == 1, f"GET /api/jobs/{{id}} should load job + relationships in ONE query, got {n}"
+    # And the eager-loaded data is real (the company path — company_name is None — resolved).
+    assert res["job"]["score"] is not None
+    assert res["job"]["status"] == ApplicationStatus.APPLIED.value
+    assert res["job"]["company"] == "Acme 0"
+
+
 def test_list_jobs_limit_is_additive_and_optional(db_session):
     """``limit`` must default to returning ALL jobs (no silent truncation of existing
     clients); supplying it pages the result."""
