@@ -132,9 +132,11 @@ class LLMWorkflows:
         The reviewer sees the SAME grounding context the drafter saw (so it can catch a fabricated
         claim the drafter is told never to make) plus the draft, and returns an improved version.
         Best-effort and fail-SAFE by design: the draft has ALREADY passed generation + moderation,
-        so this pass can only make the artifact BETTER or leave it unchanged — it must never break a
-        generation or make it worse. Any failure of the review call (provider error, empty response,
-        or the refined output tripping the moderator) falls back to the clean draft. Routing through
+        so a FAILED review can never break the generation — any failure of the review call
+        (provider error, empty response, or the refined output tripping the moderator) falls back
+        to the clean draft. (Structural guarantee on the failure paths; the reviewer is *prompt*-
+        instructed to only improve, so a successful-but-weaker revision, while not structurally
+        prevented, is what the honesty-first reviewer prompt guards against.) Routing through
         ``_call_llm`` means the refined prose is moderated too; a flagged refinement → fall back.
         """
         if not draft or not _refinement_enabled() or self.client is None:
@@ -151,7 +153,9 @@ class LLMWorkflows:
         except Exception:
             # Fail SAFE: the draft is already a valid, moderated artifact. A refinement failure
             # (provider error / empty / moderator-flagged refinement) must never degrade it.
-            logger.warning("Artifact refinement pass failed for %s; returning the draft.", kind)
+            logger.warning(
+                "Artifact refinement pass failed for %s; returning the draft.", kind, exc_info=True
+            )
             return draft
         improved = (improved or "").strip()
         return improved or draft
