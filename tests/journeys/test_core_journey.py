@@ -163,7 +163,7 @@ def test_paywall_and_ai_degrade_gracefully(client):
     # Free user hitting the AI coach -> truthful paywall, not a 500.
     chat = client.post("/api/coach/chat", headers=h, json={"message": "help"})
     assert chat.status_code == 403
-    assert "Premium" in chat.json()["detail"]
+    assert "Pro" in chat.json()["detail"]
 
     # Prep pack with no LLM key configured -> truthful 503, not a crash/fake result.
     prep = client.post("/api/prep-packs/generate", headers=h, json={"job_id": job_id})
