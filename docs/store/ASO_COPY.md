@@ -52,7 +52,7 @@ needs attention so nothing slips.
 
 **Plans**
 - **Free:** track up to 5 jobs, 1 prep pack/month, fit scoring.
-- **Pro — $12/mo or $96/yr:** unlimited jobs, AI prep packs, cover letters, and study plans, plus the AI Career Coach.
+- **Pro — $12/mo or $96/yr:** unlimited jobs, AI prep packs, tailored résumés, cover letters, and study plans, plus the AI Career Coach.
 - **Career+ — $24/mo or $192/yr:** everything in Pro, plus the AI salary-negotiation coaching
   tool. (Annual saves ~33%.)
 
