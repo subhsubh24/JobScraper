@@ -76,7 +76,7 @@ export default function PipelinePage() {
                   </span>
                 </div>
                 <div className="text-right">
-                  <div className={`text-2xl font-extrabold ${scoreColor(job.score)}`}>
+                  <div className={`text-2xl font-extrabold ${scoreColor(job.score == null ? job.score : Math.round(job.score))}`}>
                     {job.score == null ? '—' : Math.round(job.score)}
                   </div>
                   <div className="text-xs text-slate-500">fit</div>

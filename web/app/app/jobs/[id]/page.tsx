@@ -200,7 +200,7 @@ export default function JobDetailPage() {
       </div>
 
       <Card className="text-center">
-        <div className={`text-5xl font-extrabold ${scoreColor(job.score)}`}>
+        <div className={`text-5xl font-extrabold ${scoreColor(job.score == null ? job.score : Math.round(job.score))}`}>
           {job.score == null ? '—' : Math.round(job.score)}
           <span className="text-xl text-slate-500"> / 100</span>
         </div>
