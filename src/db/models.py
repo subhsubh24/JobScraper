@@ -312,7 +312,8 @@ class PrepArtifact(Base):
     id = Column(String(36), primary_key=True, default=generate_uuid)
     job_id = Column(String(36), ForeignKey("job_postings.id"), nullable=False, index=True)
 
-    artifact_type = Column(String(50), nullable=False)  # prep_pack, study_plan, cover_letter
+    # values: prep_pack, study_plan, cover_letter, salary_negotiation, tailored_resume
+    artifact_type = Column(String(50), nullable=False)
     title = Column(String(255))
     content = Column(Text, nullable=False)  # JSON or markdown content
 

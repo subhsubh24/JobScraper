@@ -27,7 +27,11 @@ It ships as three surfaces over one backend:
   breakdown. Uses Google Gemini embeddings when a key is configured, and degrades
   gracefully to a deterministic heuristic when it isn't (the core loop works key-free).
 - **Interview prep packs** — structured, role-specific prep generated for a job.
-- **AI career coach** — a chat coach with a conservative safety guardrail (Premium).
+- **AI application tools (Pro)** — a **tailored résumé** rewritten to a specific posting
+  (grounded in your real résumé, never fabricated), plus **cover letters** and **study
+  plans**, each rendered as markdown with one-tap copy/download.
+- **Salary-negotiation coaching (Career+)** — scripts and strategy for a specific offer.
+- **AI career coach** — a chat coach with a conservative safety guardrail (Pro).
 - **Pipeline CRM** — track jobs through stages with fit scores surfaced inline.
 - **ATS import preview** — preview live listings from a Greenhouse/Lever careers URL
   (SSRF-guarded), or an honest empty/unreachable state.
@@ -40,7 +44,7 @@ Subscription, good-better-best + annual (annual ≈ 2 months free). See
 | Tier | Monthly | Annual | Who | Key gates |
 |---|---|---|---|---|
 | **Free** | $0 | — | Trial / casual | 5 tracked jobs, 1 prep pack/mo, no AI coach |
-| **Pro** (Premium) | $12 | $96 | Active seeker | Unlimited jobs, unlimited prep packs, AI cover letters + study plans, AI coach (fair-use: 25 AI actions/day, shared across AI features) |
+| **Pro** | $12 | $96 | Active seeker | Unlimited jobs, unlimited prep packs, AI tailored résumés + cover letters + study plans, AI coach (fair-use: 25 AI actions/day, shared across AI features) |
 | **Career+** | $24 | $192 | Senior / urgent | Everything in Pro + AI salary-negotiation coaching |
 
 > **Current state:** **Career+ is now a real, differentiated entitlement** (PRs #152/#153/#155).
