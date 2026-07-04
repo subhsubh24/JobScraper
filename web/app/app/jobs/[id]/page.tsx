@@ -43,22 +43,22 @@ export default function JobDetailPage() {
   const [job, setJob] = useState<Job | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [prep, setPrep] = useState<{ title: string; content: string } | null>(null);
+  const [prep, setPrep] = useState<{ id: string; title: string; content: string } | null>(null);
   const [prepLoading, setPrepLoading] = useState(false);
   const [prepMsg, setPrepMsg] = useState<string | null>(null);
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
-  const [neg, setNeg] = useState<{ title: string; content: string } | null>(null);
+  const [neg, setNeg] = useState<{ id: string; title: string; content: string } | null>(null);
   const [negLoading, setNegLoading] = useState(false);
   const [negMsg, setNegMsg] = useState<string | null>(null);
   const [targetSalary, setTargetSalary] = useState('');
-  const [letter, setLetter] = useState<{ title: string; content: string } | null>(null);
+  const [letter, setLetter] = useState<{ id: string; title: string; content: string } | null>(null);
   const [letterLoading, setLetterLoading] = useState(false);
   const [letterMsg, setLetterMsg] = useState<string | null>(null);
-  const [studyPlan, setStudyPlan] = useState<{ title: string; content: string } | null>(null);
+  const [studyPlan, setStudyPlan] = useState<{ id: string; title: string; content: string } | null>(null);
   const [studyLoading, setStudyLoading] = useState(false);
   const [studyMsg, setStudyMsg] = useState<string | null>(null);
   const [studyDays, setStudyDays] = useState('7');
-  const [resume, setResume] = useState<{ title: string; content: string } | null>(null);
+  const [resume, setResume] = useState<{ id: string; title: string; content: string } | null>(null);
   const [resumeLoading, setResumeLoading] = useState(false);
   const [resumeMsg, setResumeMsg] = useState<string | null>(null);
 
@@ -247,7 +247,7 @@ export default function JobDetailPage() {
             <h3 className="mb-2 font-semibold">{prep.title}</h3>
             <Markdown content={prep.content} />
             <ArtifactActions text={prep.content} filename="interview-prep" />
-            <ReportButton contentType="prep_pack" contentRef={id} contentExcerpt={prep.content} />
+            <ReportButton contentType="prep_pack" contentRef={prep.id} contentExcerpt={prep.content} />
           </Card>
         )}
       </div>
@@ -278,7 +278,7 @@ export default function JobDetailPage() {
                   <h3 className="mb-2 font-semibold">{resume.title}</h3>
                   <Markdown content={resume.content} />
                   <ArtifactActions text={resume.content} filename="tailored-resume" />
-                  <ReportButton contentType="prep_pack" contentRef={id} contentExcerpt={resume.content} />
+                  <ReportButton contentType="prep_pack" contentRef={resume.id} contentExcerpt={resume.content} />
                 </Card>
               )}
             </div>
@@ -304,7 +304,7 @@ export default function JobDetailPage() {
                   <h3 className="mb-2 font-semibold">{letter.title}</h3>
                   <Markdown content={letter.content} />
                   <ArtifactActions text={letter.content} filename="cover-letter" />
-                  <ReportButton contentType="prep_pack" contentRef={id} contentExcerpt={letter.content} />
+                  <ReportButton contentType="prep_pack" contentRef={letter.id} contentExcerpt={letter.content} />
                 </Card>
               )}
             </div>
@@ -342,7 +342,7 @@ export default function JobDetailPage() {
                   <h3 className="mb-2 font-semibold">{studyPlan.title}</h3>
                   <Markdown content={studyPlan.content} />
                   <ArtifactActions text={studyPlan.content} filename="study-plan" />
-                  <ReportButton contentType="prep_pack" contentRef={id} contentExcerpt={studyPlan.content} />
+                  <ReportButton contentType="prep_pack" contentRef={studyPlan.id} contentExcerpt={studyPlan.content} />
                 </Card>
               )}
             </div>
@@ -394,7 +394,7 @@ export default function JobDetailPage() {
                 <h3 className="mb-2 font-semibold">{neg.title}</h3>
                 <Markdown content={neg.content} />
                 <ArtifactActions text={neg.content} filename="salary-negotiation" />
-                <ReportButton contentType="prep_pack" contentRef={id} contentExcerpt={neg.content} />
+                <ReportButton contentType="prep_pack" contentRef={neg.id} contentExcerpt={neg.content} />
               </Card>
             )}
           </div>

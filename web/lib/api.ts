@@ -225,9 +225,9 @@ export const api = {
     ).message;
   },
 
-  async generatePrepPack(jobId: string): Promise<{ title: string; content: string }> {
+  async generatePrepPack(jobId: string): Promise<{ id: string; title: string; content: string }> {
     return (
-      await request<{ prep_pack: { title: string; content: string } }>('/api/prep-packs/generate', {
+      await request<{ prep_pack: { id: string; title: string; content: string } }>('/api/prep-packs/generate', {
         method: 'POST',
         body: { job_id: jobId },
       })
@@ -241,9 +241,9 @@ export const api = {
   async generateSalaryNegotiation(
     jobId: string,
     targetSalary: number,
-  ): Promise<{ title: string; content: string }> {
+  ): Promise<{ id: string; title: string; content: string }> {
     return (
-      await request<{ artifact: { title: string; content: string } }>(
+      await request<{ artifact: { id: string; title: string; content: string } }>(
         '/api/prep/salary-negotiation',
         { method: 'POST', body: { job_id: jobId, target_salary: targetSalary } },
       )
@@ -254,9 +254,9 @@ export const api = {
   // ApiError(403) if the user isn't paid (the server is the source of truth; the client uses
   // the `premium` tier to decide whether to OFFER the action) and ApiError(503) when the server
   // has no LLM key — the caller surfaces either honestly, never a fake result.
-  async generateCoverLetter(jobId: string): Promise<{ title: string; content: string }> {
+  async generateCoverLetter(jobId: string): Promise<{ id: string; title: string; content: string }> {
     return (
-      await request<{ artifact: { title: string; content: string } }>('/api/prep/cover-letter', {
+      await request<{ artifact: { id: string; title: string; content: string } }>('/api/prep/cover-letter', {
         method: 'POST',
         body: { job_id: jobId },
       })
@@ -265,9 +265,9 @@ export const api = {
 
   // Generate a day-by-day study plan for a job — a Pro+ feature. `days` is bounded 1–30
   // server-side (a 422 outside that range); same honest 403/503 contract as coverLetter.
-  async generateStudyPlan(jobId: string, days: number): Promise<{ title: string; content: string }> {
+  async generateStudyPlan(jobId: string, days: number): Promise<{ id: string; title: string; content: string }> {
     return (
-      await request<{ artifact: { title: string; content: string } }>('/api/prep/study-plan', {
+      await request<{ artifact: { id: string; title: string; content: string } }>('/api/prep/study-plan', {
         method: 'POST',
         body: { job_id: jobId, days },
       })
@@ -277,9 +277,9 @@ export const api = {
   // Rewrite the user's saved résumé tailored to a job — a Pro+ feature. Same honest 403/503
   // contract as coverLetter, plus ApiError(400) when the user has no saved résumé to tailor
   // (the server refuses rather than fabricate one) — the caller surfaces each honestly.
-  async generateTailoredResume(jobId: string): Promise<{ title: string; content: string }> {
+  async generateTailoredResume(jobId: string): Promise<{ id: string; title: string; content: string }> {
     return (
-      await request<{ artifact: { title: string; content: string } }>('/api/prep/tailored-resume', {
+      await request<{ artifact: { id: string; title: string; content: string } }>('/api/prep/tailored-resume', {
         method: 'POST',
         body: { job_id: jobId },
       })
