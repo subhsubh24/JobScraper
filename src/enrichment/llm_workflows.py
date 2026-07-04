@@ -1,10 +1,49 @@
 """LLM workflows for job enrichment and prep pack generation."""
 import json
+import logging
+import os
+
 from sqlalchemy.orm import Session
 
 from src.ai_coach.moderation import ContentModerator
 from src.db.models import JobPosting, PrepArtifact, User
 from src.llm import get_llm_client, chat_model
+
+logger = logging.getLogger("career_operator.llm_workflows")
+
+
+def _refinement_enabled() -> bool:
+    """The drafter→reviewer pass is ON by default; the owner can disable it for cost.
+
+    It doubles the Gemini calls per generation (draft + one review-and-revise). The per-user/day
+    LLM ceiling still bounds total GENERATIONS; this env flag is the COGS lever
+    (FACTORY_STANDARD §24) to turn the extra call off wholesale if inference cost ever bites.
+    """
+    return os.getenv("ENABLE_ARTIFACT_REFINEMENT", "1").strip().lower() in ("1", "true", "yes", "on")
+
+
+# The product-side maker≠checker pass (ROADMAP Track A). Before an AI artifact is returned to the
+# user, ONE independent critique-and-revise improves it — mirroring how the FACTORY reviews its own
+# code. The single hardest constraint is that "make it stronger" must NEVER become "make things up":
+# a reviewer that adds an unsupported achievement to sound impressive would manufacture exactly the
+# "obviously-AI / inaccurate" output real users penalise (GROWTH_STATUS counter-signal; VISION
+# "honest > flashy"). So honesty is the reviewer's FIRST duty, above polish.
+_REVIEWER_SYSTEM = """You are a meticulous senior editor doing a final quality pass on an \
+AI-generated {kind} before it is shown to a job-seeker. Return the IMPROVED {kind} and nothing \
+else — no preamble, no commentary, no notes about your changes.
+
+YOUR FIRST DUTY IS HONESTY — it overrides every other goal:
+- You may ONLY use facts supported by the SOURCE CONTEXT or already present in the draft. NEVER add,
+  invent, or inflate an employer, job title, date, degree, certification, metric, number, or skill
+  that is not supported by the source. If the draft contains an unsupported or exaggerated claim,
+  REMOVE or soften it — do not "improve" it into something more impressive but false.
+- "Improving" means: sharper and more specific wording, better structure and hierarchy, removing
+  filler / robotic / generic phrasing, tightening the tailoring to THIS job, fixing tone so it reads
+  as written by a thoughtful human — NOT adding invented substance.
+
+Keep the draft's format (markdown structure, headings, length constraints). If the draft is already \
+strong and honest, return it essentially unchanged rather than padding it. Output only the final \
+{kind}."""
 
 
 class ModeratedContentError(RuntimeError):
@@ -86,6 +125,40 @@ class LLMWorkflows:
             if not verdict.allowed:
                 raise ModeratedContentError(verdict.safe_response or "")
         return content
+
+    def _refine(self, draft: str, kind: str, source_context: str) -> str:
+        """Product-side maker≠checker: run ONE independent review-and-revise on a drafted artifact.
+
+        The reviewer sees the SAME grounding context the drafter saw (so it can catch a fabricated
+        claim the drafter is told never to make) plus the draft, and returns an improved version.
+        Best-effort and fail-SAFE by design: the draft has ALREADY passed generation + moderation,
+        so a FAILED review can never break the generation — any failure of the review call
+        (provider error, empty response, or the refined output tripping the moderator) falls back
+        to the clean draft. (Structural guarantee on the failure paths; the reviewer is *prompt*-
+        instructed to only improve, so a successful-but-weaker revision, while not structurally
+        prevented, is what the honesty-first reviewer prompt guards against.) Routing through
+        ``_call_llm`` means the refined prose is moderated too; a flagged refinement → fall back.
+        """
+        if not draft or not _refinement_enabled() or self.client is None:
+            return draft
+        system_prompt = _REVIEWER_SYSTEM.format(kind=kind)
+        user_prompt = (
+            "SOURCE CONTEXT (the sole basis of truth — do NOT add anything not supported here):\n"
+            f"{source_context}\n\n"
+            f"DRAFT {kind} TO REVIEW AND IMPROVE:\n{draft}\n\n"
+            f"Return only the improved {kind}."
+        )
+        try:
+            improved = self._call_llm(system_prompt, user_prompt)
+        except Exception:
+            # Fail SAFE: the draft is already a valid, moderated artifact. A refinement failure
+            # (provider error / empty / moderator-flagged refinement) must never degrade it.
+            logger.warning(
+                "Artifact refinement pass failed for %s; returning the draft.", kind, exc_info=True
+            )
+            return draft
+        improved = (improved or "").strip()
+        return improved or draft
 
     def parse_job_description(self, job: JobPosting) -> dict:
         """Parse a job description to extract structured data."""
@@ -171,6 +244,7 @@ Create a prep pack with these sections:
 """
 
         content = self._call_llm(system_prompt, user_prompt)
+        content = self._refine(content, "interview prep pack", user_prompt)
 
         # Save as artifact
         artifact = PrepArtifact(
@@ -204,6 +278,7 @@ For each day, include:
 """
 
         content = self._call_llm(system_prompt, user_prompt)
+        content = self._refine(content, "study plan", user_prompt)
 
         artifact = PrepArtifact(
             job_id=job.id,
@@ -238,6 +313,7 @@ Resume: {user.resume_text or 'Experienced professional'}
 """
 
         content = self._call_llm(system_prompt, user_prompt)
+        content = self._refine(content, "cover letter", user_prompt)
 
         artifact = PrepArtifact(
             job_id=job.id,
@@ -299,6 +375,7 @@ never invent anything.
 """
 
         content = self._call_llm(system_prompt, user_prompt)
+        content = self._refine(content, "tailored résumé", user_prompt)
 
         artifact = PrepArtifact(
             job_id=job.id,
@@ -356,7 +433,8 @@ Their top recurring skill gaps, most-demanded first: {skills}.
 
 Write the prioritised learning plan following the RULES."""
 
-        return self._call_llm(system_prompt, user_prompt)
+        content = self._call_llm(system_prompt, user_prompt)
+        return self._refine(content, "learning plan", user_prompt)
 
     def generate_salary_negotiation(self, job: JobPosting, target_salary: int) -> PrepArtifact:
         """Generate salary negotiation scripts and strategies."""
@@ -380,6 +458,7 @@ Include:
 """
 
         content = self._call_llm(system_prompt, user_prompt)
+        content = self._refine(content, "salary negotiation guide", user_prompt)
 
         artifact = PrepArtifact(
             job_id=job.id,
