@@ -34,9 +34,11 @@ class LeverClient(BaseATSClient):
         jobs = []
         for job_data in data:
             # The required fields ("id"/"text") are read outside the request try/except above
-            # (which only catches RequestException) — a bare ``["id"]`` would raise KeyError and
-            # 500 the whole import when ONE posting in the payload is malformed. Skip the bad
-            # posting (like the optional fields already do with ``.get()``) and keep the rest.
+            # (which only catches RequestException) — a bare ``["id"]`` raises KeyError on ONE
+            # malformed posting and escapes this method. The callers wrap the whole fetch in a
+            # blanket ``except Exception``, so that single bad record loses the ENTIRE board (the
+            # company is falsely reported unreachable and every good posting is dropped). Skip just
+            # the bad posting (like the optional fields already do with ``.get()``) and keep the rest.
             lever_id = job_data.get("id")
             title = job_data.get("text")
             if not lever_id or not title:

@@ -34,10 +34,12 @@ class GreenhouseClient(BaseATSClient):
         jobs = []
         for job_data in data.get("jobs", []):
             # The required top-level fields ("id"/"title") are read OUTSIDE the request try/except
-            # above, which only catches RequestException — so a bare ``["id"]`` would raise
-            # KeyError and 500 the whole import when ONE job in the payload is malformed/partial.
-            # Skip the bad job (like the optional fields already do with ``.get()``) and keep the
-            # rest, rather than failing the entire batch on one upstream defect.
+            # above, which only catches RequestException — so a bare ``["id"]`` raises KeyError on
+            # ONE malformed/partial job and escapes this method. The callers (import-preview,
+            # main.ingest) wrap the whole fetch in a blanket ``except Exception``, so that single
+            # bad record loses the ENTIRE board: the company is falsely reported unreachable and
+            # every well-formed job in the same payload is dropped. Skip just the bad job (like the
+            # optional fields already do with ``.get()``) so one upstream defect can't sink the batch.
             job_id = job_data.get("id")
             title = job_data.get("title")
             if job_id is None or not title:
