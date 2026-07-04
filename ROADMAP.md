@@ -64,6 +64,34 @@ the guard tests, and **`FACTORY_STANDARD.md`**.
 - [x] External Postgres wired for serverless (no SQLite persistence on Vercel)
 - [x] Health/readiness endpoints + **Vercel serverless deploy** verified live (see docs/DEPLOY_VERCEL.md)
 
+#### AI application features (competitive-parity gaps — validated by ai-job-search, 3.9k★; build through the gate)
+JobScraper already ships fit-scoring, cover letters, study plans, prep packs, salary negotiation,
+and the coach. These are the genuine GAPS vs the market. Each is an AI-output feature → obeys the
+eval-coverage ratchet (deterministic + real-output eval in `tests/evals/`) and third-party-AI
+consent gate; DoD = real generation + surfaced in web AND mobile + a downloadable/copyable artifact
++ the honest paywall (premium), never a stub.
+- [ ] **Tailored résumé/CV generation (per job)** — HIGHEST value. `LLMWorkflows.generate_tailored_resume(job, user)`
+      rewrites the user's résumé to a specific posting (reorder/emphasize matching skills + achievements,
+      mirror the JD language, keep it TRUTHFUL — never fabricate experience), persisted as a
+      `PrepArtifact` (`artifact_type="tailored_resume"`), rendered as structured markdown + a
+      copy/download action on web + mobile, Premium-gated, consent-gated, moderated. Add its
+      deterministic + real-output eval (substantive, references the role's skills, no invented
+      employers/dates). This is the clearest premium hook JobScraper is missing.
+- [ ] **Cross-pipeline skill-gap heatmap + learning plan** — the market's `/upskill`. Analyze the gap
+      between the user's profile and ALL their tracked jobs (not one posting) → a prioritized
+      skill-gap ranking (frequency across the pipeline × the user's absence) + a learning plan with
+      web-searched resources + time estimates. New endpoint + a web/mobile view; a strong
+      retention/planning surface. Deterministic eval on the ranking math + a real-output eval on the plan.
+- [ ] **Drafter→reviewer pass on generated artifacts (product-side maker≠checker)** — before returning a
+      cover letter / tailored résumé / study plan, run ONE independent LLM critique (on-brand? honest,
+      no fabricated claims? tailored to THIS job? strong?) and revise once. Raises output quality;
+      guard the extra Gemini call under the per-user/day spend ceiling. (The FACTORY already does
+      maker≠checker for code; this brings it to the PRODUCT's AI output.)
+- [ ] **Profile enrichment from linked public sources** — the market's `/expand`. If the user provides
+      links (GitHub, portfolio, Scholar), enrich the profile with discovered competencies (source-tagged)
+      to feed better scoring + cover letters. Owner-authorized fetch only; WebFetch/WebSearch; never
+      invent a skill; medium value. Real-output eval on the enrichment.
+
 ### B — Native mobile app (NEW Expo / React Native, iOS + Android, TypeScript, `/mobile`)
 - [x] Expo app scaffolded, `tsc --noEmit` clean, lint clean
 - [x] Navigation + auth (login/register) wired to the Python API — the login/register screens
