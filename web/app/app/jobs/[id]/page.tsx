@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Button, Card, Field, Skeleton } from '@/components/ui';
 import { Markdown } from '@/components/markdown';
 import { ReportButton } from '@/components/report-button';
+import { ArtifactActions } from '@/components/artifact-actions';
 import { useAiConsent } from '@/components/ai-consent';
 import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
@@ -154,8 +155,9 @@ export default function JobDetailPage() {
   }
 
   async function generateNegotiation() {
-    // Round BEFORE validating: "0.4" is > 0 but rounds to 0, which the backend (ge=0) would
-    // accept — burning an LLM call on a nonsensical "$0" guide. Validate the value we send.
+    // Round BEFORE validating: "0.4" is > 0 but rounds to 0. Validate the value we send so a
+    // non-positive target gets a friendly message here (defense in depth alongside the
+    // server bound) and never burns an LLM call on a nonsensical "$0" guide.
     const parsed = Math.round(Number(targetSalary));
     if (!Number.isFinite(parsed) || parsed <= 0) {
       setNegMsg('Enter your target salary (a positive number).');
@@ -244,6 +246,7 @@ export default function JobDetailPage() {
           <Card className="mt-4">
             <h3 className="mb-2 font-semibold">{prep.title}</h3>
             <Markdown content={prep.content} />
+            <ArtifactActions text={prep.content} filename="interview-prep" />
             <ReportButton contentType="prep_pack" contentRef={id} contentExcerpt={prep.content} />
           </Card>
         )}
@@ -274,6 +277,7 @@ export default function JobDetailPage() {
                 <Card className="mt-4">
                   <h3 className="mb-2 font-semibold">{resume.title}</h3>
                   <Markdown content={resume.content} />
+                  <ArtifactActions text={resume.content} filename="tailored-resume" />
                   <ReportButton contentType="prep_pack" contentRef={id} contentExcerpt={resume.content} />
                 </Card>
               )}
@@ -299,6 +303,7 @@ export default function JobDetailPage() {
                 <Card className="mt-4">
                   <h3 className="mb-2 font-semibold">{letter.title}</h3>
                   <Markdown content={letter.content} />
+                  <ArtifactActions text={letter.content} filename="cover-letter" />
                   <ReportButton contentType="prep_pack" contentRef={id} contentExcerpt={letter.content} />
                 </Card>
               )}
@@ -336,6 +341,7 @@ export default function JobDetailPage() {
                 <Card className="mt-4">
                   <h3 className="mb-2 font-semibold">{studyPlan.title}</h3>
                   <Markdown content={studyPlan.content} />
+                  <ArtifactActions text={studyPlan.content} filename="study-plan" />
                   <ReportButton contentType="prep_pack" contentRef={id} contentExcerpt={studyPlan.content} />
                 </Card>
               )}
@@ -387,6 +393,7 @@ export default function JobDetailPage() {
               <Card>
                 <h3 className="mb-2 font-semibold">{neg.title}</h3>
                 <Markdown content={neg.content} />
+                <ArtifactActions text={neg.content} filename="salary-negotiation" />
                 <ReportButton contentType="prep_pack" contentRef={id} contentExcerpt={neg.content} />
               </Card>
             )}
