@@ -70,7 +70,7 @@ and the coach. These are the genuine GAPS vs the market. Each is an AI-output fe
 eval-coverage ratchet (deterministic + real-output eval in `tests/evals/`) and third-party-AI
 consent gate; DoD = real generation + surfaced in web AND mobile + a downloadable/copyable artifact
 + the honest paywall (premium), never a stub.
-- [ ] **Tailored résumé/CV generation (per job)** — HIGHEST value. `LLMWorkflows.generate_tailored_resume(job, user)`
+- [x] **Tailored résumé/CV generation (per job)** — HIGHEST value. `LLMWorkflows.generate_tailored_resume(job, user)`
       rewrites the user's résumé to a specific posting (reorder/emphasize matching skills + achievements,
       mirror the JD language, keep it TRUTHFUL — never fabricate experience), persisted as a
       `PrepArtifact` (`artifact_type="tailored_resume"`), rendered as structured markdown + a
@@ -83,10 +83,12 @@ consent gate; DoD = real generation + surfaced in web AND mobile + a downloadabl
       → 503 keyless → consent Apple 5.1.2(i) → LLM ceiling → generate; 422 moderated-decline
       no-persist §6), web + mobile "Application tools" surfaces (markdown render, real
       loading/error states, ReportButton), pricing/paywall copy, analytics event, and the
-      deterministic + real-output (grounding) evals. **Box stays `[ ]`** on ONE DoD sub-item: the
-      explicit **copy/download action** is not built (the artifact is copyable markdown but has no
-      copy/download button — NEITHER do the sibling cover-letter/study-plan/salary artifacts) → a
-      shared affordance for all prep artifacts, deferred (evidence-based done, not over-tick).
+      deterministic + real-output (grounding) evals. **DONE (run 24):** the last DoD sub-item —
+      the explicit **copy/download action on web AND mobile** — shipped as a shared affordance for
+      ALL prep artifacts (résumé/cover letter/study plan/prep pack/negotiation guide): web Copy
+      (clipboard) + Download (.md) via `<ArtifactActions>` (PR #258, 2 Sonnet reviewers) and mobile
+      "Copy or share" via React Native's built-in `Share` sheet — no native dep, Expo SDK-56-safe
+      (PR #257, 2 Sonnet reviewers). Both causally honest (no fake "copied"); box now `[x]`.
 - [ ] **Cross-pipeline skill-gap heatmap + learning plan** — the market's `/upskill`. Analyze the gap
       between the user's profile and ALL their tracked jobs (not one posting) → a prioritized
       skill-gap ranking (frequency across the pipeline × the user's absence) + a learning plan with
