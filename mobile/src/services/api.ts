@@ -287,4 +287,39 @@ export const api = {
       body: input,
     });
   },
+
+  // Cross-pipeline skill-gap heatmap — FREE, computed locally on the server (no LLM). Ranked
+  // gaps + strengths across ALL the user's tracked jobs vs their résumé.
+  async skillGaps(): Promise<SkillGapAnalysis> {
+    const r = await request<{ analysis: SkillGapAnalysis }>('/api/insights/skill-gaps');
+    return r.analysis;
+  },
+
+  // Generate an AI learning plan for the user's top cross-pipeline skill gaps — a Pro+ feature.
+  // Throws ApiError(403) for free tier / missing consent, ApiError(400) for no jobs / no résumé /
+  // no gaps, ApiError(503) with no server key — the caller surfaces each honestly, never a fake
+  // plan. Gaps are recomputed server-side; the client sends no skill list.
+  async generateLearningPlan(): Promise<{ title: string; content: string; skills: string[] }> {
+    const r = await request<{ artifact: { title: string; content: string; skills: string[] } }>(
+      '/api/insights/learning-plan',
+      { method: 'POST' },
+    );
+    return r.artifact;
+  },
 };
+
+// One skill and how it relates to the pipeline + résumé (the heatmap unit).
+export interface SkillStat {
+  skill: string;
+  job_count: number;
+  total_jobs: number;
+  coverage: number; // job_count / total_jobs, 0..1 — drives the heatmap bar
+  in_resume: boolean;
+}
+
+export interface SkillGapAnalysis {
+  total_jobs: number;
+  has_resume: boolean;
+  gaps: SkillStat[];
+  strengths: SkillStat[];
+}

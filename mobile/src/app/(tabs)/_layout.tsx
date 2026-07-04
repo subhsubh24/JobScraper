@@ -28,6 +28,13 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
+        name="insights"
+        options={{
+          title: 'Skill gaps',
+          tabBarIcon: ({ color, size }) => <Ionicons name="analytics" color={color} size={size} />,
+        }}
+      />
+      <Tabs.Screen
         name="coach"
         options={{
           title: 'Coach',

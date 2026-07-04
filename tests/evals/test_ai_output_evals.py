@@ -122,6 +122,28 @@ def test_tailored_resume_real_output_is_grounded_and_structured(db_session, monk
         f"tailored résumé does not reference the candidate's real skills (grounding check): {content[:200]!r}"
 
 
+def test_learning_plan_real_output_is_substantive_and_covers_the_gaps(db_session, monkeypatch):
+    """The AI learning plan must be substantive, structured markdown, and actually address the
+    supplied skill gaps (not drift onto unrelated skills). Tolerant assertions (length / at least
+    one gap skill named / a markdown heading) — a real regression that returns empty/off-topic
+    output reddens, while normal phrasing variation does not."""
+    monkeypatch.setenv("GEMINI_API_KEY", LIVE_KEY)
+    from src.enrichment.llm_workflows import LLMWorkflows
+
+    user, _ = _seed(db_session)
+    gap_skills = ["kubernetes", "terraform", "go"]
+    content = LLMWorkflows(db_session).generate_learning_plan(
+        gap_skills, ["Platform Engineer", "Site Reliability Engineer"], user
+    )
+    assert isinstance(content, str) and len(content) > 200, \
+        f"learning plan too short to be real output: {len(content or '')} chars"
+    low = content.lower()
+    # At least one of the supplied gaps is actually addressed (not a generic off-topic essay).
+    assert any(s in low for s in gap_skills), \
+        f"learning plan does not name any of the supplied gap skills: {content[:200]!r}"
+    assert "#" in content, "learning plan is not structured markdown (no heading)"
+
+
 def test_coach_real_answer_is_substantive_and_on_topic(db_session, monkeypatch):
     monkeypatch.setenv("GEMINI_API_KEY", LIVE_KEY)
     from src.ai_coach.career_coach import CareerCoach

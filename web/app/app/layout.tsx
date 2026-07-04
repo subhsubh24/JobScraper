@@ -25,6 +25,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <Link href="/app" className="rounded font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400">Career Operator</Link>
             <nav className="flex gap-3 text-sm text-slate-400 sm:gap-4">
               <Link href="/app" className="rounded hover:text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400">Pipeline</Link>
+              <Link href="/app/insights" className="rounded hover:text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400">Skill gaps</Link>
               <Link href="/app/coach" className="rounded hover:text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400">Coach</Link>
               {user.tier !== 'premium' && (
                 <Link href="/pricing" className="rounded hover:text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400">Upgrade</Link>

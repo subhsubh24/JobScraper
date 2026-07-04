@@ -38,6 +38,7 @@ EVENT_TYPES = (
     "study_plan_generated",
     "tailored_resume_generated",
     "coach_message",
+    "learning_plan_generated",
 )
 _EVENT_TYPE_SET = frozenset(EVENT_TYPES)
 
