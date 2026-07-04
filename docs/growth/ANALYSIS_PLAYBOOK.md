@@ -93,6 +93,20 @@ NOT scaling acquisition** (don't pour growth into a leaky bucket).
 Reconcile the business case against real cohort data the moment it exists; if the metrics
 contradict the model, the METRICS win. Write the read into `GROWTH_STATUS.pmf` each run.
 
+### Pulling REAL funnel/analytics data — do this EVERY run (env changes are invisible to git; FACTORY_STANDARD §28)
+The authenticated read path is **`GET /api/analytics/summary`** on your deployed production app, returning real
+privacy-safe aggregate metrics. Authenticate with the **`ANALYTICS_READ_TOKEN`** provided in your routine
+environment (PROD_URL = your deployed production domain):
+
+    curl -s -H "Authorization: Bearer $ANALYTICS_READ_TOKEN" "$PROD_URL/api/analytics/summary"
+
+- **Always CALL it — never infer "no owner movement" from `git fetch`.** Owner source-connections
+  are ENV VARS (Vercel + this routine), invisible to `git` and connector-lists — re-probe EVERY run.
+- **Self-diagnose in `GROWTH_STATUS.validation`:** report whether `ANALYTICS_READ_TOKEN` was present in your env
+  (presence only, NEVER the value) + the HTTP status. `200` → populate metrics from the REAL payload
+  and flip sources to `connected`. `401`/`503` → `ANALYTICS_READ_TOKEN` missing/mismatched vs the deployed app
+  (surface the exact owner_action). This makes the break point visible on the dashboard.
+
 ## Strategic outreach (curated, DRAFT-ONLY)
 
 A high-leverage channel: a FEW deeply-personalized 1:1 outreach emails to genuinely
