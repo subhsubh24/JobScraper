@@ -19,7 +19,7 @@ EVAL_COVERAGE:
     modules: [src/ranking/scorer.py]
     deterministic_evals: [tests/evals/test_scoring_evals.py]
     real_output_eval: tests/evals/test_ai_output_evals.py   # real embedding path -> valid score
-  - feature: prep-tools   # prep pack + cover letter + study plan (all three llm_workflows generators)
+  - feature: prep-tools   # prep pack + cover letter + study plan + salary negotiation + tailored résumé (all llm_workflows generators)
     modules: [src/enrichment/llm_workflows.py]
     deterministic_evals: [tests/evals/test_prep_pack_evals.py, tests/evals/test_prep_tools_evals.py]
     real_output_eval: tests/evals/test_ai_output_evals.py   # real prep pack / cover letter / study plan: substantive + structured
