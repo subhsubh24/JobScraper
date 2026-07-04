@@ -1,6 +1,6 @@
 /// <reference types="jest" />
 // Track B: the paywall must reflect REAL entitlement state, not a fixed upgrade pitch.
-// - a FREE user sees the upgrade offer (plans + "Start Premium"), and the purchase button is
+// - a FREE user sees the upgrade offer (plans + "Start Pro"), and the purchase button is
 //   HONEST (no fake "purchase complete" — entitlement only flips server-side);
 // - a PREMIUM user sees a confirmation state, NOT an upgrade CTA (the stale-prompt bug);
 // - the screen refreshes entitlement on open so an upgrade made elsewhere is reflected.
@@ -38,12 +38,12 @@ describe('PaywallScreen', () => {
   it('shows the upgrade offer to a free user', () => {
     mockTier = 'free';
     render(<PaywallScreen />);
-    expect(screen.getByText('Career Operator Premium')).toBeTruthy();
-    expect(screen.getByText('Start Premium')).toBeTruthy();
+    expect(screen.getByText('Career Operator Pro')).toBeTruthy();
+    expect(screen.getByText('Start Pro')).toBeTruthy();
     expect(screen.getByText('Annual')).toBeTruthy();
     expect(screen.getByText('Monthly')).toBeTruthy();
-    // Must NOT tell a free user they already have Premium.
-    expect(screen.queryByText("You're on Premium")).toBeNull();
+    // Must NOT tell a free user they already have a paid plan.
+    expect(screen.queryByText("You're on Pro")).toBeNull();
   });
 
   it('shows Pro confirmation to a Pro user WITHOUT falsely claiming the Career+ exclusive', () => {
@@ -53,7 +53,7 @@ describe('PaywallScreen', () => {
     // A Pro user is on Pro, not "Premium"/"Career+", and sees no buy CTA.
     expect(screen.getByText("You're on Pro")).toBeTruthy();
     expect(screen.queryByText("You're on Career+")).toBeNull();
-    expect(screen.queryByText('Start Premium')).toBeNull();
+    expect(screen.queryByText('Start Pro')).toBeNull();
     expect(screen.queryByText('Monthly')).toBeNull();
     // HONESTY (the bug this guards): salary negotiation is presented as a Career+ UPSELL
     // ("coming soon"), never as an already-unlocked feature — and it is not a dead end.
@@ -68,7 +68,7 @@ describe('PaywallScreen', () => {
     expect(screen.getByText("You're on Career+")).toBeTruthy();
     // The Career+ exclusive is genuinely theirs — shown as an unlocked feature row.
     expect(screen.getByLabelText('AI salary-negotiation coaching')).toBeTruthy();
-    expect(screen.queryByText('Start Premium')).toBeNull();
+    expect(screen.queryByText('Start Pro')).toBeNull();
   });
 
   it('refreshes entitlement when the paywall opens', () => {
@@ -102,10 +102,10 @@ describe('PaywallScreen', () => {
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     mockTier = 'free';
     render(<PaywallScreen />);
-    // The screen wires "Start Premium" to an honest alert. Invoke the handler the same way a
+    // The screen wires "Start Pro" to an honest alert. Invoke the handler the same way a
     // press would, by finding the button and triggering its onPress via the alert side-effect.
     // fireEvent.press bubbles from the label Text to the Button's Pressable ancestor.
-    fireEvent.press(screen.getByText('Start Premium'));
+    fireEvent.press(screen.getByText('Start Pro'));
     expect(alertSpy).toHaveBeenCalledTimes(1);
     const [title, body] = alertSpy.mock.calls[0];
     expect(String(title)).toMatch(/coming soon/i);

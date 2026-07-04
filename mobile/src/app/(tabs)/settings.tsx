@@ -122,7 +122,7 @@ export default function SettingsScreen() {
           <View style={styles.tierRow}>
             <Text style={styles.tierLabel}>Plan</Text>
             <Text style={[styles.tierValue, user?.tier === 'premium' && { color: colors.success }]}>
-              {user?.tier === 'premium' ? 'Premium' : 'Free'}
+              {user?.tier === 'premium' ? (user?.career_plus ? 'Career+' : 'Pro') : 'Free'}
             </Text>
           </View>
           <Text style={styles.usage}>
@@ -132,7 +132,7 @@ export default function SettingsScreen() {
         </Card>
 
         {user?.tier !== 'premium' ? (
-          <Button label="Upgrade to Premium" onPress={() => router.push('/paywall')} />
+          <Button label="Upgrade to Pro" onPress={() => router.push('/paywall')} />
         ) : null}
 
         <AiConsentSetting />

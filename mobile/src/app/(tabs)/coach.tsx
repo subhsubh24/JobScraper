@@ -82,7 +82,7 @@ export default function CoachScreen() {
         <Text style={styles.lockTitle}>Your AI Career Coach</Text>
         <Text style={styles.lockBody}>
           Get role-specific advice, interview prep, and salary negotiation help on demand.
-          The Coach is a Premium feature.
+          The Coach is a Pro feature.
         </Text>
         <Button label="Upgrade to unlock" onPress={() => router.push('/paywall')} />
       </SafeAreaView>

@@ -125,7 +125,7 @@ export default function PaywallScreen() {
 
   return (
     <ScrollView style={styles.flex} contentContainerStyle={styles.container}>
-      <Text style={styles.title}>Career Operator Premium</Text>
+      <Text style={styles.title}>Career Operator Pro</Text>
       <Text style={styles.subtitle}>Everything you need to land the offer, faster.</Text>
 
       <Card>
@@ -158,7 +158,7 @@ export default function PaywallScreen() {
         </View>
       </View>
 
-      <Button label="Start Premium" onPress={purchase} />
+      <Button label="Start Pro" onPress={purchase} />
       <Button label="Maybe later" variant="secondary" onPress={() => router.back()} />
       <Text style={styles.legal}>
         Subscriptions renew automatically until cancelled. Manage in your app store account.

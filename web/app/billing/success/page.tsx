@@ -52,7 +52,7 @@ export default function BillingSuccessPage() {
     >
       {status === 'active' ? (
         <>
-          <h1 className="text-3xl font-extrabold">Welcome to Premium</h1>
+          <h1 className="text-3xl font-extrabold">You&apos;re subscribed</h1>
           <p className="mt-3 text-slate-400">
             Your subscription is active. Unlimited jobs, AI prep packs, and the Career Coach are
             unlocked.
@@ -65,7 +65,7 @@ export default function BillingSuccessPage() {
         <>
           <h1 className="text-3xl font-extrabold">Payment received</h1>
           <p className="mt-3 text-slate-400">
-            Thanks! Your Premium access is activating and should appear within a minute. If it
+            Thanks! Your subscription is activating and should appear within a minute. If it
             doesn’t, refresh this page or sign out and back in.
           </p>
           <div className="mt-6">
@@ -75,7 +75,7 @@ export default function BillingSuccessPage() {
       ) : (
         <>
           <h1 className="text-3xl font-extrabold">Confirming your subscription…</h1>
-          <p className="mt-3 text-slate-400">One moment while we activate your Premium access.</p>
+          <p className="mt-3 text-slate-400">One moment while we activate your subscription.</p>
         </>
       )}
       <p className="mt-8 text-xs text-slate-500">
