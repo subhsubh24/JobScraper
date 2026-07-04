@@ -36,6 +36,36 @@ class _FakeLLM:
         return _R()
 
 
+class _SequenceFakeLLM:
+    """Returns queued completions in order — so a generation's DRAFT call and its subsequent
+    REVIEW-and-revise call can return DIFFERENT content, letting the tests prove the
+    drafter→reviewer pass actually runs and the REFINED text is what gets persisted."""
+
+    def __init__(self, *contents):
+        self._contents = list(contents)
+        self.calls = 0
+        self.chat = self
+        self.completions = self
+
+    def create(self, **kwargs):
+        idx = min(self.calls, len(self._contents) - 1)
+        content = self._contents[idx]
+        self.calls += 1
+
+        class _M:
+            pass
+
+        _M.content = content
+
+        class _C:
+            message = _M()
+
+        class _R:
+            choices = [_C()]
+
+        return _R()
+
+
 def _seed(db):
     user = User(
         email="tools@example.com",
@@ -127,3 +157,102 @@ def test_cover_letter_blank_completion_fails_loud(db_session):
         wf.generate_cover_letter(job, user)
     # Nothing was persisted.
     assert db_session.query(PrepArtifact).filter(PrepArtifact.job_id == job.id).count() == 0
+
+
+# ---------------------------------------------------------------------------
+# Drafter→reviewer pass (product-side maker≠checker, ROADMAP Track A). The generator makes TWO
+# LLM calls per artifact: a DRAFT, then one review-and-revise. These evals pin that the REFINED
+# text is what's persisted, that the pass is fail-SAFE (any refine failure falls back to the clean
+# draft — it can only improve, never break), that it's togglable for COGS, and that the internal
+# JSON-parsing path is NOT refined.
+# ---------------------------------------------------------------------------
+
+
+def test_refinement_pass_persists_the_reviewed_version_not_the_draft(db_session, monkeypatch):
+    monkeypatch.setenv("ENABLE_ARTIFACT_REFINEMENT", "1")
+    user, job = _seed(db_session)
+    wf = LLMWorkflows(db_session)
+    # 1st call = the weaker DRAFT; 2nd call = the improved REVIEWED version.
+    wf.client = _SequenceFakeLLM(
+        "Dear Hiring Manager, I want the job. I am good.",
+        "Dear Hiring Manager,\nHaving shipped Python and React systems, I'm excited to bring that "
+        "to the Backend Engineer role at Acme.",
+    )
+
+    artifact = wf.generate_cover_letter(job, user)
+
+    assert wf.client.calls == 2  # draft + one review-and-revise
+    assert "excited to bring that" in artifact.content  # the REVIEWED text was persisted
+    assert artifact.content != "Dear Hiring Manager, I want the job. I am good."
+
+
+def test_refinement_falls_back_to_draft_when_review_call_fails(db_session, monkeypatch):
+    """Fail-SAFE: if the review-and-revise call errors, the already-valid, already-moderated
+    draft is what's persisted — the pass never breaks or worsens a generation."""
+    monkeypatch.setenv("ENABLE_ARTIFACT_REFINEMENT", "1")
+    user, job = _seed(db_session)
+    wf = LLMWorkflows(db_session)
+    draft = "## Ada Dev\nSenior engineer — Python, React. Solid, honest draft."
+    wf.client = _FakeLLM(draft)
+
+    original_call = wf._call_llm
+    calls = {"n": 0}
+
+    def flaky(system_prompt, user_prompt, json_mode=False):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            return original_call(system_prompt, user_prompt, json_mode=json_mode)  # draft OK
+        raise RuntimeError("provider 503 on the review pass")
+
+    monkeypatch.setattr(wf, "_call_llm", flaky)
+
+    artifact = wf.generate_tailored_resume(job, user)
+
+    assert calls["n"] == 2  # draft succeeded, review attempted then failed
+    assert artifact.content == draft  # fell back to the clean draft — no break, no worse output
+
+
+def test_refinement_can_be_disabled_for_cost(db_session, monkeypatch):
+    """The COGS lever (§24): with the flag off, exactly ONE call is made and the draft is used."""
+    monkeypatch.setenv("ENABLE_ARTIFACT_REFINEMENT", "0")
+    user, job = _seed(db_session)
+    wf = LLMWorkflows(db_session)
+    wf.client = _SequenceFakeLLM(
+        "## Day 1\nDraft plan.",
+        "## Day 1\nThis reviewed version must NOT appear when refinement is disabled.",
+    )
+
+    artifact = wf.generate_study_plan(job, days=5)
+
+    assert wf.client.calls == 1  # no second (review) call
+    assert "Draft plan" in artifact.content
+    assert "must NOT appear" not in artifact.content
+
+
+def test_refined_blank_falls_back_to_draft(db_session, monkeypatch):
+    """A review pass that returns blank must not blank the artifact — fall back to the draft."""
+    monkeypatch.setenv("ENABLE_ARTIFACT_REFINEMENT", "1")
+    user, job = _seed(db_session)
+    wf = LLMWorkflows(db_session)
+    draft = "Dear Hiring Manager,\nA genuine, specific cover letter about the Backend role."
+    # Draft is real; the review call returns whitespace (which _call_llm would itself reject) —
+    # _refine swallows that and keeps the draft.
+    wf.client = _SequenceFakeLLM(draft, "   ")
+
+    artifact = wf.generate_cover_letter(job, user)
+
+    assert artifact.content == draft
+
+
+def test_json_parsing_path_is_not_refined(db_session, monkeypatch):
+    """parse_job_description is internal JSON plumbing (json_mode), never shown to the user, so it
+    must make exactly one call and skip the prose review pass."""
+    monkeypatch.setenv("ENABLE_ARTIFACT_REFINEMENT", "1")
+    user, job = _seed(db_session)
+    wf = LLMWorkflows(db_session)
+    wf.client = _SequenceFakeLLM('{"required_skills": ["python"]}', '{"required_skills": ["nope"]}')
+
+    result = wf.parse_job_description(job)
+
+    assert wf.client.calls == 1  # json_mode path is not refined
+    assert result == {"required_skills": ["python"]}
