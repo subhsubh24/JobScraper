@@ -5,6 +5,7 @@ import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View
 import { Button, Card, ErrorBanner, Field } from '@/components/ui';
 import { Markdown } from '@/components/markdown';
 import { ReportButton } from '@/components/report-button';
+import { ArtifactActions } from '@/components/artifact-actions';
 import { useAiConsent } from '@/components/ai-consent';
 import { useAuth } from '@/contexts/auth';
 import { api, ApiError } from '@/services/api';
@@ -288,6 +289,7 @@ export default function JobDetailScreen() {
         <Card style={styles.prepCard}>
           <Text style={styles.prepTitle}>{prep.title}</Text>
           <Markdown content={prep.content} />
+          <ArtifactActions text={prep.content} title={prep.title} />
           <ReportButton contentType="prep_pack" contentRef={id} contentExcerpt={prep.content} />
         </Card>
       ) : null}
@@ -313,6 +315,7 @@ export default function JobDetailScreen() {
             <Card style={styles.prepCard}>
               <Text style={styles.prepTitle}>{resume.title}</Text>
               <Markdown content={resume.content} />
+              <ArtifactActions text={resume.content} title={resume.title} />
               <ReportButton contentType="prep_pack" contentRef={id} contentExcerpt={resume.content} />
             </Card>
           ) : null}
@@ -332,6 +335,7 @@ export default function JobDetailScreen() {
             <Card style={styles.prepCard}>
               <Text style={styles.prepTitle}>{letter.title}</Text>
               <Markdown content={letter.content} />
+              <ArtifactActions text={letter.content} title={letter.title} />
               <ReportButton contentType="prep_pack" contentRef={id} contentExcerpt={letter.content} />
             </Card>
           ) : null}
@@ -358,6 +362,7 @@ export default function JobDetailScreen() {
             <Card style={styles.prepCard}>
               <Text style={styles.prepTitle}>{studyPlan.title}</Text>
               <Markdown content={studyPlan.content} />
+              <ArtifactActions text={studyPlan.content} title={studyPlan.title} />
               <ReportButton contentType="prep_pack" contentRef={id} contentExcerpt={studyPlan.content} />
             </Card>
           ) : null}
@@ -391,6 +396,7 @@ export default function JobDetailScreen() {
             <Card style={styles.prepCard}>
               <Text style={styles.prepTitle}>{neg.title}</Text>
               <Markdown content={neg.content} />
+              <ArtifactActions text={neg.content} title={neg.title} />
               <ReportButton contentType="prep_pack" contentRef={id} contentExcerpt={neg.content} />
             </Card>
           ) : null}
