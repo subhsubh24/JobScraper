@@ -71,7 +71,7 @@ export default function CoachPage() {
         <h1 className="text-2xl font-extrabold">Your AI Career Coach</h1>
         <p className="mt-2 text-slate-400">
           On-demand advice on strategy, interviews, and salary negotiation. The Coach is a
-          Premium feature.
+          Pro feature.
         </p>
         <div className="mt-5">
           <Button onClick={() => router.push('/pricing')}>Upgrade to unlock</Button>

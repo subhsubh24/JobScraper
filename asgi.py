@@ -1643,7 +1643,7 @@ def coach_chat(
     if user.tier != UserTier.PREMIUM:
         raise HTTPException(
             status_code=403,
-            detail="The AI Career Coach is a Premium feature. Upgrade to unlock it.",
+            detail="The AI Career Coach is a Pro feature. Upgrade to unlock it.",
         )
     if not CareerCoach.available():
         raise HTTPException(

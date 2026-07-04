@@ -67,17 +67,17 @@ describe('SettingsScreen', () => {
     expect(screen.getByText('Jane Seeker')).toBeTruthy();
     expect(screen.getByText('jane@example.com')).toBeTruthy();
     expect(screen.getByText('Free')).toBeTruthy();
-    expect(screen.getByText('Upgrade to Premium')).toBeTruthy();
+    expect(screen.getByText('Upgrade to Pro')).toBeTruthy();
     expect(screen.getByText(/Jobs remaining: 3/)).toBeTruthy();
     // Let the referral card's async load settle so its state update is wrapped in act().
     await screen.findByText('Share invite link');
   });
 
-  it('a premium user shows Premium and no upgrade CTA', async () => {
+  it('a premium (Pro) user shows Pro and no upgrade CTA', async () => {
     mockUser = { ...mockUser, tier: 'premium' };
     render(<SettingsScreen />);
-    expect(screen.getByText('Premium')).toBeTruthy();
-    expect(screen.queryByText('Upgrade to Premium')).toBeNull();
+    expect(screen.getByText('Pro')).toBeTruthy();
+    expect(screen.queryByText('Upgrade to Pro')).toBeNull();
     await screen.findByText('Share invite link');
   });
 

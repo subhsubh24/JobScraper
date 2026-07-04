@@ -90,7 +90,7 @@ export default function SettingsPage() {
   if (!user) return null;
 
   const canDelete = confirm.trim().toUpperCase() === 'DELETE' && !deleting;
-  const planLabel = user.tier === 'premium' ? 'Premium' : 'Free';
+  const planLabel = user.tier === 'premium' ? (user.career_plus ? 'Career+' : 'Pro') : 'Free';
 
   async function handleDelete() {
     if (!canDelete) return;
