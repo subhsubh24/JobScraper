@@ -77,6 +77,16 @@ consent gate; DoD = real generation + surfaced in web AND mobile + a downloadabl
       copy/download action on web + mobile, Premium-gated, consent-gated, moderated. Add its
       deterministic + real-output eval (substantive, references the role's skills, no invented
       employers/dates). This is the clearest premium hook JobScraper is missing.
+      **PROGRESS (run 23, PR #247, 2 Sonnet reviewers APPROVE):** SHIPPED the core — the generator
+      (prompt hard-constrained to the résumé as the SOLE source of truth; never invents), the
+      `POST /api/prep/tailored-resume` Pro+ endpoint (403 gate → **400 requires a saved résumé**
+      → 503 keyless → consent Apple 5.1.2(i) → LLM ceiling → generate; 422 moderated-decline
+      no-persist §6), web + mobile "Application tools" surfaces (markdown render, real
+      loading/error states, ReportButton), pricing/paywall copy, analytics event, and the
+      deterministic + real-output (grounding) evals. **Box stays `[ ]`** on ONE DoD sub-item: the
+      explicit **copy/download action** is not built (the artifact is copyable markdown but has no
+      copy/download button — NEITHER do the sibling cover-letter/study-plan/salary artifacts) → a
+      shared affordance for all prep artifacts, deferred (evidence-based done, not over-tick).
 - [ ] **Cross-pipeline skill-gap heatmap + learning plan** — the market's `/upskill`. Analyze the gap
       between the user's profile and ALL their tracked jobs (not one posting) → a prioritized
       skill-gap ranking (frequency across the pipeline × the user's absence) + a learning plan with
