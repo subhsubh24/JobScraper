@@ -17,7 +17,7 @@ HTTP<400). Auto-checked by `tests/journeys/` (run: `./scripts/run_journeys.sh`).
 | GET | `/api/jobs/{id}` | Job detail | `test_full_core_journey` | correct job |
 | PATCH | `/api/jobs/{id}` | Update pipeline status | `test_full_core_journey` | status moves; invalid -> 422 |
 | POST | `/api/prep-packs/generate` | AI interview prep | `test_paywall_and_ai_degrade_gracefully` | 503 truthful when no key; 403 over limit |
-| POST | `/api/coach/chat` | AI coach (Premium) | `test_paywall_and_ai_degrade_gracefully` | 403 paywall for free; 503 when no key |
+| POST | `/api/coach/chat` | AI coach (Pro) | `test_paywall_and_ai_degrade_gracefully` | 403 paywall for free; 503 when no key |
 | GET | `/api/coach/suggestions` | Context-aware prompts | `test_full_core_journey` | works WITHOUT a key |
 | GET | `/api/analytics/pipeline` | Pipeline stats | `test_full_core_journey` | real counts + avg score |
 

@@ -107,11 +107,22 @@ consent gate; DoD = real generation + surfaced in web AND mobile + a downloadabl
       "web-searched resources" — a per-skill WebSearch in the serverless request path is fragile
       (latency + fabricated/dead-link risk = exactly the "obviously-AI/inaccurate" output real users
       penalise); the prompt is hard-told not to invent URLs/course titles. Equivalent value, honest.
-- [ ] **Drafter→reviewer pass on generated artifacts (product-side maker≠checker)** — before returning a
-      cover letter / tailored résumé / study plan, run ONE independent LLM critique (on-brand? honest,
-      no fabricated claims? tailored to THIS job? strong?) and revise once. Raises output quality;
-      guard the extra Gemini call under the per-user/day spend ceiling. (The FACTORY already does
-      maker≠checker for code; this brings it to the PRODUCT's AI output.)
+- [x] **Drafter→reviewer pass on generated artifacts (product-side maker≠checker)** — SHIPPED
+      (run 26, PR #265, 2 Sonnet reviewers APPROVE — Reviewer A mutation-verified the fail-safe
+      fallback + JSON-path exclusion + disable-flag are all load-bearing). `LLMWorkflows._refine`
+      runs ONE independent review-and-revise on every prose artifact (prep pack / cover letter /
+      study plan / tailored résumé / salary-negotiation guide / learning plan) before it's
+      returned; `parse_job_description` (JSON plumbing) is NOT refined. The reviewer sees the SAME
+      grounding context the drafter saw and its FIRST duty is honesty — it may only
+      remove/rephrase/reorder/tighten, NEVER invent or inflate an unsupported employer/title/
+      date/metric/skill (directly answering the GROWTH_STATUS "obviously-AI/inaccurate"
+      counter-signal). Fail-SAFE: the draft has already passed generation + moderation, so any
+      review-call failure (provider error / empty / moderator-flagged refinement) falls back to
+      the clean draft — the pass can never break a generation. COGS (§24): doubles Gemini calls
+      per generation; `ENABLE_ARTIFACT_REFINEMENT` (default on) is the owner kill-switch and the
+      per-user/day ceiling still bounds total generations. Deterministic evals (sequence fake LLM)
+      pin: the REVIEWED text persists (not the draft), a failed review falls back, the disable
+      flag makes exactly one call, a blank refinement falls back, and the JSON path is not refined.
 - [ ] **Profile enrichment from linked public sources** — the market's `/expand`. If the user provides
       links (GitHub, portfolio, Scholar), enrich the profile with discovered competencies (source-tagged)
       to feed better scoring + cover letters. Owner-authorized fetch only; WebFetch/WebSearch; never
