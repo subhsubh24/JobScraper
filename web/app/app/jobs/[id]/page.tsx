@@ -155,9 +155,9 @@ export default function JobDetailPage() {
   }
 
   async function generateNegotiation() {
-    // Round BEFORE validating: "0.4" is > 0 but rounds to 0. The backend also rejects a
-    // non-positive target (gt=0), but validate here too so the user gets a friendly message
-    // instead of a 422 and we never burn an LLM call on a nonsensical "$0" guide.
+    // Round BEFORE validating: "0.4" is > 0 but rounds to 0. Validate the value we send so a
+    // non-positive target gets a friendly message here (defense in depth alongside the
+    // server bound) and never burns an LLM call on a nonsensical "$0" guide.
     const parsed = Math.round(Number(targetSalary));
     if (!Number.isFinite(parsed) || parsed <= 0) {
       setNegMsg('Enter your target salary (a positive number).');

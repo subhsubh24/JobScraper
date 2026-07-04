@@ -54,7 +54,7 @@ export function ArtifactActions({ text, filename }: { text: string; filename: st
   }
 
   const btn =
-    'inline-flex items-center gap-1 rounded text-xs text-slate-400 transition hover:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950';
+    'inline-flex items-center gap-1 rounded text-xs text-slate-500 transition hover:text-slate-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950';
 
   return (
     <div className="mt-3 flex items-center gap-4">
@@ -66,7 +66,7 @@ export function ArtifactActions({ text, filename }: { text: string; filename: st
         <DownloadIcon />
         Download
       </button>
-      {/* Assertive announcement for screen readers when the copy completes. */}
+      {/* Polite announcement for screen readers when the copy completes. */}
       <span role="status" aria-live="polite" className="sr-only">
         {copied ? 'Copied to clipboard' : copyError ? 'Copy failed' : ''}
       </span>
