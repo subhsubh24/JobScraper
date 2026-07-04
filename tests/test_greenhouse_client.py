@@ -117,6 +117,38 @@ def test_fetch_jobs_populated_board_smoke():
     assert client.last_error is None
 
 
+def test_fetch_jobs_skips_malformed_job_missing_required_field():
+    """A job object missing a required top-level field ("title"/"id") must NOT KeyError-500 the
+    whole import — it is skipped (like the optional fields already degrade) and the well-formed
+    jobs in the same payload are still returned."""
+    payload = {
+        "jobs": [
+            {"id": 1, "title": "Staff Engineer", "absolute_url": "https://x/1"},
+            {"id": 2, "absolute_url": "https://x/2"},          # malformed: no "title"
+            {"title": "Ghost Role", "absolute_url": "https://x/3"},  # malformed: no "id"
+            {"id": 4, "title": "Backend Engineer", "absolute_url": "https://x/4"},
+        ]
+    }
+    client = GreenhouseClient("acme")
+    with patch("src.ingestion.greenhouse.requests.get", return_value=_Resp(payload)):
+        jobs = client.fetch_jobs()
+
+    # Only the two well-formed jobs survive; the batch did not crash on the malformed ones.
+    assert [j.external_id for j in jobs] == ["1", "4"]
+    assert client.last_error is None
+
+
+def test_fetch_job_details_returns_none_on_malformed_payload_missing_title():
+    """A detail payload present but missing "title" (partial upstream response) degrades to a
+    failed fetch (None + last_error), never a KeyError-500 — same contract as an HTTP error."""
+    client = GreenhouseClient("acme")
+    payload = {"id": 5, "location": {"name": "NYC"}, "content": "x"}  # no "title"
+    with patch("src.ingestion.greenhouse.requests.get", return_value=_Resp(payload)):
+        listing = client.fetch_job_details("5")
+    assert listing is None
+    assert client.last_error and "malformed" in client.last_error.lower()
+
+
 def test_fetch_all_with_details_skips_failed_details_not_raises():
     """A detail fetch that fails for one job must NOT blow up the whole batch — the bad
     job is silently skipped and the good ones are still returned."""

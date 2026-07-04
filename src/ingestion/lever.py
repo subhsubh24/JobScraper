@@ -33,6 +33,18 @@ class LeverClient(BaseATSClient):
 
         jobs = []
         for job_data in data:
+            # The required fields ("id"/"text") are read outside the request try/except above
+            # (which only catches RequestException) — a bare ``["id"]`` would raise KeyError and
+            # 500 the whole import when ONE posting in the payload is malformed. Skip the bad
+            # posting (like the optional fields already do with ``.get()``) and keep the rest.
+            lever_id = job_data.get("id")
+            title = job_data.get("text")
+            if not lever_id or not title:
+                logger.warning(
+                    "Lever board %s: skipping malformed posting (missing id/text)",
+                    self.company_identifier,
+                )
+                continue
             # Lever includes full details in listing
             location = job_data.get("categories", {}).get("location", "")
             team = job_data.get("categories", {}).get("team", "")
@@ -51,8 +63,8 @@ class LeverClient(BaseATSClient):
                 description = job_data["descriptionPlain"] + "\n\n" + description
 
             job = JobListing(
-                external_id=job_data["id"],
-                title=job_data["text"],
+                external_id=lever_id,
+                title=title,
                 location=location,
                 description=description,
                 requirements=None,  # Embedded in description
@@ -60,7 +72,7 @@ class LeverClient(BaseATSClient):
                 posted_at=None,  # Lever doesn't provide this easily
                 department=team,
                 remote_type=self._detect_remote_type(
-                    f"{job_data['text']} {location} {commitment}"
+                    f"{title} {location} {commitment}"
                 ),
             )
             jobs.append(job)

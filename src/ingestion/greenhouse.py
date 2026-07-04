@@ -33,18 +33,31 @@ class GreenhouseClient(BaseATSClient):
 
         jobs = []
         for job_data in data.get("jobs", []):
+            # The required top-level fields ("id"/"title") are read OUTSIDE the request try/except
+            # above, which only catches RequestException — so a bare ``["id"]`` would raise
+            # KeyError and 500 the whole import when ONE job in the payload is malformed/partial.
+            # Skip the bad job (like the optional fields already do with ``.get()``) and keep the
+            # rest, rather than failing the entire batch on one upstream defect.
+            job_id = job_data.get("id")
+            title = job_data.get("title")
+            if job_id is None or not title:
+                logger.warning(
+                    "Greenhouse board %s: skipping malformed job (missing id/title)",
+                    self.company_identifier,
+                )
+                continue
             location = job_data.get("location", {}).get("name", "")
 
             job = JobListing(
-                external_id=str(job_data["id"]),
-                title=job_data["title"],
+                external_id=str(job_id),
+                title=title,
                 location=location,
                 description=None,  # Need to fetch separately
                 requirements=None,
                 url=job_data.get("absolute_url", ""),
                 posted_at=job_data.get("updated_at"),
                 department=None,
-                remote_type=self._detect_remote_type(f"{job_data['title']} {location}"),
+                remote_type=self._detect_remote_type(f"{title} {location}"),
             )
             jobs.append(job)
 
@@ -64,6 +77,17 @@ class GreenhouseClient(BaseATSClient):
             logger.warning("Greenhouse detail fetch failed for job %s: %s", job_id, e)
             return None
 
+        # Required fields are read outside the request try/except — a partial/malformed detail
+        # payload missing "id"/"title" would raise KeyError and 500 the fetch. Treat it as a
+        # failed fetch (set last_error, return None) so the caller degrades honestly, exactly
+        # like an upstream error.
+        gh_id = job_data.get("id")
+        title = job_data.get("title")
+        if gh_id is None or not title:
+            self.last_error = "Greenhouse returned a malformed job detail (missing id/title)"
+            logger.warning("Greenhouse detail fetch for job %s: malformed payload (missing id/title)", job_id)
+            return None
+
         location = job_data.get("location", {}).get("name", "")
         content = job_data.get("content", "")
 
@@ -74,15 +98,15 @@ class GreenhouseClient(BaseATSClient):
         department = departments[0].get("name") if departments else None
 
         return JobListing(
-            external_id=str(job_data["id"]),
-            title=job_data["title"],
+            external_id=str(gh_id),
+            title=title,
             location=location,
             description=content,
             requirements=None,  # Usually embedded in description
             url=job_data.get("absolute_url", ""),
             posted_at=job_data.get("updated_at"),
             department=department,
-            remote_type=self._detect_remote_type(f"{job_data['title']} {location} {content}"),
+            remote_type=self._detect_remote_type(f"{title} {location} {content}"),
         )
 
     def fetch_all_with_details(self) -> List[JobListing]:
