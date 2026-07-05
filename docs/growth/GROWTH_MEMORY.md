@@ -91,6 +91,71 @@ pre-launch.
 
 ---
 
+### 2026-07-05 — Daily GTM review (quiet run on funnel/steer front; real packaging research on the team/B2B2C lever)
+- **Observed:** Phase still `pre_launch`. `ListConnectors` confirms only Gmail (connected,
+  enabled) + Google Drive (connected, not enabled-in-chat) + Google Calendar (unknown/not
+  enabled) — no analytics/billing/email-provider MCP available; shell env has no `PROD_URL` or
+  `ANALYTICS_READ_TOKEN`, so the `GET /api/analytics/summary` read path (built PR #146, wired for
+  the agent PR #245) could not be called either — `engine_built: false` / `channels_connected: []`
+  stay honest. **QUALITY_SCORECARD unchanged** since the last GTM read: still the 3rd audit,
+  `as_of 2026-07-03`, overall B, ship gate NOT met — the SAME 2 ship-critical dims
+  (business-case-strength, store-readiness) are C for a 3rd consecutive GTM read now, despite the
+  product factory shipping 29 runs of adjacent work in the interim (rate limiting, coverage-floor
+  ratchet, ATS retry/backoff, résumé-view fix, redirect-SSRF fix, etc.) — none of it touches the
+  team/B2B2C tier or store assets/mobile IAP specifically. **GTM_SCORECARD unchanged** too: still
+  `as_of 2026-07-02`, overall A, `ship_gate_met: true` — no new auditor grade has landed, so no
+  fresh top_gap to work this run. Two new ROADMAP build items appeared since the last GTM read —
+  `§11 marketing media-gen adapter` (epic #281) and `§34 pre-launch funnel: public demo of the
+  core aha + gated beta` (epic #286, replaces the blank waitlist) — both product-factory-authored
+  (not a GTM steer); worth watching, especially §34, since it will change the shape of the
+  pre-launch funnel once built.
+- **Concluded:** No real data justifies a ROADMAP/BUSINESS_CASE/VISION steer this run (same
+  reasoning as every prior pre-launch read — 0 users, 0 funnel data). Zero outreach drafts is the
+  ONLY compliant outcome this run, and for a sharper reason than "no traction to report": re-read
+  of `GTM_STANDARD.md` §6 confirms its readiness gate is a HARD BLOCK on **both** outbound
+  lanes — including the bespoke 1:1 Gmail-draft lane — until the independent
+  `QUALITY_SCORECARD.ship_gate_met` is true. It is still false, so no outreach draft would be
+  compliant this run regardless of how strategic a target might be. (Correcting my own framing
+  going forward: prior entries said "no traction to honestly report" as the reason for zero
+  drafts — that's true but incomplete; the actual gate is binary and ship-gate-keyed, not a
+  traction judgment call.)
+- **Did (real, in-repo, no channel/steer needed):** Ran real GTM business-analytics research (the
+  applied-business-scientist remit — pricing & packaging, competitive analysis) on the single
+  highest-ARPA, lowest-CAC lever the business case names but hasn't built: the team/B2B2C seat
+  tier. Found that every consumer job-tool competitor with an org/institutional offering (Huntr,
+  Careerflow, Big Interview) publishes **zero public seat pricing** — all sales-gated
+  ("Request a Demo"/"Contact Sales"); the one adjacent category that DOES publish real numbers is
+  outplacement/career-transition software sold to HR/L&D — Randstad RiseSmart publishes a clean
+  per-employee, duration-tiered price list ($899–$6,499) and INTOO tiers by seniority band
+  ($600–$3,750); LinkedIn Learning for Business seats reportedly run ~$350–500/seat/yr at
+  enterprise volume (hedged as a secondary-sourced anchor, not LinkedIn's own page). Added a
+  cited packaging recommendation to `docs/BUSINESS_CASE.md` lever 2: mirror RiseSmart's hybrid —
+  publish a self-serve starter/low-seat price so a single bootcamp cohort or small outplacement
+  engagement can check out without a sales call, then route anything above a seat threshold to a
+  sales-assisted annual contract. Every number is attributed to the third-party competitor it
+  belongs to, never claimed as Career Operator's own; no ARR scenario or `floor_met_year1` was
+  touched (the tier still doesn't exist, so crediting it would be gaming the business case);
+  explicitly labeled RECOMMEND-tier input for the product factory, not a steer. Ran the change
+  through an independent reviewer (maker≠checker, fresh subagent) — it caught one real nit (3 of
+  6 named competitors lacked an individually-cited URL for the "zero public pricing" claim) —
+  fixed by re-scoping the absolute claim to the 3 individually-cited names and hedging the other 2
+  as "directional, not independently cited" — then the reviewer APPROVED.
+- **Recommended (to factory):** Unchanged priority — business-case-strength (team/B2B2C tier,
+  now with a real cited packaging structure to start from; annual-first pricing) and
+  store-readiness (rendered assets + mobile IAP) remain the two ship-critical gaps. Watch §34
+  (pre-launch demo funnel) landing — once built, re-evaluate whether it changes
+  `ANALYSIS_PLAYBOOK.md`'s phase/gate logic (a public demo is a new, measurable pre-launch surface
+  distinct from a blank waitlist).
+- **Meta / operational note:** Named the circuit-breaker explicitly this run (GTM_STANDARD's
+  brakes) — the same 2 ship-critical dims and the same `SITE_GATE_PASSWORD` owner-action have now
+  persisted across >=3-4 consecutive GTM reads. Not treating it as a stall (each has a clearly
+  named, in-progress buildable lever, and adjacent product work continues), but naming
+  `SITE_GATE_PASSWORD` prominently in `GROWTH_STATUS.owner_blockers` as the SINGLE
+  highest-leverage next connect (a ~2-minute env-var set, unlike the Stripe/Apple/Google
+  account-creation items) rather than re-listing every blocker with equal weight.
+
+---
+
 ### 2026-07-03 — Daily GTM review (first §10 demand-validation pass; closes GTM Auditor issues #191/#192)
 - **Observed:** Phase still `pre_launch`. `ListConnectors` confirms only Gmail (connected,
   enabled) + Google Drive (connected, not enabled-in-chat) + Google Calendar (unknown/not

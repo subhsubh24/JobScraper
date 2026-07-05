@@ -46,7 +46,37 @@ These are *named, buildable* items (the only valid weak-case loop-back triggers)
 
 1. **Annual-first paywall + founder/launch pricing** — raise annual mix and ARPA.
 2. **Team/coach/career-services B2B2C tier** — bootcamps & outplacement firms reselling
-   seats (higher ARPA, lower CAC per seat).
+   seats (higher ARPA, lower CAC per seat). **Packaging recommendation (GTM research,
+   2026-07-05, real cited comps — no product built yet, no ARR credited):** several
+   consumer-facing job-tool competitors with an org/institutional offering — Huntr, Careerflow,
+   and Big Interview — publish ZERO public seat pricing on their own sites; all gate it behind
+   "Request a Demo"/"Contact Sales"
+   ([huntr.co/career-centers](https://huntr.co/career-centers),
+   [careerflow.ai/organizations/bootcamps](https://www.careerflow.ai/organizations/bootcamps),
+   [biginterview.com/pricing/enterprise](https://www.biginterview.com/pricing/enterprise) —
+   "Flexible, custom pricing for every organization," 700+ orgs served). Yoodli and Final Round
+   AI likewise advertise a Team/Enterprise tier with no public number (custom-quote only),
+   though their own pricing pages weren't individually captured with a URL here, so treat that
+   pair as directional, not independently cited. The one adjacent
+   category that DOES publish real numbers is outplacement/career-transition software sold
+   to HR/L&D: Randstad RiseSmart publishes a clean per-employee, duration-tiered price list
+   ($899 for a 3-month Essentials seat up to $6,499 for a 12-month Premier seat;
+   >50-seat/non-US is "contact us") and INTOO does the same by seniority band ($600 hourly
+   worker to $3,750 executive, 3–6mo)
+   ([randstadenterprise.com/pricing-and-plans](https://www.randstadenterprise.com/pricing-and-plans),
+   [intoo.com/us/solutions/outplacement/outplacement-pricing](https://www.intoo.com/us/solutions/outplacement/outplacement-pricing/)).
+   LinkedIn Learning for Business seats reportedly run ~$350–500/seat/yr at enterprise
+   volume (secondary source, not LinkedIn's own page:
+   [linkedhelper.com/blog/linkedin-learning-cost](https://www.linkedhelper.com/blog/linkedin-learning-cost/)) —
+   a useful anchor for what HR/L&D budget-holders already pay for adjacent seat software.
+   **Recommended structure when this tier is built:** mirror RiseSmart's hybrid — publish a
+   starter seat price + a low-seat-count floor (so a single bootcamp cohort or small
+   outplacement engagement can self-serve/checkout without a sales call), then route
+   anything above a seat threshold (e.g. 50+ seats) to a sales-assisted annual contract,
+   consistent with every competitor's freemium-to-institutional-upsell pattern. This is a
+   RECOMMEND-tier packaging input for the product factory when it builds the tier (GTM_STANDARD
+   §3) — it does not change `floor_met_year1` or any ARR scenario above, since no product
+   exists yet and crediting a number pre-build would be gaming the business case.
 3. **AI-prep value expansion** — the FIRST Career+ exclusive (AI salary-negotiation
    coaching) is now **BUILT** (see lever 6); mock-interview voice sessions + company-specific
    dossiers remain future Career+ wedges to raise the upgrade rate further.
