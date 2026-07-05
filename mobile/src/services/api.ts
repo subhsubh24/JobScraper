@@ -3,7 +3,14 @@
 import Constants from 'expo-constants';
 
 import * as storage from '@/services/storage';
-import type { Job, PipelineStats, ReferralStats, User } from '@/types';
+import type {
+  Competency,
+  EnrichResult,
+  Job,
+  PipelineStats,
+  ReferralStats,
+  User,
+} from '@/types';
 
 const TOKEN_KEY = 'career_operator_token';
 
@@ -140,6 +147,20 @@ export const api = {
   async referralStats(): Promise<ReferralStats> {
     const r = await request<{ referral: ReferralStats }>('/api/referrals/me');
     return r.referral;
+  },
+
+  // Track A profile enrichment: read the user's current link-discovered competencies.
+  async getEnrichment(): Promise<Competency[]> {
+    const r = await request<{ competencies: Competency[] }>('/api/profile/enrichment');
+    return r.competencies;
+  },
+
+  // Import competencies from the user's public GitHub profile (Pro+). Returns the honest result.
+  async enrichGithub(github: string): Promise<EnrichResult> {
+    return request<EnrichResult>('/api/profile/enrich/github', {
+      method: 'POST',
+      body: { github },
+    });
   },
 
   // Grant explicit, revocable third-party-AI consent (Apple 5.1.2(i)). Returns the updated

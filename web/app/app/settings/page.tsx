@@ -4,8 +4,129 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Button, Card, ErrorText, LinkButton } from '@/components/ui';
 import { AiConsentSetting } from '@/components/ai-consent';
-import { api, ApiError, type ReferralStats } from '@/lib/api';
+import { api, ApiError, type Competency, type ReferralStats } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
+
+function GithubEnrichmentCard() {
+  const { user } = useAuth();
+  const isPro = user?.tier === 'premium';
+  const [competencies, setCompetencies] = useState<Competency[] | null>(null);
+  const [handle, setHandle] = useState('');
+  const [importing, setImporting] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isPro) return;
+    let active = true;
+    api
+      .getEnrichment()
+      .then((c) => active && setCompetencies(c))
+      .catch(() => active && setCompetencies([]));
+    return () => {
+      active = false;
+    };
+  }, [isPro]);
+
+  async function importGithub() {
+    const value = handle.trim();
+    if (!value || importing) return;
+    setImporting(true);
+    setError(null);
+    setNotice(null);
+    try {
+      // Await the real result and report it honestly — the message reflects what was actually
+      // imported (or that nothing was found), never an optimistic "done".
+      const result = await api.enrichGithub(value);
+      setCompetencies(result.competencies);
+      setNotice(result.message);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'Could not import from GitHub. Try again.');
+    } finally {
+      setImporting(false);
+    }
+  }
+
+  async function clearAll() {
+    try {
+      await api.clearEnrichment();
+      setCompetencies([]);
+      setNotice(null);
+    } catch {
+      setError('Could not clear your imported skills. Try again.');
+    }
+  }
+
+  return (
+    <Card>
+      <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">
+        Profile enrichment
+      </h2>
+      <p className="mt-2 text-sm text-slate-300">
+        Import skills from your public GitHub — the languages and topics from your own
+        repositories sharpen your fit scores and cover letters. Nothing is invented; we only read
+        your public repos.
+      </p>
+
+      {!isPro ? (
+        <div className="mt-4 flex items-center justify-between gap-4 rounded-lg border border-slate-700 bg-slate-800/40 px-4 py-3">
+          <p className="text-sm text-slate-400">A Pro feature.</p>
+          <LinkButton href="/pricing">Upgrade</LinkButton>
+        </div>
+      ) : (
+        <>
+          <div className="mt-4 flex gap-2">
+            <input
+              value={handle}
+              onChange={(e) => setHandle(e.target.value)}
+              placeholder="github.com/yourname"
+              aria-label="Your GitHub username or profile URL"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              onKeyDown={(e) => e.key === 'Enter' && importGithub()}
+              className="w-full rounded-lg border border-slate-700 bg-slate-800/60 px-3 py-2.5 text-sm text-slate-200 outline-none focus:border-indigo-500"
+            />
+            <Button onClick={importGithub} disabled={importing || !handle.trim()}>
+              {importing ? 'Importing…' : 'Import'}
+            </Button>
+          </div>
+
+          {notice && <p className="mt-3 text-sm text-slate-400">{notice}</p>}
+          <ErrorText>{error}</ErrorText>
+
+          {competencies === null ? (
+            <div className="mt-4 h-8 animate-pulse rounded-lg bg-slate-800/60" aria-hidden="true" />
+          ) : competencies.length > 0 ? (
+            <>
+              <ul className="mt-4 flex flex-wrap gap-2">
+                {competencies.map((c) => (
+                  <li
+                    key={`${c.source_type}:${c.skill}`}
+                    title={c.evidence ?? undefined}
+                    className="rounded-full border border-indigo-500/30 bg-indigo-500/10 px-3 py-1 text-xs font-medium text-indigo-200"
+                  >
+                    {c.skill}
+                  </li>
+                ))}
+              </ul>
+              <button
+                onClick={clearAll}
+                className="mt-3 rounded text-xs text-slate-500 hover:text-slate-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
+              >
+                Clear imported skills
+              </button>
+            </>
+          ) : (
+            <p className="mt-4 text-sm text-slate-500">
+              No skills imported yet — add your GitHub above.
+            </p>
+          )}
+        </>
+      )}
+    </Card>
+  );
+}
 
 function ReferAFriendCard() {
   const [stats, setStats] = useState<ReferralStats | null>(null);
@@ -164,6 +285,8 @@ export default function SettingsPage() {
       </Card>
 
       <AiConsentSetting />
+
+      <GithubEnrichmentCard />
 
       <ReferAFriendCard />
 

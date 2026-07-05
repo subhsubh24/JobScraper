@@ -84,6 +84,9 @@ class User(Base):
     content_reports = relationship(
         "ContentReport", back_populates="user", cascade="all, delete-orphan"
     )
+    enriched_competencies = relationship(
+        "EnrichedCompetency", back_populates="user", cascade="all, delete-orphan"
+    )
     subscription = relationship(
         "Subscription", back_populates="user", uselist=False, cascade="all, delete-orphan"
     )
@@ -385,6 +388,45 @@ class ContentReport(Base):
 
     # Relationships
     user = relationship("User", back_populates="content_reports")
+
+
+class EnrichedCompetency(Base):
+    """A competency discovered from a user's linked public source (Track A profile enrichment).
+
+    OPTIONAL, source-tagged metadata: the user provides a public link (today GitHub; portfolio /
+    Scholar are named follow-ups) and we pull STRUCTURED, factual signals from it — never
+    invented. For GitHub that is the repos' own ``language`` + ``topics`` fields via the public
+    REST API (a FIXED trusted host, like the ATS clients), so there is no arbitrary-URL fetch /
+    SSRF surface and nothing is scraped or hallucinated. Each row is one (skill, source_type)
+    pair with an ``evidence`` note, so a user can see WHY a skill was attributed. It NEVER blocks
+    the core flow — a failed import degrades to zero rows and scoring/generation are unchanged
+    when there are none. Cascades on account deletion (owned by the user).
+    """
+
+    __tablename__ = "enriched_competencies"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    user_id = Column(String(36), ForeignKey("users.id"), nullable=False, index=True)
+
+    # Normalized (lowercased) skill/competency name — matches the scorer's skill vocabulary.
+    skill = Column(String(100), nullable=False)
+    # Which kind of source it came from (today only "github").
+    source_type = Column(String(30), nullable=False)  # github | portfolio | scholar
+    # The public source URL the user authorized (audit trail + UI attribution).
+    source_url = Column(String(500), nullable=False)
+    # Short human-readable provenance, e.g. "Primary language in 4 repositories". Bounded.
+    evidence = Column(String(200), nullable=True)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    user = relationship("User", back_populates="enriched_competencies")
+
+    # A skill from a given source is recorded once — a re-import replaces the source's set.
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id", "skill", "source_type", name="uq_enriched_user_skill_source"
+        ),
+    )
 
 
 # ============ CONTACTS (CRM) ============

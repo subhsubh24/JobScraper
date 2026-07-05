@@ -19,6 +19,24 @@ class JobScorer:
     def __init__(self, db: Session):
         self.db = db
         self.client = get_llm_client()
+        # Per-instance cache of link-discovered competencies keyed by user id, so a bulk
+        # re-score (one JobScorer, many jobs) loads a user's enrichment ONCE, not per job.
+        self._enriched_cache: dict = {}
+
+    def _enriched_skills(self, user: User) -> set:
+        """The user's link-discovered competencies as a skill set (empty if none).
+
+        Optional signal — never breaks scoring: a load failure degrades to an empty set. Lazily
+        imported to avoid a circular import (github_enricher imports the models this module uses).
+        """
+        cached = self._enriched_cache.get(user.id)
+        if cached is not None:
+            return cached
+        from src.enrichment.github_enricher import user_enriched_skills
+
+        result = user_enriched_skills(self.db, user)
+        self._enriched_cache[user.id] = result
+        return result
 
     def get_embedding(self, text: str) -> List[float]:
         """Get embedding vector for text."""
@@ -146,8 +164,14 @@ class JobScorer:
             # Consent not granted (or no key): stay fully local, never call the third party.
             semantic_score = 0.5
 
-        # Extract skills
+        # Extract skills (résumé + optional link-discovered competencies).
         resume_skills = set(self.extract_skills(user.resume_text or ""))
+        # Fold in competencies discovered from the user's linked public sources (GitHub) — an
+        # ADDITIVE, honest signal (structured repo languages/topics, never invented) so a skill
+        # the user has proven in public work but omitted from the résumé still matches roles that
+        # require it. Memoized per scorer instance (§ perf: one query for a bulk re-score, not
+        # N). Empty for users with no enrichment → existing scores (golden evals) are unchanged.
+        resume_skills |= self._enriched_skills(user)
         jd_text = f"{job.description or ''} {job.requirements or ''}"
         job_skills = set(self.extract_skills(jd_text))
 

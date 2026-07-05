@@ -68,3 +68,18 @@ export interface ReferralStats {
   total_referred: number;
   bonus_prep_packs: number;
 }
+
+// A competency discovered from a linked public source (Track A profile enrichment).
+export interface Competency {
+  skill: string;
+  source_type: string;
+  evidence: string | null;
+}
+
+export interface EnrichResult {
+  success: boolean;
+  found: number;
+  username: string;
+  competencies: Competency[];
+  message: string;
+}

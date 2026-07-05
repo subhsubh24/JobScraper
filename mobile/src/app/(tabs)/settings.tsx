@@ -3,12 +3,83 @@ import { useEffect, useState } from 'react';
 import { Alert, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Button, Card } from '@/components/ui';
+import { Button, Card, Field } from '@/components/ui';
 import { AiConsentSetting } from '@/components/ai-consent';
 import { useAuth } from '@/contexts/auth';
 import { api } from '@/services/api';
 import { colors, spacing } from '@/theme';
-import type { ReferralStats } from '@/types';
+import type { Competency, ReferralStats } from '@/types';
+
+// Mobile parity with the web "Profile enrichment" card: import skills from the user's public
+// GitHub (Pro+). Structured, factual data (repo languages/topics) that sharpens fit scores +
+// cover letters — nothing invented. Honest states: reports the real found count / message.
+function GithubEnrichmentCard() {
+  const { user } = useAuth();
+  const isPro = user?.tier === 'premium';
+  const [competencies, setCompetencies] = useState<Competency[] | null>(null);
+  const [handle, setHandle] = useState('');
+  const [importing, setImporting] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isPro) return;
+    let active = true;
+    api
+      .getEnrichment()
+      .then((c) => active && setCompetencies(c))
+      .catch(() => active && setCompetencies([]));
+    return () => {
+      active = false;
+    };
+  }, [isPro]);
+
+  async function importGithub() {
+    const value = handle.trim();
+    if (!value || importing) return;
+    setImporting(true);
+    setNotice(null);
+    try {
+      const result = await api.enrichGithub(value);
+      setCompetencies(result.competencies);
+      setNotice(result.message);
+    } catch (e) {
+      setNotice(e instanceof Error ? e.message : 'Could not import from GitHub. Try again.');
+    } finally {
+      setImporting(false);
+    }
+  }
+
+  if (!isPro) return null;
+
+  return (
+    <Card>
+      <Text style={styles.referTitle}>Profile enrichment</Text>
+      <Text style={styles.referBody}>
+        Import skills from your public GitHub — repo languages and topics sharpen your fit scores
+        and cover letters. Nothing is invented; we only read your public repos.
+      </Text>
+      <Field
+        label="GitHub username or profile URL"
+        value={handle}
+        onChangeText={setHandle}
+        placeholder="github.com/yourname"
+        autoCapitalize="none"
+        autoCorrect={false}
+      />
+      <Button label={importing ? 'Importing…' : 'Import'} onPress={importGithub} loading={importing} disabled={!handle.trim()} />
+      {notice ? <Text style={styles.referStats}>{notice}</Text> : null}
+      {competencies && competencies.length > 0 ? (
+        <View style={styles.chipWrap}>
+          {competencies.map((c) => (
+            <View key={`${c.source_type}:${c.skill}`} style={styles.chip}>
+              <Text style={styles.chipText}>{c.skill}</Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
+    </Card>
+  );
+}
 
 // Mobile parity with the web "Refer a friend" card: shows the user's invite stats and opens
 // the native share sheet. The reward (a bonus prep pack for both sides) is granted
@@ -137,6 +208,8 @@ export default function SettingsScreen() {
 
         <AiConsentSetting />
 
+        <GithubEnrichmentCard />
+
         <ReferAFriendCard />
 
         <View style={styles.meta}>
@@ -167,6 +240,16 @@ const styles = StyleSheet.create({
   referTitle: { color: colors.text, fontSize: 16, fontWeight: '700' },
   referBody: { color: colors.textMuted, marginTop: spacing.xs, marginBottom: spacing.md, fontSize: 13 },
   referStats: { color: colors.textMuted, marginTop: spacing.sm, fontSize: 13 },
+  chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginTop: spacing.md },
+  chip: {
+    borderWidth: 1,
+    borderColor: colors.primary,
+    backgroundColor: 'rgba(99,102,241,0.12)',
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  chipText: { color: colors.text, fontSize: 12, fontWeight: '600' },
   meta: { alignItems: 'center' },
   metaText: { color: colors.textMuted, fontSize: 12 },
   deleteBtn: { paddingVertical: 14, alignItems: 'center', marginTop: spacing.sm },
