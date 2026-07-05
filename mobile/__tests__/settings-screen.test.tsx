@@ -43,6 +43,10 @@ jest.mock('@/services/api', () => ({
     deleteAccount: jest.fn(async () => {}),
     grantAiConsent: jest.fn(async () => ({ ...mockUser, ai_consent: true })),
     revokeAiConsent: jest.fn(async () => ({ ...mockUser, ai_consent: false })),
+    // The Résumé card loads the saved résumé on mount (every tier) and PATCHes on save.
+    // Mocked so the screen render doesn't call undefined methods.
+    getResume: jest.fn(async () => 'Existing résumé text.'),
+    saveResume: jest.fn(async () => true),
     // Profile enrichment (Track A): the Pro-gated GitHub card loads current competencies on
     // mount for Pro users. Mocked so a premium render doesn't call an undefined method.
     getEnrichment: jest.fn(async () => []),
@@ -107,6 +111,34 @@ describe('SettingsScreen', () => {
       expect(screen.getByText(/2 friends have joined · 1 bonus prep pack earned/)).toBeTruthy(),
     );
     expect(screen.getByText('Share invite link')).toBeTruthy();
+  });
+
+  it('résumé card loads the saved résumé and saves edits honestly (awaits the real PATCH)', async () => {
+    render(<SettingsScreen />);
+    // The card loads the current résumé on mount.
+    const field = await screen.findByDisplayValue('Existing résumé text.');
+    expect(screen.getByText('Résumé')).toBeTruthy();
+
+    // Save is disabled until the text is dirty; editing enables it.
+    fireEvent.changeText(field, 'Updated résumé — Python, FastAPI.');
+    fireEvent.press(screen.getByText('Save résumé'));
+
+    // The real PATCH is awaited with the edited text, and only then does the confirmation show
+    // (no optimistic success).
+    await waitFor(() =>
+      expect(api.saveResume).toHaveBeenCalledWith('Updated résumé — Python, FastAPI.'),
+    );
+    await screen.findByText('Résumé saved.');
+  });
+
+  it('a failed résumé save surfaces an error and shows no success confirmation', async () => {
+    (api.saveResume as jest.Mock).mockRejectedValueOnce(new Error('server down'));
+    render(<SettingsScreen />);
+    const field = await screen.findByDisplayValue('Existing résumé text.');
+    fireEvent.changeText(field, 'Broken save attempt.');
+    fireEvent.press(screen.getByText('Save résumé'));
+    await screen.findByText(/could not save your résumé/i);
+    expect(screen.queryByText('Résumé saved.')).toBeNull();
   });
 
   it('delete account is HONEST: calls the real DELETE then clears the session', async () => {
