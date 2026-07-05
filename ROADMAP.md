@@ -399,6 +399,8 @@ consent gate; DoD = real generation + surfaced in web AND mobile + a downloadabl
       NOT stored — only aggregate activation/engagement is derivable here.
 - [ ] Launch plan doc
 
+- [ ] **§11 marketing media-gen adapter (image + video + music + voiceover).** Build the thin media-gen adapter (GTM_STANDARD §11) so the marketing loop produces multi-format creative on the EXISTING Gemini key: IMAGE (Nano Banana), VIDEO (Gemini Omni Flash), MUSIC (Lyria 3), VOICEOVER (Gemini TTS) — a video can carry soundtrack and/or narration from the same key. Route via `getProvider`/`geminiProvider` + the Interactions API. Every asset passes the maker≠checker not-obviously-AI + FTC audit before publish; cost-governed; preview ids pinned. Stages creative pre-launch, publishes only post-§13-approval on a connected channel. Build epic: #281.
+
 ### H — Growth-execution engine
 - [x] Waitlist capture + double-opt-in — capture shipped earlier (PR #68); double-opt-in
       SHIPPED run 16 (PR #187, 2 Sonnet reviewers + 2 fresh re-reviewers, all APPROVE). `POST
