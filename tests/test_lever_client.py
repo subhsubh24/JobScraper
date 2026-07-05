@@ -12,8 +12,11 @@ from src.ingestion.lever import LeverClient
 
 
 class _Resp:
-    def __init__(self, payload):
+    def __init__(self, payload, status_code=200):
         self._payload = payload
+        # A real requests.Response has a status_code; the retry helper (get_with_retry) reads it
+        # to decide whether the response is transient. 200 = non-retryable (returned as-is).
+        self.status_code = status_code
 
     def raise_for_status(self):
         pass

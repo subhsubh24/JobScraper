@@ -3,7 +3,7 @@ import logging
 
 import requests
 from typing import List, Optional
-from .base import BaseATSClient, JobListing
+from .base import BaseATSClient, JobListing, get_with_retry
 
 logger = logging.getLogger("career_operator.ingestion.greenhouse")
 
@@ -23,7 +23,7 @@ class GreenhouseClient(BaseATSClient):
 
         self.last_error = None
         try:
-            response = requests.get(url, timeout=HTTP_TIMEOUT)
+            response = get_with_retry(url, timeout=HTTP_TIMEOUT)
             response.raise_for_status()
             data = response.json()
         except requests.RequestException as e:
@@ -71,7 +71,7 @@ class GreenhouseClient(BaseATSClient):
 
         self.last_error = None
         try:
-            response = requests.get(url, timeout=HTTP_TIMEOUT)
+            response = get_with_retry(url, timeout=HTTP_TIMEOUT)
             response.raise_for_status()
             job_data = response.json()
         except requests.RequestException as e:
