@@ -20,6 +20,7 @@ function GithubEnrichmentCard() {
   const [handle, setHandle] = useState('');
   const [importing, setImporting] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isPro) return;
@@ -38,18 +39,28 @@ function GithubEnrichmentCard() {
     if (!value || importing) return;
     setImporting(true);
     setNotice(null);
+    setError(null);
     try {
       const result = await api.enrichGithub(value);
       setCompetencies(result.competencies);
       setNotice(result.message);
     } catch (e) {
-      setNotice(e instanceof Error ? e.message : 'Could not import from GitHub. Try again.');
+      setError(e instanceof Error ? e.message : 'Could not import from GitHub. Try again.');
     } finally {
       setImporting(false);
     }
   }
 
-  if (!isPro) return null;
+  async function clearAll() {
+    try {
+      await api.clearEnrichment();
+      setCompetencies([]);
+      setNotice(null);
+      setError(null);
+    } catch {
+      setError('Could not clear your imported skills. Try again.');
+    }
+  }
 
   return (
     <Card>
@@ -58,25 +69,47 @@ function GithubEnrichmentCard() {
         Import skills from your public GitHub — repo languages and topics sharpen your fit scores
         and cover letters. Nothing is invented; we only read your public repos.
       </Text>
-      <Field
-        label="GitHub username or profile URL"
-        value={handle}
-        onChangeText={setHandle}
-        placeholder="github.com/yourname"
-        autoCapitalize="none"
-        autoCorrect={false}
-      />
-      <Button label={importing ? 'Importing…' : 'Import'} onPress={importGithub} loading={importing} disabled={!handle.trim()} />
-      {notice ? <Text style={styles.referStats}>{notice}</Text> : null}
-      {competencies && competencies.length > 0 ? (
-        <View style={styles.chipWrap}>
-          {competencies.map((c) => (
-            <View key={`${c.source_type}:${c.skill}`} style={styles.chip}>
-              <Text style={styles.chipText}>{c.skill}</Text>
-            </View>
-          ))}
-        </View>
-      ) : null}
+      {/* Gate like the Insights learning-plan card: SHOW the feature to free users with an
+          upgrade CTA (discoverability/conversion), never hide it. */}
+      {!isPro ? (
+        <>
+          <Text style={styles.proNote}>A Pro feature.</Text>
+          <Button label="Upgrade to Pro" onPress={() => router.push('/paywall')} />
+        </>
+      ) : (
+        <>
+          <Field
+            label="GitHub username or profile URL"
+            value={handle}
+            onChangeText={setHandle}
+            placeholder="github.com/yourname"
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+          <Button
+            label={importing ? 'Importing…' : 'Import'}
+            onPress={importGithub}
+            loading={importing}
+            disabled={!handle.trim()}
+          />
+          {notice ? <Text style={styles.referStats}>{notice}</Text> : null}
+          {error ? <Text style={styles.errorText}>{error}</Text> : null}
+          {competencies && competencies.length > 0 ? (
+            <>
+              <View style={styles.chipWrap}>
+                {competencies.map((c) => (
+                  <View key={`${c.source_type}:${c.skill}`} style={styles.chip}>
+                    <Text style={styles.chipText}>{c.skill}</Text>
+                  </View>
+                ))}
+              </View>
+              <Pressable accessibilityRole="button" onPress={clearAll} style={styles.clearBtn}>
+                <Text style={styles.clearText}>Clear imported skills</Text>
+              </Pressable>
+            </>
+          ) : null}
+        </>
+      )}
     </Card>
   );
 }
@@ -250,6 +283,10 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   chipText: { color: colors.text, fontSize: 12, fontWeight: '600' },
+  proNote: { color: colors.textMuted, marginBottom: spacing.sm, fontSize: 13 },
+  errorText: { color: colors.danger, marginTop: spacing.sm, fontSize: 13 },
+  clearBtn: { paddingVertical: 8, marginTop: spacing.xs },
+  clearText: { color: colors.textMuted, fontSize: 12 },
   meta: { alignItems: 'center' },
   metaText: { color: colors.textMuted, fontSize: 12 },
   deleteBtn: { paddingVertical: 14, alignItems: 'center', marginTop: spacing.sm },

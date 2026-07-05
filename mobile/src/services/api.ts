@@ -163,6 +163,11 @@ export const api = {
     });
   },
 
+  // Remove ALL of the user's imported competencies (data control; web parity).
+  async clearEnrichment(): Promise<void> {
+    await request('/api/profile/enrichment', { method: 'DELETE' });
+  },
+
   // Grant explicit, revocable third-party-AI consent (Apple 5.1.2(i)). Returns the updated
   // user (ai_consent=true) so the caller can sync auth state without a second /me round-trip.
   async grantAiConsent(): Promise<User> {
