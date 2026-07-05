@@ -41,9 +41,10 @@ Keep this current as routes are added. A new route with no journey coverage is a
 - **résumé view/edit** — `GET`/`PATCH /api/profile/resume` (`tests/test_resume_profile.py`):
   the post-signup add/edit path (closes the résumé dead-end); end-to-end unblock proven (a
   résumé-less Premium user hits the tailored-résumé 400, adds a résumé, the guard clears).
-- **GitHub profile enrichment** — `POST`/`GET`/`DELETE /api/profile/enrich/github`
-  (`tests/test_github_enrichment.py`): Pro-gated; imports the user's OWN public repo
-  language/topics from the fixed `api.github.com` host (SSRF-safe); degrades gracefully.
+- **GitHub profile enrichment** (`tests/test_github_enrichment.py`): `POST /api/profile/enrich/github`
+  — Pro-gated; imports the user's OWN public repo language/topics from the fixed `api.github.com`
+  host (SSRF-safe); degrades gracefully. `GET`/`DELETE /api/profile/enrichment` (a DIFFERENT path)
+  — free, read/clear your own competencies.
 - **skill-gap heatmap** — `GET /api/insights/skill-gaps` (`tests/test_skill_gaps.py`): FREE,
   key-free, honest empty state; the cross-pipeline retention hook.
 - **AI learning plan** — `POST /api/insights/learning-plan` (`tests/test_skill_gaps.py`): Pro+;
