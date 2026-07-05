@@ -136,6 +136,48 @@ def test_generate_tailored_resume_persists_artifact(db_session):
     assert len(rows) == 1 and rows[0].artifact_type == "tailored_resume"
 
 
+def test_generate_salary_negotiation_persists_artifact(db_session):
+    """Salary-negotiation (the Career+ exclusive) had its only deterministic eval OUTSIDE
+    tests/evals/ (in tests/test_llm_workflows.py) — its siblings all live here. Bring it to
+    parity: patch the LLM and assert the persisted artifact has the right shape AND that a
+    healthy generation flows through substantively/structured (so a pipeline regression that
+    stubs or unstructures it reddens per-PR, not just in the nightly live eval below)."""
+    user, job = _seed(db_session)
+    wf = LLMWorkflows(db_session)
+    wf.client = _FakeLLM(
+        "## Research talking points\nMarket rate for a Backend Engineer at Acme is competitive.\n"
+        "## Initial offer response\n\"Thank you — I'd like to discuss the compensation package.\"\n"
+        "## Counter-offer script\nAnchor at your target and justify it with your Python/React impact.\n"
+        "## Handling pushback\nStay collaborative; restate your value.\n"
+        "## Beyond salary\nNegotiate equity, signing bonus, and PTO."
+    )
+
+    artifact = wf.generate_salary_negotiation(job, target_salary=150000)
+
+    assert isinstance(artifact, PrepArtifact)
+    assert artifact.artifact_type == "salary_negotiation"
+    assert artifact.job_id == job.id
+    assert "Backend Engineer" in artifact.title
+    assert artifact.content and "Counter-offer" in artifact.content
+    assert artifact.model_used
+    # Substantive + structured — a stub/unstructured persist would fail these.
+    assert len(artifact.content) > 200 and artifact.content.count("##") >= 3
+
+    rows = db_session.query(PrepArtifact).filter(PrepArtifact.job_id == job.id).all()
+    assert len(rows) == 1 and rows[0].artifact_type == "salary_negotiation"
+
+
+def test_salary_negotiation_blank_completion_fails_loud(db_session):
+    """An empty completion must raise (honest 502 upstream), never persist a blank 'guide' and
+    report success — SIDE-EFFECT INTEGRITY (§6), same contract as the other generators."""
+    user, job = _seed(db_session)
+    wf = LLMWorkflows(db_session)
+    wf.client = _FakeLLM("   ")  # whitespace-only == empty
+    with pytest.raises(RuntimeError):
+        wf.generate_salary_negotiation(job, target_salary=150000)
+    assert db_session.query(PrepArtifact).filter(PrepArtifact.job_id == job.id).count() == 0
+
+
 def test_tailored_resume_blank_completion_fails_loud(db_session):
     """An empty completion must raise (honest 502 upstream), never persist a blank 'tailored'
     résumé and report success — SIDE-EFFECT INTEGRITY (§6)."""

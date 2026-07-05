@@ -144,6 +144,27 @@ def test_learning_plan_real_output_is_substantive_and_covers_the_gaps(db_session
     assert "#" in content, "learning plan is not structured markdown (no heading)"
 
 
+def test_salary_negotiation_real_output_is_substantive_and_on_topic(db_session, monkeypatch):
+    """The Career+ salary-negotiation guide is the ONE generator that had no real-output eval.
+    Its real Gemini output must be substantive, structured, and actually about negotiating the
+    offer (scripts / counter-offer / compensation) — not off-topic filler. Tolerant assertions
+    (length / a negotiation keyword / markdown) so normal wording variation doesn't flake."""
+    monkeypatch.setenv("GEMINI_API_KEY", LIVE_KEY)  # restore the real key (conftest blanked it)
+    from src.enrichment.llm_workflows import LLMWorkflows
+
+    user, job = _seed(db_session)
+    artifact = LLMWorkflows(db_session).generate_salary_negotiation(job, target_salary=180000)
+    content = artifact.content or ""
+
+    assert isinstance(artifact, PrepArtifact) and artifact.artifact_type == "salary_negotiation"
+    assert len(content) > 200, f"salary guide too short to be real output: {len(content)} chars"
+    low = content.lower()
+    assert any(t in low for t in ("negotiat", "salary", "offer", "counter", "compensation")), \
+        f"salary guide reads off-topic (not about negotiation): {content[:200]!r}"
+    assert any(ch in content for ch in ("#", "-", "1.", "2.")), \
+        "salary guide lacks any structure (no heading or list)"
+
+
 def test_coach_real_answer_is_substantive_and_on_topic(db_session, monkeypatch):
     monkeypatch.setenv("GEMINI_API_KEY", LIVE_KEY)
     from src.ai_coach.career_coach import CareerCoach
