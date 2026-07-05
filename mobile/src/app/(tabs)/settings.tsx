@@ -10,6 +10,88 @@ import { api } from '@/services/api';
 import { colors, spacing } from '@/theme';
 import type { Competency, ReferralStats } from '@/types';
 
+// Mobile parity with the web "Résumé" card. The résumé powers fit scoring, tailored résumés,
+// cover letters, and the skill-gap heatmap — several of those tell the user to add it "in
+// Settings", so this is the reachable place to do so. Available to every tier (core input).
+function ResumeCard() {
+  const [resume, setResume] = useState<string | null>(null); // null = still loading
+  const [saved, setSaved] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    api
+      .getResume()
+      .then((text) => {
+        if (!active) return;
+        setResume(text);
+        setSaved(text);
+      })
+      .catch(() => active && setError('Could not load your résumé. Reopen Settings to try again.'));
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const dirty = resume !== null && resume !== saved;
+
+  async function save() {
+    if (resume === null || saving || !dirty) return;
+    setSaving(true);
+    setError(null);
+    setNotice(null);
+    try {
+      // Await the real PATCH; only reflect "saved" once the server confirms it.
+      const hasResume = await api.saveResume(resume);
+      setSaved(resume);
+      setNotice(hasResume ? 'Résumé saved.' : 'Résumé cleared.');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not save your résumé. Try again.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Card>
+      <Text style={styles.referTitle}>Résumé</Text>
+      <Text style={styles.referBody}>
+        Paste your résumé as text. It powers your fit scores, tailored résumés, cover letters, and
+        skill-gap heatmap — the more complete it is, the sharper they get.
+      </Text>
+      {resume === null ? (
+        <Text style={styles.referStats}>Loading your résumé…</Text>
+      ) : (
+        <>
+          <Field
+            label="Your résumé text"
+            value={resume}
+            onChangeText={(t) => {
+              setResume(t);
+              setNotice(null);
+            }}
+            placeholder="Paste your résumé here — experience, skills, achievements…"
+            multiline
+            numberOfLines={8}
+            maxLength={50000}
+            style={styles.resumeInput}
+          />
+          <Button
+            label={saving ? 'Saving…' : 'Save résumé'}
+            onPress={save}
+            loading={saving}
+            disabled={!dirty}
+          />
+          {notice ? <Text style={styles.savedText}>{notice}</Text> : null}
+          {error ? <Text style={styles.errorText}>{error}</Text> : null}
+        </>
+      )}
+    </Card>
+  );
+}
+
 // Mobile parity with the web "Profile enrichment" card: import skills from the user's public
 // GitHub (Pro+). Structured, factual data (repo languages/topics) that sharpens fit scores +
 // cover letters — nothing invented. Honest states: reports the real found count / message.
@@ -239,6 +321,8 @@ export default function SettingsScreen() {
           <Button label="Upgrade to Pro" onPress={() => router.push('/paywall')} />
         ) : null}
 
+        <ResumeCard />
+
         <AiConsentSetting />
 
         <GithubEnrichmentCard />
@@ -284,6 +368,8 @@ const styles = StyleSheet.create({
   },
   chipText: { color: colors.text, fontSize: 12, fontWeight: '600' },
   proNote: { color: colors.textMuted, marginBottom: spacing.sm, fontSize: 13 },
+  resumeInput: { minHeight: 160, paddingTop: spacing.sm, textAlignVertical: 'top' },
+  savedText: { color: colors.success, marginTop: spacing.sm, fontSize: 13 },
   errorText: { color: colors.danger, marginTop: spacing.sm, fontSize: 13 },
   clearBtn: { paddingVertical: 8, marginTop: spacing.xs },
   clearText: { color: colors.textMuted, fontSize: 12 },

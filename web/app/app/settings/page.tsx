@@ -7,6 +7,88 @@ import { AiConsentSetting } from '@/components/ai-consent';
 import { api, ApiError, type Competency, type ReferralStats } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 
+function ResumeCard() {
+  const [resume, setResume] = useState<string | null>(null); // null = still loading
+  const [saved, setSaved] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    api
+      .getResume()
+      .then((text) => {
+        if (!active) return;
+        setResume(text);
+        setSaved(text);
+      })
+      .catch(() => active && setError('Could not load your résumé. Reload to try again.'));
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const dirty = resume !== null && resume !== saved;
+
+  async function save() {
+    if (resume === null || saving || !dirty) return;
+    setSaving(true);
+    setError(null);
+    setNotice(null);
+    try {
+      // Await the real PATCH; only reflect "saved" once the server confirms it.
+      const hasResume = await api.saveResume(resume);
+      setSaved(resume);
+      setNotice(hasResume ? 'Résumé saved.' : 'Résumé cleared.');
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'Could not save your résumé. Try again.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Card>
+      <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">Résumé</h2>
+      <p className="mt-2 text-sm text-slate-300">
+        Paste your résumé as text. It powers your fit scores, tailored résumés, cover letters, and
+        your skill-gap heatmap — the more complete it is, the sharper they get.
+      </p>
+
+      {resume === null ? (
+        <div className="mt-4 h-40 animate-pulse rounded-lg bg-slate-800/60" aria-hidden="true" />
+      ) : (
+        <>
+          <label className="mt-4 block">
+            <span className="sr-only">Your résumé text</span>
+            <textarea
+              value={resume}
+              onChange={(e) => {
+                setResume(e.target.value);
+                setNotice(null);
+              }}
+              rows={10}
+              maxLength={50000}
+              placeholder="Paste your résumé here — experience, skills, achievements…"
+              aria-label="Your résumé text"
+              className="w-full resize-y rounded-lg border border-slate-700 bg-slate-800/60 px-3 py-2.5 text-sm leading-relaxed text-slate-200 outline-none focus:border-indigo-500"
+            />
+          </label>
+          <div className="mt-3 flex items-center justify-between gap-4">
+            <span className="text-xs text-slate-500">{resume.length.toLocaleString()} / 50,000</span>
+            <Button onClick={save} disabled={!dirty || saving}>
+              {saving ? 'Saving…' : 'Save résumé'}
+            </Button>
+          </div>
+          {notice && <p className="mt-2 text-sm text-emerald-400">{notice}</p>}
+          <ErrorText>{error}</ErrorText>
+        </>
+      )}
+    </Card>
+  );
+}
+
 function GithubEnrichmentCard() {
   const { user } = useAuth();
   const isPro = user?.tier === 'premium';
@@ -283,6 +365,8 @@ export default function SettingsPage() {
           </p>
         )}
       </Card>
+
+      <ResumeCard />
 
       <AiConsentSetting />
 

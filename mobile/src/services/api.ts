@@ -149,6 +149,22 @@ export const api = {
     return r.referral;
   },
 
+  // Read the signed-in user's saved résumé text (their own data). Returns '' when none is saved.
+  async getResume(): Promise<string> {
+    const r = await request<{ resume_text: string }>('/api/profile/resume');
+    return r.resume_text;
+  },
+
+  // Save (or clear, with an empty string) the user's résumé. Awaits the real PATCH and returns
+  // the server-confirmed has_resume — never an optimistic success.
+  async saveResume(resumeText: string): Promise<boolean> {
+    const r = await request<{ has_resume: boolean }>('/api/profile/resume', {
+      method: 'PATCH',
+      body: { resume_text: resumeText },
+    });
+    return r.has_resume;
+  },
+
   // Track A profile enrichment: read the user's current link-discovered competencies.
   async getEnrichment(): Promise<Competency[]> {
     const r = await request<{ competencies: Competency[] }>('/api/profile/enrichment');
