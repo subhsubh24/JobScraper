@@ -383,6 +383,28 @@ def rate_limit(bucket: str, limit: int, window_seconds: int = 60):
     return _dep
 
 
+def rate_limit_user(bucket: str, limit: int, window_seconds: int = 60):
+    """Per-USER fixed-window limiter for AUTHED endpoints — keyed by user id, not client IP.
+
+    Authed reads (session restore, the pipeline list, job detail) are hit on every app launch
+    and pull-to-refresh, and behind carrier-grade NAT many distinct users share ONE public IP,
+    so an IP-keyed limit (``rate_limit``) would false-429 legitimate mobile users the moment a
+    busy NAT crossed the threshold. Keying by user id — like ``check_llm_ceiling`` — removes
+    that shared-IP hazard AND gives real per-account abuse protection: a single compromised
+    token can't hammer these DB-reading endpoints unbounded. The subject is prefixed ``user:``
+    so its counter rows never collide with the IP-keyed limiter's, even in a shared bucket.
+    """
+    def _dep(
+        user: User = Depends(get_current_user),
+        db: Session = Depends(get_db),
+    ) -> None:
+        if _RATE_LIMIT_DISABLED:
+            return
+        if not _consume_counter(db, f"user:{user.id}", bucket, limit, window_seconds):
+            raise HTTPException(status_code=429, detail="Too many requests. Slow down.")
+    return _dep
+
+
 def check_llm_ceiling(user: User, db: Session) -> None:
     # 86400s window keyed by user id — a per-user/day ceiling that holds across instances.
     if not _consume_counter(db, user.id, "llm_daily", LLM_DAILY_CEILING, 86400):
@@ -736,7 +758,7 @@ def login(data: UserLogin, request: Request, db: Session = Depends(get_db)):
     return {"success": True, "token": token, "user": user_public(user, db)}
 
 
-@app.get("/api/auth/me")
+@app.get("/api/auth/me", dependencies=[Depends(rate_limit_user("user_read", 120))])
 def me(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     return {"success": True, "user": user_public(user, db)}
 
@@ -766,7 +788,7 @@ def revoke_ai_consent(user: User = Depends(get_current_user), db: Session = Depe
     return {"success": True, "user": user_public(user, db)}
 
 
-@app.get("/api/referrals/me")
+@app.get("/api/referrals/me", dependencies=[Depends(rate_limit_user("user_read", 120))])
 def referrals_me(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """The caller's referral code, how many friends joined with it, and bonus earned."""
     stats = referrals.referral_stats(db, user)
@@ -1147,7 +1169,7 @@ def create_job(
     return {"success": True, "job": job_public(job)}
 
 
-@app.get("/api/jobs")
+@app.get("/api/jobs", dependencies=[Depends(rate_limit_user("user_read", 120))])
 def list_jobs(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -1176,7 +1198,7 @@ def list_jobs(
     return {"success": True, "jobs": [job_public(j) for j in jobs]}
 
 
-@app.get("/api/jobs/{job_id}")
+@app.get("/api/jobs/{job_id}", dependencies=[Depends(rate_limit_user("user_read", 120))])
 def get_job(
     job_id: str,
     user: User = Depends(get_current_user),
@@ -1946,7 +1968,7 @@ def enrich_profile_github(
     }
 
 
-@app.get("/api/profile/enrichment")
+@app.get("/api/profile/enrichment", dependencies=[Depends(rate_limit_user("user_read", 120))])
 def get_profile_enrichment(
     user: User = Depends(get_current_user), db: Session = Depends(get_db)
 ):
@@ -1971,7 +1993,7 @@ def clear_profile_enrichment(
 # ---------------------------------------------------------------------------
 # Analytics
 # ---------------------------------------------------------------------------
-@app.get("/api/analytics/pipeline")
+@app.get("/api/analytics/pipeline", dependencies=[Depends(rate_limit_user("user_read", 120))])
 def pipeline_stats(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     # Eager-load application + score so the aggregate loop (and the top-5 sort, which both
     # read job.score) never lazy-loads per row; also company, which job_public() reads when
