@@ -119,6 +119,21 @@ export interface SkillGapAnalysis {
   strengths: SkillStat[]; // demanded skills the résumé already has
 }
 
+// A competency discovered from a linked public source (Track A profile enrichment).
+export interface Competency {
+  skill: string;
+  source_type: string;
+  evidence: string | null;
+}
+
+export interface EnrichResult {
+  success: boolean;
+  found: number;
+  username: string;
+  competencies: Competency[];
+  message: string;
+}
+
 export const api = {
   apiUrl: API_URL,
 
@@ -155,6 +170,24 @@ export const api = {
 
   async referralStats(): Promise<ReferralStats> {
     return (await request<{ referral: ReferralStats }>('/api/referrals/me')).referral;
+  },
+
+  // Track A profile enrichment: read the user's current link-discovered competencies.
+  async getEnrichment(): Promise<Competency[]> {
+    return (await request<{ competencies: Competency[] }>('/api/profile/enrichment')).competencies;
+  },
+
+  // Import competencies from the user's public GitHub profile (Pro+). Returns the honest result
+  // (found count + the persisted set + a message) — never a fake success.
+  async enrichGithub(github: string): Promise<EnrichResult> {
+    return request<EnrichResult>('/api/profile/enrich/github', {
+      method: 'POST',
+      body: { github },
+    });
+  },
+
+  async clearEnrichment(): Promise<void> {
+    await request('/api/profile/enrichment', { method: 'DELETE' });
   },
 
   // Grant explicit, revocable third-party-AI consent (Apple 5.1.2(i)). Returns the updated

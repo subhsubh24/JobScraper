@@ -43,6 +43,17 @@ jest.mock('@/services/api', () => ({
     deleteAccount: jest.fn(async () => {}),
     grantAiConsent: jest.fn(async () => ({ ...mockUser, ai_consent: true })),
     revokeAiConsent: jest.fn(async () => ({ ...mockUser, ai_consent: false })),
+    // Profile enrichment (Track A): the Pro-gated GitHub card loads current competencies on
+    // mount for Pro users. Mocked so a premium render doesn't call an undefined method.
+    getEnrichment: jest.fn(async () => []),
+    enrichGithub: jest.fn(async () => ({
+      success: true,
+      found: 0,
+      username: 'octocat',
+      competencies: [],
+      message: 'No public repositories with detectable skills found for github.com/octocat.',
+    })),
+    clearEnrichment: jest.fn(async () => {}),
   },
 }));
 
@@ -67,17 +78,26 @@ describe('SettingsScreen', () => {
     expect(screen.getByText('Jane Seeker')).toBeTruthy();
     expect(screen.getByText('jane@example.com')).toBeTruthy();
     expect(screen.getByText('Free')).toBeTruthy();
-    expect(screen.getByText('Upgrade to Pro')).toBeTruthy();
+    // A free user gets at least one "Upgrade to Pro" CTA (the top-level Plan button AND the
+    // Pro-gated enrichment card's contextual upsell both render), so match all of them.
+    expect(screen.getAllByText('Upgrade to Pro').length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText(/Jobs remaining: 3/)).toBeTruthy();
+    // The enrichment card is SHOWN to free users with a Pro upsell (not hidden).
+    expect(screen.getByText('Profile enrichment')).toBeTruthy();
+    expect(screen.getByText('A Pro feature.')).toBeTruthy();
     // Let the referral card's async load settle so its state update is wrapped in act().
     await screen.findByText('Share invite link');
   });
 
-  it('a premium (Pro) user shows Pro and no upgrade CTA', async () => {
+  it('a premium (Pro) user shows Pro and the enrichment import flow, no upgrade CTA', async () => {
     mockUser = { ...mockUser, tier: 'premium' };
     render(<SettingsScreen />);
     expect(screen.getByText('Pro')).toBeTruthy();
+    // No "Upgrade to Pro" anywhere for a Pro user (top-level hidden; enrichment card shows the
+    // import flow, not the upsell).
     expect(screen.queryByText('Upgrade to Pro')).toBeNull();
+    // The Pro user sees the enrichment import affordance.
+    expect(screen.getByText('Import')).toBeTruthy();
     await screen.findByText('Share invite link');
   });
 

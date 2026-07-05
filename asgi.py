@@ -38,6 +38,7 @@ from src.db.models import (
     ApplicationStatus,
     ATSType,
     ContentReport,
+    EnrichedCompetency,
     JobPosting,
     PrepArtifact,
     RateCounter,
@@ -46,6 +47,11 @@ from src.db.models import (
     Waitlist,
 )
 from src.enrichment.llm_workflows import LLMWorkflows, ModeratedContentError
+from src.enrichment.github_enricher import (
+    discover_github_competencies,
+    parse_github_username,
+    replace_github_competencies,
+)
 from src.insights.skill_gaps import analyze_skill_gaps
 from src.llm import llm_available
 from src.ranking.scorer import JobScorer
@@ -1834,6 +1840,96 @@ def generate_learning_plan_endpoint(
             "skills": top_gaps,
         },
     }
+
+
+# ---------------------------------------------------------------------------
+# Profile enrichment (Track A — the market's /expand)
+# ---------------------------------------------------------------------------
+class GithubEnrichRequest(BaseModel):
+    # A GitHub username or github.com profile URL. Bounded (we only ever extract a validated
+    # username from it and hit the FIXED host api.github.com — no arbitrary-URL fetch).
+    github: str = Field(min_length=1, max_length=200)
+
+
+def _enrichment_payload(db: Session, user: User) -> list:
+    rows = (
+        db.query(EnrichedCompetency)
+        .filter(EnrichedCompetency.user_id == user.id)
+        .order_by(EnrichedCompetency.skill)
+        .all()
+    )
+    return [
+        {"skill": r.skill, "source_type": r.source_type, "evidence": r.evidence}
+        for r in rows
+    ]
+
+
+@app.post("/api/profile/enrich/github", dependencies=[Depends(rate_limit("write", 20))])
+def enrich_profile_github(
+    data: GithubEnrichRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Import competencies from the user's public GitHub profile — a Pro+ feature (/expand).
+
+    Honest, structured enrichment: we validate the username and call the PUBLIC GitHub REST API
+    (fixed host api.github.com — no arbitrary-URL fetch, no SSRF, nothing scraped or invented).
+    The repos' own language + topics become source-tagged competencies that feed fit-scoring +
+    cover-letter generation. A re-import REPLACES the prior GitHub set (reflects current repos).
+    No consent gate / LLM ceiling: no third-party AI is called and the user's own data is not
+    sent anywhere — we only read their OWN public GitHub. Degrades honestly: an unknown user /
+    private-only account / API error returns 200 with found=0 and an honest message, never a lie.
+    """
+    if user.tier != UserTier.PREMIUM:
+        raise HTTPException(
+            status_code=403,
+            detail="Profile enrichment is a Pro feature. Upgrade to Pro or Career+ to unlock it.",
+        )
+    username = parse_github_username(data.github)
+    if not username:
+        raise HTTPException(
+            status_code=400,
+            detail="Enter a valid GitHub username or profile URL (e.g. github.com/yourname).",
+        )
+    discovered = discover_github_competencies(username)
+    source_url = f"https://github.com/{username}"
+    added = replace_github_competencies(db, user, source_url, discovered)
+    db.commit()
+    if added:
+        analytics.record_event(db, "profile_enriched")  # aggregate metric (best-effort, no PII)
+    return {
+        "success": True,
+        "found": added,
+        "username": username,
+        "competencies": _enrichment_payload(db, user),
+        "message": (
+            f"Imported {added} skill{'' if added == 1 else 's'} from github.com/{username}."
+            if added
+            else f"No public repositories with detectable skills found for github.com/{username}."
+        ),
+    }
+
+
+@app.get("/api/profile/enrichment")
+def get_profile_enrichment(
+    user: User = Depends(get_current_user), db: Session = Depends(get_db)
+):
+    """The user's current link-discovered competencies (free; read your own data)."""
+    return {"success": True, "competencies": _enrichment_payload(db, user)}
+
+
+@app.delete("/api/profile/enrichment", dependencies=[Depends(rate_limit("write", 20))])
+def clear_profile_enrichment(
+    user: User = Depends(get_current_user), db: Session = Depends(get_db)
+):
+    """Remove ALL of the user's imported competencies (data control — real cascade-free delete)."""
+    deleted = (
+        db.query(EnrichedCompetency)
+        .filter(EnrichedCompetency.user_id == user.id)
+        .delete(synchronize_session=False)
+    )
+    db.commit()
+    return {"success": True, "deleted": int(deleted)}
 
 
 # ---------------------------------------------------------------------------

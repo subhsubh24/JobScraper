@@ -139,6 +139,26 @@ VALIDATION_CAPABILITIES:
                               # mobile widget are deployed. (owner_action stays null here — non-blocking
                               # connect step, same pattern as `email`; the gate never blocks unrelated work.)
     owner_action: null
+  - id: github_enrichment
+    service: "Profile enrichment from a user's public GitHub profile (Track A /expand)"
+    env: []                    # NO secret: reads the PUBLIC GitHub REST API (fixed host
+                               # api.github.com) — no key, no user data sent anywhere.
+    used_for: "importing the user's own repo languages/topics as source-tagged competencies that feed fit-scoring + cover letters"
+    validation: mock           # The full flow is exercised without any live call: mocked
+                               # api.github.com round-trips (tests/test_github_enrichment.py)
+                               # pin username parsing, language/topic aggregation, fork exclusion,
+                               # the Pro+ gate, honest found=0, re-import REPLACE semantics, and
+                               # that discovered skills raise the fit score. NO live happy-path
+                               # test: the UNAUTHENTICATED GitHub API is rate-limited (60/hr per
+                               # IP) so from shared CI IPs it 403s unpredictably — a live test
+                               # would be a flaky false-red, not a reliable real lane (§28). The
+                               # graceful-DEGRADE path (403/network -> empty, never a raise) IS
+                               # real-observable and is the mocked coverage above.
+    covered_by: tests/test_github_enrichment.py
+    key_in_ci: false
+    blocking: false            # non-critical: any failure degrades to found=0 with an honest
+                               # message; the core product is unchanged without it.
+    owner_action: null
 ```
 
 When `GEMINI_API_KEY` is present in CI, `tests/test_llm_live.py` automatically exercises a real

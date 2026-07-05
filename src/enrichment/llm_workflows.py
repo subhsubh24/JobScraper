@@ -79,6 +79,30 @@ class LLMWorkflows:
         # We screen the model OUTPUT (the text shown to the user), never the JSON-parsing call.
         self.moderator = ContentModerator()
 
+    def _enriched_context(self, user: User) -> str:
+        """A grounding block of competencies discovered from the user's linked public profiles.
+
+        Factual, structured skills (e.g. GitHub repo languages/topics — never invented). Returned
+        as an explicit block the generator MAY reference as demonstrated skills; the surrounding
+        prompts still forbid inventing employers/titles/dates/metrics. Empty when the user has no
+        enrichment, so the prompt is unchanged for everyone else.
+        """
+        try:
+            from src.enrichment.github_enricher import user_enriched_skills
+
+            skills = sorted(user_enriched_skills(self.db, user))
+        except Exception:
+            return ""
+        if not skills:
+            return ""
+        return (
+            "\nSKILLS VERIFIED FROM THE CANDIDATE'S LINKED PUBLIC PROFILES (e.g. GitHub — "
+            "factual, from their own public repositories; you MAY cite these as demonstrated "
+            "skills, but do NOT invent projects, employers, titles, dates, or metrics):\n"
+            + ", ".join(skills)
+            + "\n"
+        )
+
     def _call_llm(self, system_prompt: str, user_prompt: str, json_mode: bool = False) -> str:
         """Make a call to the LLM."""
         if self.client is None:
@@ -310,7 +334,7 @@ Description: {job.description or 'N/A'}
 CANDIDATE:
 Name: {user.full_name or 'Candidate'}
 Resume: {user.resume_text or 'Experienced professional'}
-"""
+{self._enriched_context(user)}"""
 
         content = self._call_llm(system_prompt, user_prompt)
         content = self._refine(content, "cover letter", user_prompt)
