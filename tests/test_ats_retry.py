@@ -79,6 +79,20 @@ def test_timeout_not_retried(monkeypatch):
     assert calls["n"] == 1
 
 
+def test_connect_timeout_not_retried(monkeypatch):
+    # ConnectTimeout subclasses BOTH Timeout and ConnectionError — it must be treated as a
+    # Timeout (raised immediately, NO retry), or a run of connect-timeouts at HTTP_TIMEOUT=20s
+    # would cost ~3x and overrun the 60s serverless budget. Regression for the exact hierarchy
+    # overlap a bare `except ConnectionError` would wrongly retry.
+    calls = _seq(monkeypatch, [requests.exceptions.ConnectTimeout("connect slow")])
+    try:
+        get_with_retry("https://x", timeout=5)
+        assert False, "expected ConnectTimeout to propagate without retry"
+    except requests.Timeout:
+        pass
+    assert calls["n"] == 1
+
+
 def test_success_first_try_no_retry(monkeypatch):
     calls = _seq(monkeypatch, [_Resp(200, {"ok": True})])
     get_with_retry("https://x", timeout=5)

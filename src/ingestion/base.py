@@ -33,6 +33,14 @@ def get_with_retry(url: str, *, timeout: int, **kwargs) -> requests.Response:
     while True:
         try:
             response = requests.get(url, timeout=timeout, **kwargs)
+        except requests.Timeout:
+            # A timeout has already consumed part of the serverless budget — retrying risks
+            # overrunning the function (DEEP_DIAGNOSIS rule a), so NEVER retry it. This clause
+            # MUST precede the ConnectionError one: ``requests.ConnectTimeout`` subclasses BOTH
+            # Timeout AND ConnectionError, so catching ConnectionError first would wrongly retry
+            # a connect-timeout (up to 3×timeout ≈ past the 60s budget) — the exact overrun this
+            # helper exists to avoid.
+            raise
         except requests.ConnectionError:
             if attempt >= _MAX_RETRIES:
                 raise
