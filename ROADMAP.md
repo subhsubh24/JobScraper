@@ -311,6 +311,8 @@ consent gate; DoD = real generation + surfaced in web AND mobile + a downloadabl
     **prep-pack content** rendered (needs an LLM key — keyless E2E can't generate it) and the
     **mobile component snapshots** (`mobile/__screenshots__/`). Box stays `[ ]`.
 
+- [ ] **§29 deployed-app validator (computer-use, autonomous, non-blocking).** Build the Browserbase-driven end-to-end sweep of the DEPLOYED web app (FACTORY_STANDARD §29). Keys `BROWSERBASE_API_KEY`/`BROWSERBASE_PROJECT_ID` are SET + connectivity PROVEN (2026-07-04, HTTP 200 to the live app). Connect via the SDK's signed `s.connectUrl`; enumerate EVERY core flow, drive each, assert real user-visible outcomes with dedicated TEST accounts + Stripe TEST mode (no real charges); publish `docs/autonomous-loop/VALIDATOR_STATUS.md` (REAL flow counts — NEVER a fabricated green). Exploratory FINDER, not a merge gate. A green full-flow sweep is a §13 marketing-arming signal. Build epic: #251.
+
 ### F — Security & abuse hardening
 - [x] Rate limiting on every paid/expensive/auth/scrape endpoint
 - [x] Server-side input validation on all write endpoints
