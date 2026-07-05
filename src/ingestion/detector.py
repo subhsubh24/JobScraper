@@ -68,7 +68,7 @@ class ATSDetector:
             return ats_type, identifier
 
         # SSRF guard: this fetches a user-supplied URL server-side. Refuse internal hosts.
-        from .url_guard import assert_public_http_url, UnsafeURLError
+        from .url_guard import assert_public_http_url, get_with_redirect_guard, UnsafeURLError
 
         try:
             assert_public_http_url(careers_url)
@@ -76,16 +76,18 @@ class ATSDetector:
             logger.warning("Refusing unsafe careers URL %s: %s", careers_url, e)
             return ATSType.UNKNOWN, None
 
-        # Fetch the page and look for ATS indicators
+        # Fetch the page and look for ATS indicators. get_with_redirect_guard re-validates EVERY
+        # redirect hop, so a 3xx to an internal host (cloud metadata, localhost) can't slip past
+        # the guard the way plain allow_redirects=True would — an UnsafeURLError on a bad hop is
+        # caught below and degrades to UNKNOWN, exactly like an unreachable page.
         try:
-            response = requests.get(
+            response = get_with_redirect_guard(
                 careers_url,
                 timeout=HTTP_TIMEOUT,
                 headers={"User-Agent": "Mozilla/5.0 (compatible; CareerOperator/1.0)"},
-                allow_redirects=True,
             )
             response.raise_for_status()
-        except requests.RequestException as e:
+        except (requests.RequestException, UnsafeURLError) as e:
             logger.warning("Careers page probe failed for %s: %s", careers_url, e)
             return ATSType.UNKNOWN, None
 
