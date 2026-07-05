@@ -33,10 +33,13 @@ def _patch_public_dns(monkeypatch):
 
 
 class _FakeResp:
-    def __init__(self, json_data, url="https://boards.greenhouse.io/acme", text=""):
+    def __init__(self, json_data, url="https://boards.greenhouse.io/acme", text="", status_code=200):
         self._json = json_data
         self.url = url
         self.text = text
+        # A real requests.Response has a status_code; the ATS retry helper (get_with_retry) reads
+        # it to decide whether the response is transient. 200 = non-retryable (returned as-is).
+        self.status_code = status_code
 
     def raise_for_status(self):
         pass

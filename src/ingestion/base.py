@@ -1,7 +1,50 @@
 """Base class for ATS clients."""
+import logging
+import time
 from abc import ABC, abstractmethod
 from typing import List, Optional
 from dataclasses import dataclass
+
+import requests
+
+logger = logging.getLogger("career_operator.ingestion")
+
+# Transient upstream statuses worth a bounded retry: rate limiting + gateway/server errors.
+# A busy Greenhouse/Lever board returns these briefly; without a retry ONE transient blip is
+# reported to the user as "board unreachable" and every good job in it is dropped.
+_RETRYABLE_STATUS = frozenset({429, 500, 502, 503, 504})
+# Bounded so the added latency stays well under the serverless budget: at most 2 retries with
+# 0.5s then 1.0s backoff (~1.5s worst case) on top of the (fast-returning) error responses.
+_MAX_RETRIES = 2
+_BACKOFF_BASE = 0.5
+
+
+def get_with_retry(url: str, *, timeout: int, **kwargs) -> requests.Response:
+    """GET with a bounded retry on TRANSIENT upstream failures.
+
+    Retries only on fast-failing signals — a retryable HTTP status (429/5xx, which return
+    quickly) or a ``ConnectionError`` — and NEVER on a ``Timeout``: a timeout has already
+    consumed part of the serverless budget, so retrying it risks overrunning the function
+    (DEEP_DIAGNOSIS rule a). Returns the final ``Response`` (so the caller's ``raise_for_status``
+    handling is unchanged) or re-raises the final ``requests`` exception on exhaustion — the
+    caller's existing ``except requests.RequestException`` still degrades honestly.
+    """
+    attempt = 0
+    while True:
+        try:
+            response = requests.get(url, timeout=timeout, **kwargs)
+        except requests.ConnectionError:
+            if attempt >= _MAX_RETRIES:
+                raise
+        else:
+            if response.status_code not in _RETRYABLE_STATUS or attempt >= _MAX_RETRIES:
+                return response
+            logger.info(
+                "ATS fetch got transient %s from %s; retry %d/%d",
+                response.status_code, url, attempt + 1, _MAX_RETRIES,
+            )
+        attempt += 1
+        time.sleep(_BACKOFF_BASE * (2 ** (attempt - 1)))
 
 
 @dataclass
