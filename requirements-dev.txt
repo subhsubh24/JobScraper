@@ -28,6 +28,10 @@ pytest==7.4.4
 pytest-mock==3.12.0
 pytest-cov==4.1.0
 
+# Store assets (DEV-ONLY, never imported at runtime): renders the committed Google Play
+# feature graphic via scripts/generate_feature_graphic.py; also lets CI assert the asset spec.
+Pillow==10.4.0
+
 # Lint / format
 black==24.1.1
 flake8==7.0.0
