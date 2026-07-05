@@ -147,3 +147,58 @@ the repo's design evidence contradicts the shipped UI. Regenerate them (holds de
 **Issues:** #92 (business-case) + #93 (store-readiness) both remain the correct open ship-critical
 issues (both still C) — updated with this audit's fresh evidence rather than duplicated. No dimension
 regressed below A that lacked an issue; no new ship-critical issue needed.
+
+## 2026-07-05 — 4th independent audit
+
+**Overall: B (=) · ship_gate_met: false.** No overall grade change and NO dimension moved a
+letter vs 2026-07-03 — but real, evidence-backed internal progress inside the passing dims, and
+zero regressions. The ship gate is still blocked by the *same two* pre-launch C's
+(store-readiness, business-case), correctly holding overall at B.
+
+Per-dimension (Δ vs 2026-07-03): functional-reality **A+** (=), correctness **A+** (=, standing
+retry/backoff gap now CLOSED), security **A** (=, redirect-SSRF closed), design-taste **A** (=),
+store-readiness **C** (=), artifact-integrity **A+** (=), business-case-strength **C** (=),
+tests-evals **A** (=, materially better within A), performance **A** (=).
+
+Method: 9 fresh independent adversarial grader subagents (maker ≠ checker), each ran its own
+signal + cited file/line. Auditor pre-ran the gate at HEAD `7572338`: flake8 clean, **484 backend
+pass @ 92.21% cov** (was 387 @ 92.75%; floor 75), **15 journeys**, **46 evals** (was 31), scorecard
+parses, `readiness`→FAIL (store-readiness C), `analysis/arr_base.py`→57500, `floor_met_year1=false`,
+`engine_pct=0`, no tracked secrets. web/mobile tsc/lint/jest/Playwright not re-runnable locally
+(node_modules absent) — relied on committed artifacts + required CI on main HEAD `7572338`. Notable:
+the grader env had a live `GEMINI_API_KEY`, so the `live`-marked content evals (tailored-résumé
+grounding, prep-pack real output) actually RAN and PASSED — the "AI output is real" claim was
+exercised, not just nightly-theoretical.
+
+**What genuinely improved this run (all inside already-passing dims — no letter change):**
+- **correctness** — the prior standing gap ("ATS fetches have timeouts but no retry/backoff on
+  transient 429/5xx") is CLOSED by #271: `get_with_retry` bounded exponential backoff, never on
+  Timeout, correct ConnectTimeout hierarchy edge case (`src/ingestion/base.py:22-55`), with
+  `test_ats_retry.py` asserting exact call counts. Stays A+ (was already A+ with the gap open).
+- **security** — #277 closed the redirect-based SSRF in the ATS careers-page probe; `url_guard.py:74-84`
+  re-validates the host on EVERY redirect hop before connect (tested). Doesn't touch the two A+
+  holdbacks (CAPTCHA no-op seam, in-memory lockout), so stays A.
+- **tests-evals** — eval count 31→46 with genuinely rigorous new evals (drafter→reviewer persists the
+  REVIEWED text + COGS toggle `test_prep_tools_evals.py:171-258`; skill-gap ranking math; tailored-résumé
+  grounding). Backend 387→484. "Better within A"; held off A+ only by the loose 75 coverage floor.
+- **performance** — #266 job-detail GET eager-loads its relationships (`asgi.py:1189-1195`); new features
+  (skill-gap heatmap, learning plan) are capped at 500, no new N+1. Stays A; same single
+  `/api/analytics/pipeline` `.all()`+in-Python-sort gap.
+
+**Standing ship-critical gaps (still C — these block the ship gate, both UNCHANGED):**
+1. **business-case-strength (C):** honest $57.5K < $100K. Shipped Pro value-adds diversify the wedge
+   but don't floor-flip and are honestly uncredited in the projection. **Team/B2B2C seat (org) tier
+   still entirely unbuilt** — no `Organization`/`Seat` model in `src/db/models.py`, `UserTier` binary
+   FREE/PREMIUM (`billing.py:63`). The one lever with the math to cross the floor. 15+ consecutive
+   runs confirm it is genuinely owner/GTM-blocked, not code-blocked (`loop-memory.md`).
+2. **store-readiness (C):** unchanged — no rendered store assets (`docs/store/assets/` absent), no
+   store screenshots, mobile IAP client NOT integrated (`react-native-purchases` absent from
+   `mobile/package.json`; `paywall.tsx:40,118` are deferral comments) → 4 open ACCEPTANCE_AUDIT FAILs
+   (A3/A4/G4/G7). `git log` on docs/store + paywall.tsx shows ZERO store-asset/IAP movement since
+   last audit. Vercel deploy config itself remains A-level.
+
+**Issues:** #92 (business-case) + #93 (store-readiness) both remain the correct open ship-critical
+issues (both still C, both unchanged) — updated with this audit's fresh evidence rather than
+duplicated. No dimension regressed below A; no new ship-critical issue needed. (Latent config gaps
+in #222 — Career+ prod-503 price-env validation + DATABASE_URL SQLite default — remain honestly
+disclosed, keeping artifact-integrity at A+; they are tracked there, not re-filed.)
