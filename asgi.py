@@ -442,6 +442,12 @@ class UserCreate(BaseModel):
     captcha_token: Optional[str] = Field(default=None, max_length=4096)
 
 
+class ResumeUpdate(BaseModel):
+    # Same 50k bound + wallet-drain rationale as UserCreate.resume_text above: this text is
+    # embedded verbatim into LLM prompts (scoring, prep packs, tailored résumé, cover letters).
+    resume_text: str = Field(default="", max_length=50000)
+
+
 class UserLogin(BaseModel):
     email: str
     password: str
@@ -1862,6 +1868,36 @@ def _enrichment_payload(db: Session, user: User) -> list:
         {"skill": r.skill, "source_type": r.source_type, "evidence": r.evidence}
         for r in rows
     ]
+
+
+@app.get("/api/profile/resume", dependencies=[Depends(rate_limit("read", 60))])
+def get_resume(user: User = Depends(get_current_user)):
+    """Return the signed-in user's saved résumé text (their OWN data) so Settings can show + edit it.
+
+    Empty string (never null) when none is saved, so the client renders an editable field either
+    way. The résumé is core input for fit scoring, the tailored-résumé generator, cover letters,
+    and the skill-gap heatmap — several of those explicitly tell the user to "add your résumé in
+    Settings," so a read+write path here is what makes that instruction reachable.
+    """
+    return {"success": True, "resume_text": user.resume_text or ""}
+
+
+@app.patch("/api/profile/resume", dependencies=[Depends(rate_limit("write", 20))])
+def update_resume(
+    data: ResumeUpdate,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Save (or clear) the user's résumé text — the update path that was missing after signup.
+
+    Bounded server-side (50k chars, see ResumeUpdate). A blank/whitespace-only body CLEARS the
+    résumé (stored as NULL) so a user can remove it; anything else is stored trimmed. Returns
+    ``has_resume`` so the client can reflect the real saved state without a second round-trip.
+    """
+    text = (data.resume_text or "").strip()
+    user.resume_text = text or None
+    db.commit()
+    return {"success": True, "has_resume": bool(text)}
 
 
 @app.post("/api/profile/enrich/github", dependencies=[Depends(rate_limit("write", 20))])
