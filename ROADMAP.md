@@ -123,10 +123,26 @@ consent gate; DoD = real generation + surfaced in web AND mobile + a downloadabl
       per-user/day ceiling still bounds total generations. Deterministic evals (sequence fake LLM)
       pin: the REVIEWED text persists (not the draft), a failed review falls back, the disable
       flag makes exactly one call, a blank refinement falls back, and the JSON path is not refined.
-- [ ] **Profile enrichment from linked public sources** — the market's `/expand`. If the user provides
+- [x] **Profile enrichment from linked public sources** — the market's `/expand`. If the user provides
       links (GitHub, portfolio, Scholar), enrich the profile with discovered competencies (source-tagged)
-      to feed better scoring + cover letters. Owner-authorized fetch only; WebFetch/WebSearch; never
-      invent a skill; medium value. Real-output eval on the enrichment.
+      to feed better scoring + cover letters. Owner-authorized fetch only; never invent a skill; medium
+      value. Real-output eval on the enrichment.
+      **SHIPPED (run 27, PR #270, 2 Sonnet reviewers — Reviewer A mutation-verified the fork-skip / Pro
+      gate / hostname-allowlist guards + adversarially fuzzed the SSRF surface; Reviewer B caught a real
+      mobile discoverability regression, fixed + fresh-re-reviewed).** `src/enrichment/github_enricher.py`
+      imports the user's OWN public GitHub repo `language` + `topics` as source-tagged `EnrichedCompetency`
+      rows (migration `f1a2b3c4d5e6`) that feed fit-scoring (scorer skill-match, memoized) + cover-letter
+      grounding — never inventing a skill. `POST /api/profile/enrich/github` (Pro+) + GET/DELETE
+      `/api/profile/enrichment`; web + mobile Settings card (Pro-gated, honest states). **DECISION COROLLARY
+      (honest > flashy, like run 25's learning-plan resources):** we do NOT scrape arbitrary user URLs
+      (fragile HTML, SSRF surface, hallucination magnet = the "obviously-AI/inaccurate" counter-signal) —
+      we call the PUBLIC GitHub REST API at the FIXED host `api.github.com` (same shape as the ATS clients),
+      so there is no arbitrary-URL fetch and the `language`/`topics` are STRUCTURED, factual data.
+      Deterministic golden + 28 mocked round-trip tests; VALIDATION.md declares it `github_enrichment`
+      `mock` (the unauthenticated GitHub API rate-limits from shared CI IPs, so a live happy-path test would
+      be a flaky false-red; the graceful-degrade path is real-observed). **Portfolio / Scholar are named
+      next-source follow-ups** — the highest-value source for the tech ICP (GitHub) ships first; an
+      authenticated `GITHUB_TOKEN` for the 5000/hr rate limit is an optional loop/owner follow-up.
 
 ### B — Native mobile app (NEW Expo / React Native, iOS + Android, TypeScript, `/mobile`)
 - [x] Expo app scaffolded, `tsc --noEmit` clean, lint clean
