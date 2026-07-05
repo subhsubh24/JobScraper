@@ -131,8 +131,11 @@ describe('SettingsScreen', () => {
     await screen.findByText('Résumé saved.');
   });
 
-  it('a failed résumé save surfaces an error and shows no success confirmation', async () => {
-    (api.saveResume as jest.Mock).mockRejectedValueOnce(new Error('server down'));
+  it('a failed résumé save surfaces the error and shows no success confirmation', async () => {
+    // The card surfaces the caught error's message (same pattern as the enrichment/delete cards);
+    // a real failure carries the server's honest 'detail'. The key guarantee: an error is shown
+    // and the "saved" confirmation is NOT (no optimistic/fake success).
+    (api.saveResume as jest.Mock).mockRejectedValueOnce(new Error('Could not save your résumé.'));
     render(<SettingsScreen />);
     const field = await screen.findByDisplayValue('Existing résumé text.');
     fireEvent.changeText(field, 'Broken save attempt.');
