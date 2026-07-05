@@ -17,7 +17,8 @@ Keep this current as routes are added. A new route with no journey coverage is a
 | `/app` (add job) | Core product loop | `e2e/core-journey.spec.ts` | **fit SCORE (core output) renders as a real number** |
 | `/app/jobs/[id]` | Job detail | `e2e/core-journey.spec.ts` | detail renders the job |
 | `/app/coach` | AI coach | (API gate covers paywall/degrade) | free → truthful paywall, not 500 |
-| `/app/settings` | Account/settings | API gate (`/api/auth/me`, delete) | — _browser coverage: follow-up_ |
+| `/app/insights` | Skill-gap heatmap + AI learning plan | `tests/test_skill_gaps.py` (API) | free heatmap renders; plan is Pro/consent-gated |
+| `/app/settings` | Account/settings (incl. résumé view/edit, GitHub enrichment) | API gate (`/api/auth/me`, résumé, enrichment, delete) | — _browser coverage: follow-up_ |
 | `/pricing` | Plans | — | _follow-up_ |
 | `/waitlist` | Pre-launch capture | `tests/test_waitlist.py` (API) | join → row written; enumeration-safe; no fake-email claim; rate-limited |
 | `/privacy`, `/terms` | Legal | (marketing-exempt; static) | render |
@@ -35,6 +36,19 @@ Keep this current as routes are added. A new route with no journey coverage is a
 - Vercel stripped-prefix mirror: every `/api/*` method also reachable at the bare path
 - waitlist join: row persisted; already-present email returns identical body (no enumeration);
   no "email sent" claim (no provider wired); 6th/hr per IP → 429
+
+### Additional authed API endpoints (dedicated in-process tests, outside the core journey)
+- **résumé view/edit** — `GET`/`PATCH /api/profile/resume` (`tests/test_resume_profile.py`):
+  the post-signup add/edit path (closes the résumé dead-end); end-to-end unblock proven (a
+  résumé-less Premium user hits the tailored-résumé 400, adds a résumé, the guard clears).
+- **GitHub profile enrichment** — `POST`/`GET`/`DELETE /api/profile/enrich/github`
+  (`tests/test_github_enrichment.py`): Pro-gated; imports the user's OWN public repo
+  language/topics from the fixed `api.github.com` host (SSRF-safe); degrades gracefully.
+- **skill-gap heatmap** — `GET /api/insights/skill-gaps` (`tests/test_skill_gaps.py`): FREE,
+  key-free, honest empty state; the cross-pipeline retention hook.
+- **AI learning plan** — `POST /api/insights/learning-plan` (`tests/test_skill_gaps.py`): Pro+;
+  same tier→data→503→consent→ceiling→moderation gate chain as the other generators; gaps
+  recomputed server-side (never client-trusted).
 
 ## Mobile screens (`mobile/src/app/**`, jest-expo component/integration tests)
 | Screen / unit | Covered by | Outcome asserted |
