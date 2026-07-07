@@ -19,7 +19,7 @@ import pytest
 
 import asgi
 from src import billing
-from src.db.models import Subscription, User, UserTier
+from src.db.models import AggregateEvent, Subscription, User, UserTier
 
 
 # --------------------------------------------------------------------------- helpers
@@ -203,6 +203,38 @@ def test_career_plus_generates_real_artifact(client, db_session, _llm_on):
     assert art["id"] == "art-neg-1"
     assert "Salary Negotiation" in art["title"]
     assert art["content"].strip()  # real content, not a placeholder
+
+
+def test_salary_negotiation_records_pmf_funnel_event(client, db_session, _llm_on):
+    """A successful salary-negotiation generation increments the aggregate PMF counter, exactly
+    like every other generator — this was the ONE generator invisible to the funnel. The event
+    is recorded only AFTER the artifact commits (best-effort, no PII), so it counts real value
+    delivered, never a refused/degraded attempt (SIDE-EFFECT INTEGRITY §6)."""
+    uid, token = _register(client, "cp-funnel@example.com")
+    job_id = _add_job(client, token)
+    _make_career_plus(db_session, uid)
+    assert client.post("/api/ai-consent", headers=_auth(token)).status_code == 200
+
+    before = (
+        db_session.query(AggregateEvent)
+        .filter_by(event_type="salary_negotiation_generated")
+        .count()
+    )
+    assert before == 0  # not counted until a real generation succeeds
+
+    r = client.post(
+        "/api/prep/salary-negotiation",
+        headers=_auth(token),
+        json={"job_id": job_id, "target_salary": 180000},
+    )
+    assert r.status_code == 200, r.text
+
+    row = (
+        db_session.query(AggregateEvent)
+        .filter_by(event_type="salary_negotiation_generated")
+        .one()
+    )
+    assert row.count == 1  # the funnel now sees Career+'s exclusive feature being used
 
 
 def test_career_plus_foreign_job_is_404(client, db_session, _llm_on):

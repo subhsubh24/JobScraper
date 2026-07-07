@@ -1468,6 +1468,7 @@ def generate_salary_negotiation_guide(
         raise HTTPException(status_code=502, detail="AI provider error generating negotiation guide")
 
     db.commit()
+    analytics.record_event(db, "salary_negotiation_generated")  # aggregate metric (best-effort, no PII)
     return {
         "success": True,
         "artifact": {

@@ -37,6 +37,7 @@ EVENT_TYPES = (
     "cover_letter_generated",
     "study_plan_generated",
     "tailored_resume_generated",
+    "salary_negotiation_generated",
     "coach_message",
     "learning_plan_generated",
     "profile_enriched",
