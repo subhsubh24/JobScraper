@@ -6,9 +6,34 @@
 
 ## What we are building
 
-**Career Operator** is a real, sellable product that helps job seekers run their
-search like an operator: ingest roles, score fit against their profile, generate
-interview prep, and coach them through the pipeline. It ships as **both**:
+**Career Operator** is the autonomous system that *gets you the job*. It does not just
+hand you job-search tools — it **runs your preparation for you**: it finds the right
+roles, closes your skill gaps like a personal tutor, and coaches you to interview-ready
+through realistic practice, continuously working your weaknesses until you have the
+highest possible chance of the offer.
+
+**Three surfaces, tied together by one loop:**
+
+1. **Find & target** *(the LinkedIn/Indeed layer)* — discover, fit-score, and track the
+   roles actually worth your energy.
+2. **Close the gap** *(the Khan Academy layer)* — personalized, structured upskilling on
+   exactly what your target roles demand: a skill-gap read across your pipeline → a
+   learning plan → measured progress.
+3. **Get interview-ready** *(the interview-coaching layer — Siro for interviews)* —
+   realistic mock interviews where your answers are analyzed for content **and** delivery
+   (STAR structure, specificity, filler, confidence) with concrete, drill-able coaching,
+   per role.
+
+**The autonomous prep loop is the differentiator.** Nobody closes the arc from "found a
+role" to "you're the strongest candidate for it": LinkedIn/Indeed do discovery, Khan does
+learning, interview tools are one-off. Career Operator owns the whole arc and is
+**outcome-measured on offers** — it diagnoses your weaknesses (profile + skill-gap
+analysis + how you actually performed in mock interviews), assigns the next best practice,
+measures whether you improved, and repeats until you're interview-ready for the target
+role, **maximizing your probability of the offer**. You show up prepared; it did the
+operating.
+
+It ships as **both**:
 
 - a **web product + API** (Next.js web app + Python FastAPI API), and
 - a **native mobile app** (Expo / React Native, TypeScript, iOS + Android),
@@ -19,6 +44,13 @@ Python backend API.
 It is monetized by **subscription** (good-better-best + annual) and is intended to
 earn **reliable revenue with ≥ $100K/yr ARR as the FLOOR, not the target** — we
 maximize beyond it.
+
+> **Honest status (2026-07):** surfaces 1 and 2 are largely built (discovery, fit-scoring,
+> pipeline, prep packs, cover letters, study plans, tailored résumé, skill-gap heatmap +
+> learning plan, the coach). Surface 3 (mock-interview coaching) and the autonomous prep
+> loop are the **current frontier** — sequenced in [ROADMAP.md](./ROADMAP.md) under
+> Track A "Interview coaching + the autonomous prep loop", built through the same gate,
+> never faked ahead of reality.
 
 ## The standing design / quality bar
 

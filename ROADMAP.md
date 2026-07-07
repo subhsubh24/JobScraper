@@ -144,6 +144,32 @@ consent gate; DoD = real generation + surfaced in web AND mobile + a downloadabl
       next-source follow-ups** — the highest-value source for the tech ICP (GitHub) ships first; an
       authenticated `GITHUB_TOKEN` for the 5000/hr rate limit is an optional loop/owner follow-up.
 
+#### Interview coaching + the autonomous prep loop (THE NORTH-STAR PILLAR — VISION §"What we are building", surface 3 + the loop)
+The differentiator: not tools, but an **operator** that drills you to interview-ready and measures
+readiness toward the OFFER. This closes the arc from "found a role" → "you're the strongest
+candidate for it." Each is an AI-output feature → obeys the eval-coverage ratchet (deterministic +
+real-output eval in `tests/evals/`) + the third-party-AI consent gate; DoD = real generation +
+surfaced in web AND mobile + Premium-gated + honest paywall, never a stub. Build the text engine
+FIRST; voice/delivery is a later, owner-gated increment.
+- [ ] **Mock interview engine (text-first)** — a realistic, role-specific mock interview: the coach
+      asks JD-derived questions one at a time, the user answers, and each answer is **scored**
+      (relevance, specificity, STAR structure) with concrete feedback + a model answer, persisted
+      per job (a `PrepArtifact` `artifact_type="mock_interview"` or a dedicated model). Web + mobile
+      surface (real loading/empty/error states, ReportButton), Premium-gated, consent-gated,
+      moderated (§6 no-persist on decline). Deterministic eval (scoring/output SHAPE) + real-output
+      eval (feedback is substantive, on-topic to the role, never generic). This is surface 3's core.
+- [ ] **Interview-readiness score + autonomous next-best-action** — per target job, compute a
+      readiness read from the user's REAL signals (skill-gap coverage + mock-interview scores +
+      artifacts completed) and recommend the SINGLE next best action (drill question X, study skill
+      Y, redo the weak answer). This is the loop that drives them to ready. It climbs ONLY on real
+      practice — never a vanity number, never fabricated. Web + mobile surface; deterministic eval
+      on the readiness math (monotonic in real inputs, honest 0-state). This is the differentiator.
+- [ ] **Voice mock interviews + delivery analysis (Siro-like; OWNER-GATED)** — record spoken answers
+      → transcribe (speech-to-text) → analyze DELIVERY (pace, filler words, confidence) alongside
+      content. Bigger build; needs an owner-provided STT/speech capability → declare it in
+      `docs/ci/VALIDATION.md` and surface a `validation-capability-*` OWNER_ACTION (do NOT tick until
+      the capability is real). Ship the text engine + readiness loop first; this is the later increment.
+
 ### B — Native mobile app (NEW Expo / React Native, iOS + Android, TypeScript, `/mobile`)
 - [x] Expo app scaffolded, `tsc --noEmit` clean, lint clean
 - [x] Navigation + auth (login/register) wired to the Python API — the login/register screens
