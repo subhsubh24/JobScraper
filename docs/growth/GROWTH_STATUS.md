@@ -18,7 +18,7 @@ All metrics below are null/0 — the honest pre-launch state. Nothing is fabrica
 ```yaml
 GROWTH_STATUS:
   project: jobscraper
-  as_of: 2026-07-05
+  as_of: 2026-07-07
   phase: pre_launch
   engine_built: false
   engine_pct: 0
@@ -160,7 +160,7 @@ GROWTH_STATUS:
     published: 0
     last_published: null
   validation:               # GTM_STANDARD s4 self-validation -- fail closed, never claim an unverified source
-    checked_as_of: 2026-07-05
+    checked_as_of: 2026-07-07
     sources:
       - name: product_analytics
         status: unavailable   # no PROD_URL/ANALYTICS_READ_TOKEN present in this run's env; no
@@ -171,8 +171,9 @@ GROWTH_STATUS:
         status: unavailable   # no email-provider MCP/tool connected this run
       - name: gtm_scorecard
         status: available     # docs/growth/GTM_SCORECARD.md (independent auditor, as_of
-                               # 2026-07-02: overall A, ship_gate_met true) -- no re-grade has
-                               # landed since; read as a DATA signal, consumed not authored
+                               # 2026-07-02: overall A, ship_gate_met true) -- git log --follow
+                               # confirms still zero re-grades since (last touch b628f5b,
+                               # 2026-07-03); read as a DATA signal, consumed not authored
     note: "All funnel/acquisition/pmf/channels metrics above are 0/null because no analytics/
            billing/email source is connected -- this satisfies scripts/validate_gtm.py's honesty
            gate (a non-zero metric requires a connected source). Re-checked this run: (1)
@@ -182,8 +183,50 @@ GROWTH_STATUS:
            ANALYTICS_READ_TOKEN set for this routine, so the GET /api/analytics/summary read
            path (ANALYSIS_PLAYBOOK.md, wired by PR #146/#245) cannot be called this run either.
            Both checks confirm engine_built=false / channels_connected=[] honestly (fail-closed,
-           no invented metric)."
+           no invented metric). Also re-verified via git log --follow that neither
+           docs/quality/QUALITY_SCORECARD.md nor docs/growth/GTM_SCORECARD.md has been
+           re-touched since commit b628f5b (2026-07-03) despite 20+ intervening product-factory
+           commits -- both independent-auditor grades are READ AS-IS (B / ship_gate_met:false
+           and A / ship_gate_met:true respectively), never assumed to have improved just because
+           adjacent product work landed."
   learnings:
+    - "2026-07-07 (GTM run): Quiet run, no steer -- still 0 users/0 funnel, phase=pre_launch.
+       Re-verified ListConnectors (only Gmail/Drive/Calendar, no analytics/billing/ESP MCP) and
+       shell env (no PROD_URL/ANALYTICS_READ_TOKEN) -- channels_connected=[] / engine_built=false
+       confirmed honestly, same as every prior run. QUALITY_SCORECARD and GTM_SCORECARD both
+       UNCHANGED (git log --follow confirms neither file re-touched since commit b628f5b,
+       2026-07-03) despite 20+ intervening product-factory commits in between (coverage-floor
+       ratchet 75->85, per-user rate limiting, a real per-PR prep-pack content-quality eval that
+       plausibly closes one of QUALITY_SCORECARD's named tests-evals nits, a new #34 pre-launch
+       public-demo-funnel ROADMAP item, a new #11 marketing media-gen adapter ROADMAP item, and
+       GTM_STANDARD gaining s10 Reddit/X sourcing clarifications + a full s13 two-gate autonomous
+       marketing-launch protocol). None of that is self-certifiable by this loop -- both
+       scorecards are read AS-IS (ship_gate_met: QUALITY=false, GTM=true) until their own
+       independent auditor re-grades; noting the gap here rather than assuming progress.
+       Notable reconciliation (not a GTM steer -- the product factory made this call itself):
+       VISION.md was rewritten this cycle (commit 5846822) to name 'interview coaching (Siro for
+       interviews)' as the current frontier / surface 3 of the north star, and ROADMAP.md gained
+       a full 'Interview coaching + the autonomous prep loop' track (mock-interview engine,
+       readiness score, voice/delivery analysis). This is exactly the JTBD theme
+       (interview-PRACTICE anxiety, distinct from content prep) this GTM loop's 2026-07-03 s10
+       demand-signal pass flagged as only PARTIALLY solved and tied to BUSINESS_CASE lever 3's
+       named-but-unbuilt 'mock-interview voice sessions' wedge -- the product factory converged on
+       it independently. Recording the convergence as a real, citable data point (git commit
+       5846822 + the 2026-07-03 demand_signal block above), not claiming credit or crediting any
+       ARR (still 0 users; the mock-interview engine itself remains unbuilt, [ ] in ROADMAP.md).
+       Checked demand_signal refresh cadence: last run 2026-07-03 (4 days ago); the ~quarterly
+       refresh is not due. Checked ROADMAP #34 (pre-launch public-demo funnel, epic #286): still
+       unchecked/unbuilt (only the ROADMAP entry + a FACTORY_STANDARD doc landed, commits
+       f43f673/7572338) -- the pre-launch funnel shape is still the blank waitlist; re-check next
+       run. Checked for a `marketing:` / MARKETING_APPROVED / MARKETING_HOLD surface (GTM_STANDARD
+       s13, newly added this cycle by the product factory, commit 53b7a57): none exists yet,
+       correctly -- s13's Gate 1 (start waitlist outreach) preconditions
+       (ship_gate_met + a green computer-use E2E sweep + passed launch assets) are not met, so no
+       waitlist-outreach plan should be proposed this run; nothing to do here yet. Zero outreach
+       drafts (correct, unchanged reason): GTM_STANDARD s6's readiness gate keeps both outbound
+       lanes hard-blocked until QUALITY_SCORECARD.ship_gate_met is true; still false. No
+       ROADMAP/BUSINESS_CASE/VISION steer this run -- no new significant data (same reasoning as
+       every prior pre-launch read)."
     - "2026-07-05 (GTM run): No new real data since 2026-07-03 -- still 0 users/0 funnel,
        phase=pre_launch. QUALITY_SCORECARD unchanged (3rd audit, still 2026-07-03: overall B,
        ship gate NOT met, same 2 ship-critical C's: business-case-strength, store-readiness).
@@ -277,20 +320,19 @@ GROWTH_STATUS:
        changed -- pure computation-integrity hardening, independently reviewed
        (maker!=checker, APPROVE)."
   next_actions:
-    - "Factory: business-case-strength and store-readiness remain the 2 ship-critical gaps
-       (unchanged since 2026-07-01, now 3 consecutive GTM reads) -- team/coach/B2B2C seat tier
-       + annual-first/founder pricing for the floor; rendered store assets + mobile IAP for
-       store-readiness. This run added a cited, real-comp packaging recommendation
-       (docs/BUSINESS_CASE.md lever 2) for the team/B2B2C tier so the factory has a
-       market-grounded starting structure (self-serve starter price + sales-assisted volume
-       contract) when it builds it -- input only, does not reprioritize above the two
-       ship-critical C's."
-    - "Owner (CIRCUIT BREAKER -- same ask across >=4 GTM reads since bootstrap): apply
-       SITE_GATE_PASSWORD to the deployed app (PENDING_OPS id 'site-gate') -- this is the
-       SINGLE highest-leverage owner action to unblock next: it is a ~2-minute env-var set
-       (unlike Stripe/Apple/Google account setup), yet it alone gates site_gate_up and thus
-       ALL pre-launch execute-mode outreach even after a channel is connected. Naming it
-       prominently per GTM_STANDARD's circuit-breaker rule, not re-litigating it silently."
+    - "Factory: business-case-strength and store-readiness remain the 2 ship-critical gaps per
+       the last independent grade (as_of 2026-07-03, unchanged) -- team/coach/B2B2C seat tier +
+       annual-first/founder pricing for the floor; rendered store assets + mobile IAP for
+       store-readiness. The 2026-07-05 GTM run already added a cited, real-comp packaging
+       recommendation (docs/BUSINESS_CASE.md lever 2) for the team/B2B2C tier -- input only,
+       nothing new to add until the tier is actually built or a fresh audit lands."
+    - "Owner (CIRCUIT BREAKER -- same ask across >=5 consecutive GTM reads since bootstrap,
+       2026-06-29/07-01/07-03/07-05/07-07): apply SITE_GATE_PASSWORD to the deployed app
+       (PENDING_OPS id 'site-gate') -- this remains the SINGLE highest-leverage owner action to
+       unblock next: a ~2-minute env-var set (unlike Stripe/Apple/Google account setup), yet it
+       alone gates site_gate_up and thus ALL pre-launch execute-mode outreach even after a
+       channel is connected. Escalating the persistence count explicitly per GTM_STANDARD's
+       circuit-breaker rule rather than re-litigating it silently each run."
     - "Owner: connect an email provider + analytics (see CONNECT.md) to move engine off 0%."
     - "No outreach drafts this run: GTM_STANDARD §6's readiness gate is a HARD block on both
        outbound lanes (incl. the bespoke 1:1 draft lane) until QUALITY_SCORECARD.ship_gate_met
@@ -298,21 +340,25 @@ GROWTH_STATUS:
        target quality. Re-evaluate the moment ship_gate_met flips true."
     - "Next GTM run: re-check for demand-signal recency drift (~quarterly refresh, last run
        2026-07-03, not due yet), watch for a connected analytics/billing/email MCP source or a
-       PROD_URL/ANALYTICS_READ_TOKEN appearing in env, and watch ROADMAP §34 (pre-launch demo
-       funnel, epic #286) landing -- it will change the pre-launch funnel shape once built."
+       PROD_URL/ANALYTICS_READ_TOKEN appearing in env, watch ROADMAP §34 (pre-launch demo
+       funnel, epic #286, still unbuilt) landing, and watch for either scorecard's next
+       independent re-grade (both stuck at their 2026-07-02/07-03 grades for 2 straight GTM
+       reads now) -- a fresh QUALITY_SCORECARD grade in particular could flip ship_gate_met and
+       open the outreach gate."
   owner_blockers:
-    - "QUALITY_SCORECARD B (3rd audit, still as_of 2026-07-03 -- no new grade since), ship gate
-       NOT met: same 2 ship-critical dims (business-case-strength, store-readiness) still C for
-       3 consecutive GTM reads now (2026-07-01, 07-03, 07-05) -- no launch until the factory
-       drives them to A. Not yet a stall: both C's have a clearly named, in-progress buildable
-       lever (team/B2B2C tier + annual pricing; store assets + mobile IAP), and the product
-       factory has shipped substantial adjacent work in the interim (29 runs, e.g. rate limiting,
-       coverage floor, ATS retry) -- but the SAME two blocking dims specifically haven't moved;
-       flagging the persistence explicitly per the circuit-breaker rule rather than re-reporting
-       it as new each time."
-    - "SITE_GATE_PASSWORD not applied (open since bootstrap, >=4 GTM reads): site_gate_up
-       remains false; execute-mode outreach stays hard-blocked regardless of channel connection.
-       See next_actions above -- this is the ONE highest-leverage owner action to clear next."
+    - "QUALITY_SCORECARD B (3rd audit, still as_of 2026-07-03 -- no new grade landed in 2 GTM
+       reads now), ship gate NOT met: same 2 ship-critical dims (business-case-strength,
+       store-readiness) still C. Not yet a stall: both C's have a clearly named, in-progress
+       buildable lever (team/B2B2C tier + annual pricing; store assets + mobile IAP), and the
+       product factory has shipped substantial adjacent work in the interim (~20 more commits
+       since the last audit, including a coverage-floor ratchet and a real per-PR prep-pack
+       content eval) -- but the SAME two blocking dims specifically haven't been re-graded;
+       flagging the persistence explicitly per the circuit-breaker rule rather than assuming
+       improvement without evidence."
+    - "SITE_GATE_PASSWORD not applied (open since bootstrap, now >=5 consecutive GTM reads):
+       site_gate_up remains false; execute-mode outreach stays hard-blocked regardless of
+       channel connection. See next_actions above -- this is the ONE highest-leverage owner
+       action to clear next, and the longest-standing single blocker in this loop's history."
     - "No marketing channels connected -- Growth Agent stays in prepare-mode."
   links:
     connect_runbook: docs/growth/CONNECT.md

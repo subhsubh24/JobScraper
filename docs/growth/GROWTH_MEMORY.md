@@ -91,6 +91,67 @@ pre-launch.
 
 ---
 
+### 2026-07-07 — Daily GTM review (quiet run; VISION-pivot reconciliation, no steer)
+- **Observed:** Phase still `pre_launch`. `ListConnectors` confirms only Gmail (connected,
+  enabled) + Google Drive (connected, not enabled-in-chat) + Google Calendar (unknown/not
+  enabled) — no analytics/billing/email-provider MCP available; shell env has no `PROD_URL` or
+  `ANALYTICS_READ_TOKEN` — `engine_built: false` / `channels_connected: []` stay honest, same as
+  every prior run. Pulled the full `main` branch (44 commits had landed since the last GTM read,
+  2026-07-05 → 2026-07-07) and checked both independent scorecards with `git log --follow`:
+  **neither `docs/quality/QUALITY_SCORECARD.md` nor `docs/growth/GTM_SCORECARD.md` has been
+  re-touched since commit `b628f5b` (2026-07-03)** — no fresh independent grade exists despite
+  ~20 intervening product-factory commits (coverage-floor ratchet 75→85, per-user rate limiting,
+  a real per-PR prep-pack content-quality eval, ATS retry/backoff, profile enrichment, tailored
+  résumé generation, a new §34 pre-launch public-demo-funnel ROADMAP item, a new §11 marketing
+  media-gen adapter ROADMAP item). QUALITY_SCORECARD therefore stays read AS-IS: **B, ship gate
+  NOT met**, same 2 ship-critical C's (business-case-strength, store-readiness). GTM_SCORECARD
+  stays **A, ship_gate_met: true** (unchanged). `docs/BUSINESS_CASE.md` unchanged since the
+  2026-07-05 GTM run (still $57.5K base < $100K floor; team/B2B2C tier still unbuilt).
+- **The one genuinely notable event:** `VISION.md` was rewritten this cycle (commit `5846822`,
+  outside the GTM loop, by the product factory) to name **"interview coaching (Siro for
+  interviews)"** as the current frontier / surface 3 of the north star, and `ROADMAP.md` gained a
+  full new track — "Interview coaching + the autonomous prep loop" (mock-interview engine,
+  interview-readiness score, owner-gated voice/delivery analysis) — all still unchecked/unbuilt.
+  This is exactly the JTBD theme this loop's 2026-07-03 §10 demand-signal pass flagged as only
+  **PARTIALLY solved** ("interview-PRACTICE anxiety, distinct from content prep") and tied to
+  `BUSINESS_CASE.md` lever 3's already-named "mock-interview voice sessions" wedge — the product
+  factory converged on it independently, without a GTM-authored ROADMAP/VISION edit. Recording the
+  convergence as a citable data point (commit `5846822` + the existing `demand_signal` block), not
+  claiming credit for the pivot or crediting any ARR — 0 users still, and the mock-interview engine
+  itself is `[ ]` unbuilt in `ROADMAP.md`.
+- **Concluded:** No real data justifies a ROADMAP/BUSINESS_CASE/VISION steer this run (same
+  reasoning as every prior pre-launch read — 0 users, 0 funnel data). Checked GTM_STANDARD §13
+  (new this cycle, commit `53b7a57`) for a `marketing:` block / `MARKETING_APPROVED` /
+  `MARKETING_HOLD` file: **none exists**, correctly — Gate 1's preconditions
+  (`ship_gate_met` + a green computer-use E2E sweep + passed launch assets) are not met, so no
+  waitlist-outreach plan should be proposed yet. Checked demand-signal refresh cadence: last run
+  2026-07-03 (4 days), the ~quarterly refresh is not due. Checked ROADMAP §34 (pre-launch
+  public-demo funnel): still unchecked — the pre-launch funnel shape is still the blank waitlist,
+  unchanged from the last read.
+- **Did:** Refreshed `GROWTH_STATUS.md` (dates, re-validated sources, the VISION-pivot
+  reconciliation note, an explicit note that neither scorecard has been re-touched since the last
+  audit despite substantial adjacent product work) and this entry. No new asset, no channel, no
+  steer — a routine dashboard-bookkeeping refresh, not a substantive GTM change, so no
+  maker≠checker review was run (consistent with how prior bookkeeping-only refreshes were
+  handled; substantive research runs like 2026-07-03/07-05 DID go through review).
+- **Recommended (to factory):** Unchanged priority — business-case-strength (team/B2B2C tier,
+  annual-first pricing) and store-readiness (rendered assets + mobile IAP) remain the two
+  ship-critical gaps per the last independent grade. Zero outreach drafts this run: the readiness
+  gate (`QUALITY_SCORECARD.ship_gate_met`) is still false.
+- **Meta / operational note (circuit breaker, escalating):** `SITE_GATE_PASSWORD` has now been
+  named as the single highest-leverage owner action across **5 consecutive GTM reads**
+  (2026-06-29, 07-01, 07-03, 07-05, 07-07) — the longest-standing single blocker in this loop's
+  history. It remains a ~2-minute env-var set, unlike the Stripe/Apple/Google account-creation
+  items. Also naming a second, related pattern for the first time: **both independent scorecards
+  have now gone 2 straight GTM reads (07-05, 07-07) without a re-grade**, even though the product
+  factory has been actively shipping in the interim — this loop correctly does NOT infer progress
+  from adjacent commits (that would be self-certification, the exact failure mode GTM_STANDARD §4
+  forbids), but it's worth watching whether the independent-auditor routines themselves have
+  stalled, since a fresh QUALITY_SCORECARD grade is the most likely near-term way `ship_gate_met`
+  flips true and opens the outreach gate.
+
+---
+
 ### 2026-07-05 — Daily GTM review (quiet run on funnel/steer front; real packaging research on the team/B2B2C lever)
 - **Observed:** Phase still `pre_launch`. `ListConnectors` confirms only Gmail (connected,
   enabled) + Google Drive (connected, not enabled-in-chat) + Google Calendar (unknown/not
