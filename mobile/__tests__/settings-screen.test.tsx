@@ -36,7 +36,19 @@ jest.mock('@/contexts/auth', () => ({
   }),
 }));
 
-jest.mock('@/services/api', () => ({
+jest.mock('@/services/api', () => {
+  // Mirror the real ApiError (extends Error) so the screen's `e instanceof ApiError`
+  // guards resolve to a real class under the module mock — matching the sibling test
+  // files (job-detail/insights/coach). Without this the mocked module would leave
+  // ApiError undefined and `e instanceof ApiError` would throw at runtime.
+  class ApiError extends Error {
+    status: number;
+    constructor(status: number, message: string) {
+      super(message);
+      this.status = status;
+    }
+  }
+  return {
   api: {
     apiUrl: 'https://api.example.com',
     referralStats: jest.fn(async () => ({ code: 'ABC123', total_referred: 2, bonus_prep_packs: 1 })),
@@ -59,7 +71,9 @@ jest.mock('@/services/api', () => ({
     })),
     clearEnrichment: jest.fn(async () => {}),
   },
-}));
+  ApiError,
+  };
+});
 
 import SettingsScreen from '@/app/(tabs)/settings';
 import { api } from '@/services/api';
@@ -132,9 +146,10 @@ describe('SettingsScreen', () => {
   });
 
   it('a failed résumé save surfaces the error and shows no success confirmation', async () => {
-    // The card surfaces the caught error's message (same pattern as the enrichment/delete cards);
-    // a real failure carries the server's honest 'detail'. The key guarantee: an error is shown
-    // and the "saved" confirmation is NOT (no optimistic/fake success).
+    // The card surfaces an honest error on failure (a real ApiError carries the server's
+    // 'detail'; an unexpected non-ApiError throw like this one falls through to the friendly
+    // fallback). The key guarantee under test: an error IS shown and the "saved" confirmation
+    // is NOT (no optimistic/fake success).
     (api.saveResume as jest.Mock).mockRejectedValueOnce(new Error('Could not save your résumé.'));
     render(<SettingsScreen />);
     const field = await screen.findByDisplayValue('Existing résumé text.');

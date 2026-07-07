@@ -6,7 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button, Card, Field } from '@/components/ui';
 import { AiConsentSetting } from '@/components/ai-consent';
 import { useAuth } from '@/contexts/auth';
-import { api } from '@/services/api';
+import { api, ApiError } from '@/services/api';
 import { colors, spacing } from '@/theme';
 import type { Competency, ReferralStats } from '@/types';
 
@@ -48,7 +48,7 @@ function ResumeCard() {
       setSaved(resume);
       setNotice(hasResume ? 'Résumé saved.' : 'Résumé cleared.');
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not save your résumé. Try again.');
+      setError(e instanceof ApiError ? e.message : 'Could not save your résumé. Try again.');
     } finally {
       setSaving(false);
     }
@@ -127,7 +127,7 @@ function GithubEnrichmentCard() {
       setCompetencies(result.competencies);
       setNotice(result.message);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not import from GitHub. Try again.');
+      setError(e instanceof ApiError ? e.message : 'Could not import from GitHub. Try again.');
     } finally {
       setImporting(false);
     }
@@ -274,7 +274,7 @@ export default function SettingsScreen() {
       // Only the deletion request itself failing should surface as a failure.
       Alert.alert(
         'Could not delete account',
-        e instanceof Error ? e.message : 'Something went wrong. Please try again.',
+        e instanceof ApiError ? e.message : 'Something went wrong. Please try again.',
       );
       return;
     }
