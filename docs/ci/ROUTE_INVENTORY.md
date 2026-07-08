@@ -21,6 +21,7 @@ Keep this current as routes are added. A new route with no journey coverage is a
 | `/app/settings` | Account/settings (incl. résumé view/edit, GitHub enrichment) | API gate (`/api/auth/me`, résumé, enrichment, delete) | — _browser coverage: follow-up_ |
 | `/pricing` | Plans | — | _follow-up_ |
 | `/waitlist` | Pre-launch capture | `tests/test_waitlist.py` (API) | join → row written; enumeration-safe; no fake-email claim; rate-limited |
+| `/demo` | Public no-account skill-match demo (§34 aha) | `e2e/demo-journey.spec.ts` | paste JD+résumé → real matching/missing skills + coverage % RENDER; no-résumé + no-skills + backend-500 all degrade honestly (no fake 0%, no dead-end); → waitlist CTA |
 | `/privacy`, `/terms` | Legal | (marketing-exempt; static) | render |
 | `/billing/success`, `/billing/cancel` | Stripe return | API gate (checkout/webhook) | — _follow-up_ |
 
@@ -60,6 +61,12 @@ Keep this current as routes are added. A new route with no journey coverage is a
   from the user's REAL signals (résumé-vs-JD skill coverage + answered/scored mock questions +
   completed prep artifacts); scoped to `user.id` (404 on another user's job); honest 0-state,
   climbs only on real practice. The math is pinned by `tests/evals/test_readiness_evals.py`.
+- **public demo skill-match** — `POST /api/demo/skill-match` (`tests/test_demo_skill_match.py`,
+  `tests/evals/test_demo_match_evals.py`): PUBLIC (no account), KEY-FREE + local (no LLM/DB/PII);
+  paste one JD (+ optional résumé) → matching/missing skills + coverage % from the shared
+  `extract_skills` vocabulary. Hardened like a live public surface (§12): bounded input, a burst
+  (20/min) + daily (200/day) per-IP rate limit, captcha seam (no-op until owner connects). Honest
+  no-résumé state (has_resume=false, no fake 0%). The §34 pre-launch "aha" funnel driver.
 
 ## Mobile screens (`mobile/src/app/**`, jest-expo component/integration tests)
 | Screen / unit | Covered by | Outcome asserted |
