@@ -53,3 +53,48 @@ test('public demo: empty submit is guarded, not a dead-end', async ({ page }) =>
   // An inline validation message, not a crash or a silent no-op.
   await expect(page.getByText(/paste a job description to see your match/i)).toBeVisible();
 });
+
+test('public demo: no résumé → honest "role wants" state, no fake 0% verdict', async ({ page }) => {
+  await page.goto('/demo');
+  await page.getByPlaceholder(/Paste the role/i).fill(JD);
+  // Deliberately leave the résumé blank.
+  await page.getByRole('button', { name: /See your match/i }).click();
+
+  // Honest framing: the role's skills are shown as what it "wants", with an invite to add a
+  // résumé — NOT a coverage badge implying a real 0% match.
+  await expect(page.getByRole('heading', { name: /Skills this role wants/i })).toBeVisible({
+    timeout: 20_000,
+  });
+  await expect(page.getByText(/Paste your résumé above/i)).toBeVisible();
+  await expect(page.getByText('python', { exact: true })).toBeVisible();
+  // No coverage badge in the no-résumé state (has_resume=false gates it).
+  await expect(page.getByLabel(/percent skill coverage/i)).toHaveCount(0);
+});
+
+test('public demo: JD with no recognized skills → honest prompt, never a blank result', async ({
+  page,
+}) => {
+  await page.goto('/demo');
+  await page.getByPlaceholder(/Paste the role/i).fill('We want a friendly teammate who loves coffee.');
+  await page.getByRole('button', { name: /See your match/i }).click();
+  await expect(page.getByText(/couldn't spot any recognized skills/i)).toBeVisible({
+    timeout: 20_000,
+  });
+});
+
+test('public demo: a backend failure degrades to an honest error, not a dead-end', async ({
+  page,
+}) => {
+  // Force the configured-but-failing path (§6): the endpoint 500s at runtime.
+  await page.route('**/api/demo/skill-match', (route) =>
+    route.fulfill({ status: 500, contentType: 'application/json', body: '{"detail":"boom"}' }),
+  );
+  await page.goto('/demo');
+  await page.getByPlaceholder(/Paste the role/i).fill(JD);
+  await page.getByRole('button', { name: /See your match/i }).click();
+
+  // An announced error (role=alert), and the results panel falls back to its placeholder —
+  // never a stuck spinner or a stale/blank result.
+  await expect(page.getByRole('alert')).toContainText(/boom|went wrong/i);
+  await expect(page.getByText(/Your instant skill match appears here/i)).toBeVisible();
+});

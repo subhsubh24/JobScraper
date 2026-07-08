@@ -76,7 +76,7 @@ function SkillChips({ skills, tone }: { skills: string[]; tone: 'have' | 'gap' }
 function Results({ result }: { result: MatchResult }) {
   const pct = Math.round(result.coverage * 100);
   return (
-    <div className="space-y-5" aria-live="polite">
+    <div className="space-y-5">
       {result.role_skill_count === 0 ? (
         <Card>
           <p className="text-slate-300">
@@ -132,22 +132,28 @@ function Results({ result }: { result: MatchResult }) {
           </Card>
         </>
       )}
-
-      <Card className="space-y-3 border-indigo-500/30 bg-indigo-500/[0.06]">
-        <p className="font-semibold text-slate-100">This is a taste of the full operator.</p>
-        <p className="text-sm text-slate-400">
-          Career Operator scores every role against your résumé across your whole pipeline, finds
-          the skills your saved jobs repeatedly demand, and drafts role-specific interview prep.
-          Join the waitlist for early access.
-        </p>
-        <Link
-          href="/waitlist"
-          className="inline-flex items-center justify-center rounded-lg bg-indigo-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
-        >
-          Join the waitlist
-        </Link>
-      </Card>
     </div>
+  );
+}
+
+// Static upsell — deliberately OUTSIDE the aria-live results region so it is not re-announced
+// to assistive tech on every submit (it never changes).
+function UpsellCard() {
+  return (
+    <Card className="space-y-3 border-indigo-500/30 bg-indigo-500/[0.06]">
+      <p className="font-semibold text-slate-100">This is a taste of the full operator.</p>
+      <p className="text-sm text-slate-400">
+        Career Operator scores every role against your résumé across your whole pipeline, finds the
+        skills your saved jobs repeatedly demand, and drafts role-specific interview prep. Join the
+        waitlist for early access.
+      </p>
+      <Link
+        href="/waitlist"
+        className="inline-flex items-center justify-center rounded-lg bg-indigo-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
+      >
+        Join the waitlist
+      </Link>
+    </Card>
   );
 }
 
@@ -215,17 +221,24 @@ export function DemoClient() {
         </form>
       </Card>
 
-      <div>
-        {result ? (
-          <Results result={result} />
-        ) : (
-          <Card className="flex h-full min-h-[16rem] items-center justify-center text-center">
-            <p className="max-w-xs text-sm text-slate-400">
-              Your instant skill match appears here — matching skills, gaps, and a coverage % against
-              the role.
-            </p>
-          </Card>
-        )}
+      <div className="space-y-5">
+        {/* Persistent live region: always mounted (even empty) so the FIRST result is reliably
+            announced by assistive tech — a region that appears in the same paint as its content
+            is often not announced. Only the dynamic match summary lives here; the static upsell
+            is rendered outside it. */}
+        <div aria-live="polite">
+          {result ? (
+            <Results result={result} />
+          ) : (
+            <Card className="flex min-h-[16rem] items-center justify-center text-center">
+              <p className="max-w-xs text-sm text-slate-400">
+                Your instant skill match appears here — matching skills, gaps, and a coverage %
+                against the role.
+              </p>
+            </Card>
+          )}
+        </div>
+        {result && <UpsellCard />}
       </div>
     </div>
   );

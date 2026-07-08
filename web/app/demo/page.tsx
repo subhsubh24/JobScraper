@@ -35,8 +35,8 @@ export default function DemoPage() {
         </h1>
         <p className="mt-4 max-w-xl text-lg leading-relaxed text-slate-400">
           Paste a job description and your résumé. Career Operator shows the skills you already have,
-          the ones the role wants that you&apos;re missing, and your coverage — the same read that
-          powers the full product.
+          the ones the role wants that you&apos;re missing, and your coverage — the same skills read
+          that powers the full product.
         </p>
       </div>
 
