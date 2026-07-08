@@ -31,6 +31,10 @@ EVAL_COVERAGE:
     modules: [src/insights/skill_gaps.py, src/enrichment/llm_workflows.py]  # ranking is key-free; generate_learning_plan is the LLM half
     deterministic_evals: [tests/evals/test_skill_gap_evals.py]   # pins the frequency×absence ranking math exactly
     real_output_eval: tests/evals/test_ai_output_evals.py   # real learning plan: substantive + covers the gaps + structured
+  - feature: mock-interview   # role-specific question generation + honest per-answer scoring (llm_workflows generators)
+    modules: [src/enrichment/llm_workflows.py]  # generate_mock_interview_questions + score_mock_interview_answer
+    deterministic_evals: [tests/evals/test_mock_interview_evals.py]   # pins question shape/bounds + computed-not-trusted overall + fail-loud
+    real_output_eval: tests/evals/test_ai_output_evals.py   # real questions are role-specific; real scoring is honest (strong > weak) + structured
 ```
 
 Adding a new AI feature? Add its module to a feature entry (or a new entry) with a deterministic

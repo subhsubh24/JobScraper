@@ -50,6 +50,11 @@ Keep this current as routes are added. A new route with no journey coverage is a
 - **AI learning plan** — `POST /api/insights/learning-plan` (`tests/test_skill_gaps.py`): Pro+;
   same tier→data→503→consent→ceiling→moderation gate chain as the other generators; gaps
   recomputed server-side (never client-trusted).
+- **mock interview** — `POST /api/prep/mock-interview` (start), `POST /api/prep/mock-interview/{id}/answer`
+  (score one answer), `GET /api/prep/mock-interview/{id}`, `GET /api/prep/mock-interviews?job_id=`
+  (`tests/test_mock_interview.py`): Pro+; same tier→job→503→consent→ceiling→moderation gate chain;
+  multi-turn state on one `MockInterview` row scoped to `user.id` (tenant-isolated); honest scoring
+  (weak answer scores low, `overall` computed server-side); account-deletion cascade proven.
 
 ## Mobile screens (`mobile/src/app/**`, jest-expo component/integration tests)
 | Screen / unit | Covered by | Outcome asserted |

@@ -244,6 +244,7 @@ class JobPosting(Base):
     score = relationship("JobScore", back_populates="job", uselist=False, cascade="all, delete-orphan")
     application = relationship("Application", back_populates="job", uselist=False, cascade="all, delete-orphan")
     prep_artifacts = relationship("PrepArtifact", back_populates="job", cascade="all, delete-orphan")
+    mock_interviews = relationship("MockInterview", back_populates="job", cascade="all, delete-orphan")
 
     __table_args__ = (
         Index("ix_job_user_company", "user_id", "company_name"),
@@ -328,6 +329,56 @@ class PrepArtifact(Base):
 
     # Relationships
     job = relationship("JobPosting", back_populates="prep_artifacts")
+
+
+# ============ MOCK INTERVIEW (interview coaching — north-star pillar) ============
+
+class MockInterview(Base):
+    """A text-first, role-specific mock interview session (ROADMAP Track A, surface 3).
+
+    The differentiator is an *operator* that drills a candidate to interview-ready, not just
+    another content tool. One row is ONE interview session for ONE tracked job: the coach
+    generates JD-derived questions up front, then the user answers them one at a time and each
+    answer is independently SCORED with concrete feedback + a model answer.
+
+    Design notes:
+    - **Job-scoped, like PrepArtifact.** ``job_id`` owns the row; deleting the job (or the user,
+      whose ``jobs`` cascade reaches here) removes the session — so account deletion leaves ZERO
+      rows (Apple 5.1.1(v) / Google). ``user_id`` is ALSO stored as an indexed FK so every
+      endpoint can scope the lookup to the caller server-side (tenant isolation, never trust the
+      client) without joining through the job.
+    - **Multi-turn state as JSON, not a second table.** ``questions`` is the fixed generated set;
+      ``answers`` is a list of per-question scored results appended/overwritten by index as the
+      user answers. Keeping both as JSON on the one row keeps the whole session in a single read
+      (no N+1) and avoids a second migration — the session is small and bounded (≤8 questions).
+    - **Honest scoring only.** Each score reflects the REAL answer: a blank/evasive answer scores
+      low. The score climbs only on real practice (VISION "honest > flashy") — never a vanity
+      number. The user-facing feedback/model-answer prose is moderated at generation time.
+    """
+
+    __tablename__ = "mock_interviews"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    # Stored for direct, server-side ownership scoping on every endpoint (tenant isolation).
+    user_id = Column(String(36), ForeignKey("users.id"), nullable=False, index=True)
+    # The owning relationship: cascade deletes the session when the job (or user) is removed.
+    job_id = Column(String(36), ForeignKey("job_postings.id"), nullable=False, index=True)
+
+    # Generated questions: [{"question": str, "category": "technical"|"behavioral"}] (≤8).
+    questions = Column(JSON, nullable=False)
+    # Scored answers, keyed by "question_index": [{"question_index": int, "answer": str,
+    #   "relevance": int(0-5), "specificity": int(0-5), "star": int(0-5), "overall": float(0-100),
+    #   "feedback": str, "model_answer": str}]. Empty until the user answers.
+    answers = Column(JSON, nullable=False, default=list)
+
+    status = Column(String(20), nullable=False, default="in_progress")  # in_progress | completed
+    model_used = Column(String(100))
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships (job owns the cascade; user_id is a scoping column, no dual-cascade).
+    job = relationship("JobPosting", back_populates="mock_interviews")
 
 
 # ============ AI COACH ============

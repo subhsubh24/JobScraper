@@ -40,6 +40,7 @@ from src.db.models import (
     ContentReport,
     EnrichedCompetency,
     JobPosting,
+    MockInterview,
     PrepArtifact,
     RateCounter,
     User,
@@ -532,7 +533,7 @@ class ReportRequest(BaseModel):
     unbounded write (they are stored verbatim, never fed back into an LLM prompt).
     """
 
-    content_type: Literal["coach", "prep_pack"]
+    content_type: Literal["coach", "prep_pack", "mock_interview"]
     reason: Literal["harmful", "inaccurate", "offensive", "other"]
     # Optional client reference to the specific item; equality/audit only, never a write key.
     content_ref: Optional[str] = Field(default=None, max_length=64)
@@ -577,6 +578,22 @@ class TailoredResumeRequest(BaseModel):
     # Same bounded job id contract as the other prep tools — the endpoint scopes the lookup to
     # the caller, so an over-length value just misses; 422 at the boundary is the honest failure.
     job_id: str = Field(min_length=1, max_length=64)
+
+
+class MockInterviewStartRequest(BaseModel):
+    # Same bounded job id contract as the other prep tools.
+    job_id: str = Field(min_length=1, max_length=64)
+    # 3–8 questions: <3 is not a real interview, >8 inflates the LLM prompt/response and the
+    # session without adding practice value. Bounded as an honest abuse guard on a paid call.
+    num_questions: int = Field(default=5, ge=3, le=8)
+
+
+class MockInterviewAnswerRequest(BaseModel):
+    # Which question is being answered (0-based; the endpoint bounds it to the session's set).
+    question_index: int = Field(ge=0, le=7)
+    # The candidate's answer. Bounded so one scored answer can't be an unbounded LLM prompt;
+    # min_length 1 so a blank submission is a 422 at the boundary, not a burned paid call.
+    answer: str = Field(min_length=1, max_length=8000)
 
 
 class ImportPreviewRequest(BaseModel):
@@ -1673,6 +1690,225 @@ def generate_tailored_resume_endpoint(
             "title": artifact.title,
             "content": artifact.content,
         },
+    }
+
+
+# ---------------------------------------------------------------------------
+# Mock interview engine (Pro+; LLM — the interview-coaching pillar, ROADMAP Track A surface 3)
+#
+# A realistic, role-specific text mock interview: the coach asks JD-derived questions, the user
+# answers one at a time, and each answer is SCORED (relevance / specificity / STAR) with concrete
+# feedback + a model answer. Multi-turn state lives on ONE ``MockInterview`` row. Every endpoint
+# scopes the session to ``user.id`` server-side (tenant isolation — never trust the client).
+# ---------------------------------------------------------------------------
+def _mock_interview_public(interview: MockInterview) -> dict:
+    """Serialize a session for the client: questions + any scored answers + status."""
+    questions = interview.questions or []
+    answers = interview.answers or []
+    return {
+        "id": interview.id,
+        "job_id": interview.job_id,
+        "status": interview.status,
+        "questions": questions,
+        "answers": answers,
+        "answered_count": len(answers),
+        "total": len(questions),
+        "created_at": interview.created_at.isoformat() if interview.created_at else None,
+    }
+
+
+@app.post("/api/prep/mock-interview", dependencies=[Depends(rate_limit("llm", 10))])
+def start_mock_interview(
+    data: MockInterviewStartRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Start a mock interview for a tracked job — a Pro+ feature.
+
+    Same Pro+ gate / consent / ceiling / honest-degradation contract as the other AI generators.
+    Generates the JD-derived question set up front and persists an ``in_progress`` session; the
+    user then answers each question via the ``/answer`` endpoint. A keyless server refuses
+    honestly (503, no fake session); a moderated generation returns 422 and persists nothing (§6).
+    """
+    if user.tier != UserTier.PREMIUM:
+        raise HTTPException(
+            status_code=403,
+            detail="Mock interviews are a Pro feature. Upgrade to Pro or Career+ to unlock them.",
+        )
+
+    job = (
+        db.query(JobPosting)
+        .filter(JobPosting.id == data.job_id, JobPosting.user_id == user.id)
+        .first()
+    )
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    if not llm_available():
+        raise HTTPException(
+            status_code=503,
+            detail="Mock interviews require the server's GEMINI_API_KEY to be configured.",
+        )
+
+    require_ai_consent(user)
+    check_llm_ceiling(user, db)
+    try:
+        questions = LLMWorkflows(db).generate_mock_interview_questions(job, data.num_questions)
+    except ModeratedContentError:
+        logger.info("Mock-interview questions withheld by content moderation")
+        raise HTTPException(status_code=422, detail=_MODERATED_DECLINE_DETAIL)
+    except Exception:
+        logger.exception("Mock-interview question generation failed")
+        raise HTTPException(status_code=502, detail="AI provider error starting the mock interview")
+
+    interview = MockInterview(
+        user_id=user.id,
+        job_id=job.id,
+        questions=questions,
+        answers=[],
+        status="in_progress",
+        model_used=LLMWorkflows.MODEL,
+    )
+    db.add(interview)
+    db.commit()
+    db.refresh(interview)
+    analytics.record_event(db, "mock_interview_started")  # aggregate metric (best-effort, no PII)
+    return {"success": True, "interview": _mock_interview_public(interview)}
+
+
+@app.post(
+    "/api/prep/mock-interview/{interview_id}/answer",
+    dependencies=[Depends(rate_limit("llm", 20))],
+)
+def answer_mock_interview(
+    interview_id: str,
+    data: MockInterviewAnswerRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Submit an answer to one question and get it scored — a Pro+ feature.
+
+    Scores the answer (relevance / specificity / STAR) with concrete feedback + a model answer,
+    then persists the result on the session (keyed by ``question_index``; re-answering a question
+    OVERWRITES its prior score — the readiness-loop "redo the weak answer" path). When every
+    question has been answered the session flips to ``completed``. Honest scoring only: a weak
+    answer scores low. A moderated result returns 422 and persists nothing (§6).
+    """
+    if user.tier != UserTier.PREMIUM:
+        raise HTTPException(
+            status_code=403,
+            detail="Mock interviews are a Pro feature. Upgrade to Pro or Career+ to unlock them.",
+        )
+
+    interview = (
+        db.query(MockInterview)
+        .filter(MockInterview.id == interview_id, MockInterview.user_id == user.id)
+        .first()
+    )
+    if not interview:
+        raise HTTPException(status_code=404, detail="Mock interview not found")
+
+    questions = interview.questions or []
+    if data.question_index >= len(questions):
+        raise HTTPException(status_code=422, detail="Question index out of range for this interview.")
+
+    job = (
+        db.query(JobPosting)
+        .filter(JobPosting.id == interview.job_id, JobPosting.user_id == user.id)
+        .first()
+    )
+    if not job:
+        # The owning job was deleted (which would cascade-delete the interview) — defensive.
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    if not llm_available():
+        raise HTTPException(
+            status_code=503,
+            detail="Mock interviews require the server's GEMINI_API_KEY to be configured.",
+        )
+
+    require_ai_consent(user)
+    check_llm_ceiling(user, db)
+    question_text = questions[data.question_index].get("question", "")
+    try:
+        result = LLMWorkflows(db).score_mock_interview_answer(job, question_text, data.answer)
+    except ModeratedContentError:
+        logger.info("Mock-interview answer feedback withheld by content moderation")
+        raise HTTPException(status_code=422, detail=_MODERATED_DECLINE_DETAIL)
+    except Exception:
+        logger.exception("Mock-interview answer scoring failed")
+        raise HTTPException(status_code=502, detail="AI provider error scoring your answer")
+
+    entry = {"question_index": data.question_index, "answer": data.answer, **result}
+    # Reassign a NEW list so SQLAlchemy marks the JSON column dirty (in-place mutation isn't
+    # tracked). Overwrite any prior answer at this index (re-answer / redo the weak one).
+    existing = [a for a in (interview.answers or []) if a.get("question_index") != data.question_index]
+    existing.append(entry)
+    existing.sort(key=lambda a: a.get("question_index", 0))
+    interview.answers = existing
+    answered_indexes = {a.get("question_index") for a in existing}
+    if len(answered_indexes) >= len(questions):
+        interview.status = "completed"
+    db.commit()
+    db.refresh(interview)
+    analytics.record_event(db, "mock_interview_answered")  # aggregate metric (best-effort, no PII)
+    return {
+        "success": True,
+        "result": {"question_index": data.question_index, **result},
+        "status": interview.status,
+        "answered_count": len(answered_indexes),
+        "total": len(questions),
+    }
+
+
+@app.get(
+    "/api/prep/mock-interview/{interview_id}",
+    dependencies=[Depends(rate_limit_user("user_read", 120))],
+)
+def get_mock_interview(
+    interview_id: str,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Fetch a full mock-interview session (questions + scored answers) — the caller's own only."""
+    interview = (
+        db.query(MockInterview)
+        .filter(MockInterview.id == interview_id, MockInterview.user_id == user.id)
+        .first()
+    )
+    if not interview:
+        raise HTTPException(status_code=404, detail="Mock interview not found")
+    return {"success": True, "interview": _mock_interview_public(interview)}
+
+
+@app.get(
+    "/api/prep/mock-interviews",
+    dependencies=[Depends(rate_limit_user("user_read", 120))],
+)
+def list_mock_interviews(
+    job_id: str = Query(..., min_length=1, max_length=64),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """List the caller's mock-interview sessions for one tracked job (most recent first)."""
+    interviews = (
+        db.query(MockInterview)
+        .filter(MockInterview.user_id == user.id, MockInterview.job_id == job_id)
+        .order_by(MockInterview.created_at.desc())
+        .all()
+    )
+    return {
+        "success": True,
+        "interviews": [
+            {
+                "id": i.id,
+                "status": i.status,
+                "total": len(i.questions or []),
+                "answered_count": len(i.answers or []),
+                "created_at": i.created_at.isoformat() if i.created_at else None,
+            }
+            for i in interviews
+        ],
     }
 
 
