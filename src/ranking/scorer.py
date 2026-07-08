@@ -108,8 +108,14 @@ class JobScorer:
         self.db.flush()
         return embedding
 
-    def extract_skills(self, text: str) -> List[str]:
-        """Extract skills from text using common patterns."""
+    @staticmethod
+    def extract_skills(text: str) -> List[str]:
+        """Extract skills from text using common patterns.
+
+        A pure function of ``text`` (no instance/DB/LLM state) — declared ``@staticmethod`` so a
+        key-free, DB-free caller (e.g. the public no-account demo, FACTORY_STANDARD §34) can reuse
+        the EXACT same skill vocabulary as the scorer without standing up a ``JobScorer(db)``.
+        Still callable as ``self.extract_skills(...)`` from the scoring path, unchanged."""
         common_skills = [
             "python", "javascript", "typescript", "java", "c++", "c#", "go", "rust",
             "react", "vue", "angular", "node", "django", "flask", "fastapi",
