@@ -31,8 +31,42 @@ class GreenhouseClient(BaseATSClient):
             logger.warning("Greenhouse fetch failed for board %s: %s", self.company_identifier, e)
             return []
 
+        # Greenhouse's board API returns a JSON object ``{"jobs": [...]}``. This runs on the LIVE
+        # import-preview path over arbitrary third-party JSON, so a malformed payload that is NOT a
+        # dict (an error array, null, a string) would make ``data.get(...)`` raise AttributeError
+        # and 500 the whole import — the same graceful-degrade gap the per-record guard below
+        # covers. Degrade to an empty board.
+        if not isinstance(data, dict):
+            self.last_error = "unexpected Greenhouse payload (expected an object with 'jobs')"
+            logger.warning(
+                "Greenhouse board %s: unexpected payload shape (%s), skipping",
+                self.company_identifier,
+                type(data).__name__,
+            )
+            return []
+
+        # A PRESENT-but-non-list "jobs" field is a malformed payload, not an empty board — so set
+        # last_error (like the top-level guard above) and degrade. This keeps the caller's honesty
+        # contract intact: import-preview must report "temporarily unreachable", never fall through
+        # to the "no open roles are posted" message on a broken response. (An ABSENT "jobs" key
+        # defaults to [], a list — a legitimately empty board, no error.)
+        raw_jobs = data.get("jobs", [])
+        if not isinstance(raw_jobs, list):
+            self.last_error = "unexpected Greenhouse payload ('jobs' was not a list)"
+            logger.warning(
+                "Greenhouse board %s: 'jobs' field is not a list (%s), skipping",
+                self.company_identifier,
+                type(raw_jobs).__name__,
+            )
+            return []
+
         jobs = []
-        for job_data in data.get("jobs", []):
+        for job_data in raw_jobs:
+            if not isinstance(job_data, dict):
+                logger.warning(
+                    "Greenhouse board %s: skipping non-object job", self.company_identifier
+                )
+                continue
             # The required top-level fields ("id"/"title") are read OUTSIDE the request try/except
             # above, which only catches RequestException — so a bare ``["id"]`` raises KeyError on
             # ONE malformed/partial job and escapes this method. The callers (import-preview,

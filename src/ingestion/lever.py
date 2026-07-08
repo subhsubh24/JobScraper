@@ -31,6 +31,20 @@ class LeverClient(BaseATSClient):
             logger.warning("Lever fetch failed for board %s: %s", self.company_identifier, e)
             return []
 
+        # Lever's board API returns a JSON array of postings. This runs on the LIVE import-preview
+        # path (POST /api/jobs/import-preview → detector → LeverClient.fetch_jobs) over arbitrary
+        # third-party JSON, so a malformed payload that is NOT a list (an error object, null, a
+        # string) would make ``for job_data in data`` iterate the wrong thing or crash — the same
+        # graceful-degrade gap the per-record guards below cover. Degrade to an empty board.
+        if not isinstance(data, list):
+            self.last_error = "unexpected Lever payload (expected a list of postings)"
+            logger.warning(
+                "Lever board %s: unexpected payload shape (%s), skipping",
+                self.company_identifier,
+                type(data).__name__,
+            )
+            return []
+
         jobs = []
         for job_data in data:
             # The required fields ("id"/"text") are read outside the request try/except above
@@ -39,6 +53,11 @@ class LeverClient(BaseATSClient):
             # blanket ``except Exception``, so that single bad record loses the ENTIRE board (the
             # company is falsely reported unreachable and every good posting is dropped). Skip just
             # the bad posting (like the optional fields already do with ``.get()``) and keep the rest.
+            if not isinstance(job_data, dict):
+                logger.warning(
+                    "Lever board %s: skipping non-object posting", self.company_identifier
+                )
+                continue
             lever_id = job_data.get("id")
             title = job_data.get("text")
             if not lever_id or not title:
@@ -47,16 +66,27 @@ class LeverClient(BaseATSClient):
                     self.company_identifier,
                 )
                 continue
-            # Lever includes full details in listing
-            location = job_data.get("categories", {}).get("location", "")
-            team = job_data.get("categories", {}).get("team", "")
-            commitment = job_data.get("categories", {}).get("commitment", "")
+            # Lever includes full details in listing. ``categories`` may be a non-object (null, a
+            # string) on a malformed posting — reading ``.get(...)`` on a non-dict would 500 the
+            # whole import (same crash class as the greenhouse ``location`` guard), so only read it
+            # when it is actually a dict; otherwise degrade to empty fields.
+            categories = job_data.get("categories")
+            if not isinstance(categories, dict):
+                categories = {}
+            location = categories.get("location", "") or ""
+            team = categories.get("team", "") or ""
+            commitment = categories.get("commitment", "") or ""
 
-            # Build description from lists
+            # Build description from lists. ``lists`` may be absent or a non-list, and an individual
+            # section may be a non-object — skip anything that isn't a dict rather than crash.
             description_parts = []
-            for section in job_data.get("lists", []):
-                description_parts.append(f"## {section.get('text', '')}")
-                description_parts.append(section.get("content", ""))
+            sections = job_data.get("lists")
+            if isinstance(sections, list):
+                for section in sections:
+                    if not isinstance(section, dict):
+                        continue
+                    description_parts.append(f"## {section.get('text', '')}")
+                    description_parts.append(section.get("content", ""))
 
             description = "\n\n".join(description_parts)
 
