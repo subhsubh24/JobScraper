@@ -2351,15 +2351,15 @@ def pipeline_stats(user: User = Depends(get_current_user), db: Session = Depends
     )
     status_counts: Dict[str, int] = {}
     for status, count in status_rows:
-        if status is None:
-            key = ApplicationStatus.SAVED.value
-        elif isinstance(status, ApplicationStatus):
-            key = status.value
-        else:  # some drivers hand back the raw stored string
-            key = str(status)
+        # SQLAlchemy's Enum result-processor hands back an ApplicationStatus member (or None for
+        # the outer-joined application-less rows); the None bucket folds into SAVED, matching the
+        # old Python default. A non-enum value would AttributeError here (fail loud) rather than
+        # silently produce a wrong key.
+        key = ApplicationStatus.SAVED.value if status is None else status.value
         status_counts[key] = status_counts.get(key, 0) + count
 
-    # Average score over SCORED jobs only (func.avg ignores NULLs / unscored rows), rounded to
+    # Average score over SCORED jobs only — the INNER JOIN to JobScore excludes unscored jobs
+    # entirely (overall_score is NOT NULL), matching the old ``if j.score`` filter — rounded to
     # match the previous Python round(mean, 1); 0.0 when the user has no scored jobs.
     avg_raw = (
         db.query(func.avg(JobScore.overall_score))
