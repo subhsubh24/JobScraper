@@ -2,7 +2,7 @@
 
 import { useParams, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
-import { Button, Card, Field, Skeleton } from '@/components/ui';
+import { Button, Card, Field, LinkButton, Skeleton } from '@/components/ui';
 import { Markdown } from '@/components/markdown';
 import { ReportButton } from '@/components/report-button';
 import { ArtifactActions } from '@/components/artifact-actions';
@@ -250,6 +250,17 @@ export default function JobDetailPage() {
             <ReportButton contentType="prep_pack" contentRef={prep.id} contentExcerpt={prep.content} />
           </Card>
         )}
+      </div>
+
+      <div>
+        <h2 className="mb-2 text-lg font-semibold">Practice interview</h2>
+        <Card className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-sm text-slate-400">
+            Run a role-specific mock interview — the coach asks questions from this job, scores each
+            answer, and shows a model answer.
+          </p>
+          <LinkButton href={`/app/jobs/${id}/interview`}>Start mock interview →</LinkButton>
+        </Card>
       </div>
 
       <div>
