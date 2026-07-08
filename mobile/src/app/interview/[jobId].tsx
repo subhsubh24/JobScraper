@@ -81,6 +81,10 @@ export default function MockInterviewScreen() {
       const firstUnanswered = iv.questions.findIndex((_q, i) => !answered.has(i));
       setActiveIndex(firstUnanswered === -1 ? Math.max(iv.questions.length - 1, 0) : firstUnanswered);
     } catch (e) {
+      if (e instanceof ApiError && e.status === 403) {
+        router.push('/paywall');
+        return;
+      }
       setStartMsg(e instanceof ApiError ? e.message : 'Could not open that session.');
     }
   }
@@ -170,14 +174,15 @@ function StartScreen({
         ) : (
           <View style={styles.stack}>
             <Text style={styles.pickerLabel}>NUMBER OF QUESTIONS</Text>
-            <View style={styles.pickerRow}>
+            <View style={styles.pickerRow} accessibilityRole="radiogroup">
               {[3, 4, 5, 6, 7, 8].map((n) => {
                 const selected = n === numQuestions;
                 return (
                   <Pressable
                     key={n}
-                    accessibilityRole="button"
+                    accessibilityRole="radio"
                     accessibilityState={{ selected }}
+                    accessibilityLabel={`${n} questions`}
                     onPress={() => onSetNumQuestions(n)}
                     style={[styles.pickerChip, selected && styles.pickerChipSelected]}
                   >
@@ -195,7 +200,7 @@ function StartScreen({
               loading={starting}
             />
             {startMsg ? (
-              <Text style={styles.error} accessibilityRole="alert">
+              <Text style={styles.error} accessibilityRole="alert" accessibilityLiveRegion="polite">
                 {startMsg}
               </Text>
             ) : null}
@@ -283,6 +288,13 @@ function InterviewRunner({
       onUpdate(next);
       setReAnswer(false);
     } catch (e) {
+      // The server is the source of truth: a 403 mid-session (Pro lapsed / consent revoked on
+      // another device) must route to the paywall, not trap the user with an inline-only error —
+      // same contract as every generator in job/[id].tsx.
+      if (e instanceof ApiError && e.status === 403) {
+        router.push('/paywall');
+        return;
+      }
       setMsg(e instanceof ApiError ? e.message : 'Could not score your answer — try again.');
     } finally {
       setSubmitting(false);
@@ -348,7 +360,7 @@ function InterviewRunner({
               <Button label="Cancel" variant="secondary" onPress={() => setReAnswer(false)} />
             ) : null}
             {msg ? (
-              <Text style={styles.error} accessibilityRole="alert">
+              <Text style={styles.error} accessibilityRole="alert" accessibilityLiveRegion="polite">
                 {msg}
               </Text>
             ) : null}

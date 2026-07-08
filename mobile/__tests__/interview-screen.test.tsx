@@ -144,6 +144,23 @@ describe('MockInterviewScreen', () => {
     await waitFor(() => expect(mockAnswer).toHaveBeenCalledWith('iv-1', 0, 'I designed a distributed queue that cut latency 40%.'));
   });
 
+  it('routes to the paywall (not a dead-end) if scoring 403s mid-session', async () => {
+    const { ApiError } = require('@/services/api');
+    mockUser = { id: 'u1', tier: 'premium', ai_consent: true };
+    mockList.mockResolvedValue([]);
+    mockStart.mockResolvedValue(SESSION);
+    // Pro lapses / consent revoked between start and submit → the answer POST 403s.
+    mockAnswer.mockRejectedValue(new ApiError(403, 'Mock interviews are a Pro feature.'));
+
+    render(<MockInterviewScreen />);
+    fireEvent.press(await screen.findByText('Start mock interview'));
+    const input = await screen.findByLabelText('Your answer');
+    fireEvent.changeText(input, 'an answer');
+    fireEvent.press(screen.getByText('Submit answer'));
+
+    await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/paywall'));
+  });
+
   it('surfaces an honest error state when the session list fails (no stuck spinner)', async () => {
     const { ApiError } = require('@/services/api');
     mockList.mockRejectedValue(new ApiError(500, 'Could not load this interview.'));
