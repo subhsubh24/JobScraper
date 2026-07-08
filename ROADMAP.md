@@ -167,12 +167,29 @@ FIRST; voice/delivery is a later, owner-gated increment.
       success). Deterministic eval (`tests/evals/test_mock_interview_evals.py`) + nightly real-output eval
       (role-specific questions; HONEST strong>weak scoring). PMF events `mock_interview_started/answered`.
       This is surface 3's core.
-- [ ] **Interview-readiness score + autonomous next-best-action** — per target job, compute a
-      readiness read from the user's REAL signals (skill-gap coverage + mock-interview scores +
-      artifacts completed) and recommend the SINGLE next best action (drill question X, study skill
-      Y, redo the weak answer). This is the loop that drives them to ready. It climbs ONLY on real
-      practice — never a vanity number, never fabricated. Web + mobile surface; deterministic eval
-      on the readiness math (monotonic in real inputs, honest 0-state). This is the differentiator.
+- [x] **Interview-readiness score + autonomous next-best-action** — SHIPPED (run 32, PRs #310
+      backend + #312 web + #313 mobile, 2 Sonnet reviewers each). `src/insights/readiness.py` is a
+      PURE, deterministic, KEY-FREE composite (like `skill_gaps.py`) of the user's REAL signals per
+      job — résumé-vs-JD **skill coverage** + **interview practice** (answered + scored mock
+      questions) + **completed prep artifacts** — into a 0–100 score, plus a priority-ordered
+      **next-best-action** (add résumé → start a mock interview → answer question N → redo the
+      weakest answer → generate a missing artifact → study skill Y → ready). Honest 0-state;
+      **monotonic in real inputs** (more practice / higher scores / more artifacts never lower it);
+      climbs ONLY on real practice — never a vanity number, never fabricated (weights renormalize
+      when a component is unmeasurable rather than silently penalizing). `GET /api/jobs/{job_id}/readiness`
+      is FREE, fully local (no LLM/consent, works with no key), tenant-scoped server-side (404 on
+      another user's job), prep_artifacts + mock_interviews eager-loaded (N+1-free). Web
+      (`/app/jobs/[id]`) + mobile (`job/[id]`) surface an on-brand card (score + Practice/Skill
+      coverage/Materials meters with honest `n/a` + a11y + a 4% 0-sliver, + the single next step
+      with a real CTA routing where it's done); readiness degrades gracefully (a failure never
+      breaks the job page) and re-reads after a prep artifact is generated. Deterministic eval
+      (`tests/evals/test_readiness_evals.py`, 9) pins the math — 0-state, monotonicity, component
+      correctness, the full next-action priority order, malformed-score fail-safe; endpoint +
+      web + mobile tests prove the wiring + tenant isolation + graceful degrade. **maker≠checker:**
+      web/mobile reviewers confirmed the type contract + exhaustive action map + graceful degrade;
+      the mobile jest mock gained `getReadiness` (the run-30 missing-mock class) with a
+      degrade-gracefully test. This is the differentiator — the loop that drives a candidate to
+      interview-ready.
 - [ ] **Voice mock interviews + delivery analysis (Siro-like; OWNER-GATED)** — record spoken answers
       → transcribe (speech-to-text) → analyze DELIVERY (pace, filler words, confidence) alongside
       content. Bigger build; needs an owner-provided STT/speech capability → declare it in
