@@ -38,6 +38,9 @@ It ships as three surfaces over one backend:
 - **Pipeline CRM** — track jobs through stages with fit scores surfaced inline.
 - **ATS import preview** — preview live listings from a Greenhouse/Lever careers URL
   (SSRF-guarded), or an honest empty/unreachable state.
+- **Public demo (no account)** — a free `/demo` page: paste a job description and your résumé
+  to instantly see the skills you already have, the ones the role wants that you're missing, and
+  your coverage %. Key-free and local (no data stored); the pre-launch taste of the core fit read.
 
 ## Pricing
 
