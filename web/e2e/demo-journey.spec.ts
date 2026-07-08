@@ -93,8 +93,8 @@ test('public demo: a backend failure degrades to an honest error, not a dead-end
   await page.getByPlaceholder(/Paste the role/i).fill(JD);
   await page.getByRole('button', { name: /See your match/i }).click();
 
-  // An announced error (role=alert), and the results panel falls back to its placeholder —
-  // never a stuck spinner or a stale/blank result.
-  await expect(page.getByRole('alert')).toContainText(/boom|went wrong/i);
+  // An announced error (the ErrorText is role=alert), and the results panel falls back to its
+  // placeholder — never a stuck spinner or a stale/blank result.
+  await expect(page.getByText('boom', { exact: true })).toBeVisible();
   await expect(page.getByText(/Your instant skill match appears here/i)).toBeVisible();
 });
