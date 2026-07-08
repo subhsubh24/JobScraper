@@ -7,6 +7,8 @@ detail-fetch failure is skipped (not raised) so one bad job never sinks the whol
 """
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from src.ingestion.greenhouse import GreenhouseClient
 
 
@@ -66,6 +68,33 @@ def test_fetch_job_details_survives_department_without_name():
     assert listing is not None
     assert listing.title == "Data Engineer"
     assert listing.department is None  # gracefully absent, not a crash
+
+
+@pytest.mark.parametrize("bad_location", [
+    "Remote",   # location is a bare string, not an object
+    None,       # location is null
+    123,        # location is a number
+    [],         # location is a list
+])
+def test_fetch_jobs_survives_non_dict_location(bad_location):
+    """A board job whose "location" is a non-object (a bare string / null / number / list) must
+    NOT crash ``fetch_jobs`` — this is the LIVE ``/api/jobs/import-preview`` path (import-preview →
+    detector → GreenhouseClient.fetch_jobs), which ingests arbitrary third-party board JSON.
+    ``.get("location", {}).get(...)`` raises AttributeError on the non-dict and would 500 the whole
+    import on one bad job; the guard degrades it to location="" while the well-formed job still
+    parses. Mutation-catchable: reverting the isinstance guard reddens these cases."""
+    client = GreenhouseClient("acme")
+    payload = {"jobs": [
+        {"id": 7, "title": "Staff Engineer", "location": bad_location,
+         "absolute_url": "https://example.com/jobs/7"},
+    ]}
+    with patch("src.ingestion.greenhouse.requests.get", return_value=_Resp(payload)):
+        jobs = client.fetch_jobs()
+
+    assert len(jobs) == 1  # did not 500 on the malformed payload
+    assert jobs[0].title == "Staff Engineer"
+    assert jobs[0].location == ""  # gracefully empty, not a crash
+    assert client.last_error is None
 
 
 def test_fetch_job_details_returns_none_on_http_error():

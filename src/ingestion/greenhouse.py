@@ -48,7 +48,15 @@ class GreenhouseClient(BaseATSClient):
                     self.company_identifier,
                 )
                 continue
-            location = job_data.get("location", {}).get("name", "")
+            # Parse location defensively. This runs on the LIVE import-preview path
+            # (POST /api/jobs/import-preview → detector → GreenhouseClient.fetch_jobs), which
+            # ingests arbitrary third-party board JSON. A malformed/partial payload where a job's
+            # "location" is a non-object (a bare string, null, a number) would make
+            # ``.get("location", {}).get(...)`` raise AttributeError on the non-dict and 500 the
+            # whole import — the same graceful-degrade gap the id/title skip above guards. Only
+            # read the name when location is actually a dict; otherwise degrade to "".
+            loc = job_data.get("location")
+            location = loc.get("name", "") if isinstance(loc, dict) else ""
 
             job = JobListing(
                 external_id=str(job_id),
