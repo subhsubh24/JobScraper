@@ -48,7 +48,15 @@ class GreenhouseClient(BaseATSClient):
                     self.company_identifier,
                 )
                 continue
-            location = job_data.get("location", {}).get("name", "")
+            # Parse location defensively. This runs on the LIVE import-preview path
+            # (POST /api/jobs/import-preview → detector → GreenhouseClient.fetch_jobs), which
+            # ingests arbitrary third-party board JSON. A malformed/partial payload where a job's
+            # "location" is a non-object (a bare string, null, a number) would make
+            # ``.get("location", {}).get(...)`` raise AttributeError on the non-dict and 500 the
+            # whole import — the same graceful-degrade gap the id/title skip above guards. Only
+            # read the name when location is actually a dict; otherwise degrade to "".
+            loc = job_data.get("location")
+            location = loc.get("name", "") if isinstance(loc, dict) else ""
 
             job = JobListing(
                 external_id=str(job_id),
@@ -93,15 +101,11 @@ class GreenhouseClient(BaseATSClient):
         location = job_data.get("location", {}).get("name", "")
         content = job_data.get("content", "")
 
-        # Parse departments defensively. A Greenhouse department entry can be present but lack a
-        # "name" key, OR the array's first element can be a non-object (null, a bare string, a
-        # number) in a partial/malformed API payload. A bare ``["name"]`` KeyError OR calling
-        # ``.get`` on a non-dict (``'str' object has no attribute 'get'``) would 500 the whole
-        # detail fetch on one bad job — the exact graceful-degrade gap this branch guards. Only
-        # read the name when the first element is actually a dict; otherwise degrade to None.
+        # Parse departments. Use ``.get("name")`` — a Greenhouse department object can be
+        # present but lack a "name" key (partial/malformed API payload), and a bare
+        # ``["name"]`` would raise KeyError and 500 the whole detail fetch on one bad job.
         departments = job_data.get("departments", [])
-        first_department = departments[0] if departments else None
-        department = first_department.get("name") if isinstance(first_department, dict) else None
+        department = departments[0].get("name") if departments else None
 
         return JobListing(
             external_id=str(gh_id),
