@@ -460,14 +460,21 @@ const READINESS_ACTION_HREF: Record<string, (jobId: string) => string | null> = 
 function ReadinessMeter({ label, value }: { label: string; value: number | null }) {
   // value is 0..1 or null (unmeasurable — e.g. no extractable skills in the JD). Honest "n/a".
   const pct = value == null ? null : Math.round(value * 100);
+  // Keep a visible sliver at a genuine 0% so an empty component reads as "0%", not a render glitch
+  // (matches the interview ProgressBar's Math.max(pct, 4)); n/a stays truly empty.
+  const fillPct = pct == null ? 0 : Math.max(pct, 4);
   return (
     <div>
       <div className="mb-1 flex items-center justify-between text-xs">
         <span className="text-slate-400">{label}</span>
         <span className="text-slate-500">{pct == null ? 'n/a' : `${pct}%`}</span>
       </div>
-      <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-800">
-        <div className="h-full rounded-full bg-indigo-500 transition-all" style={{ width: `${pct ?? 0}%` }} />
+      <div
+        className="h-1.5 w-full overflow-hidden rounded-full bg-slate-800"
+        role="img"
+        aria-label={`${label}: ${pct == null ? 'not measured' : `${pct}%`}`}
+      >
+        <div className="h-full rounded-full bg-indigo-500 transition-all" style={{ width: `${fillPct}%` }} />
       </div>
     </div>
   );
@@ -498,7 +505,7 @@ function ReadinessCard({ readiness, jobId }: { readiness: Readiness; jobId: stri
       </div>
 
       <div className="mt-4 border-t border-slate-800 pt-4">
-        <p className="text-xs font-semibold uppercase tracking-wide text-indigo-300">Next step</p>
+        <p className="text-xs font-semibold uppercase tracking-wide text-indigo-400">Next step</p>
         <p className="mt-1 font-semibold text-slate-100">{next.label}</p>
         <p className="mt-0.5 text-sm text-slate-400">{next.detail}</p>
         {href && (
