@@ -318,7 +318,7 @@ export const api = {
   // Awaits the REAL POST /api/report and throws ApiError on failure so the caller can surface
   // it honestly — the success state is only shown once the server records the row.
   async reportContent(input: {
-    content_type: 'coach' | 'prep_pack';
+    content_type: 'coach' | 'prep_pack' | 'mock_interview';
     reason: 'harmful' | 'inaccurate' | 'offensive' | 'other';
     content_ref?: string;
     content_excerpt?: string;
@@ -328,6 +328,50 @@ export const api = {
       method: 'POST',
       body: input,
     });
+  },
+
+  // Mock interview engine (Pro+; the interview-coaching pillar). Start a session — the server
+  // generates JD-derived questions. Throws ApiError(403) tier/consent, (404) job, (503) no key.
+  async startMockInterview(jobId: string, numQuestions = 5): Promise<MockInterviewSession> {
+    const r = await request<{ interview: MockInterviewSession }>('/api/prep/mock-interview', {
+      method: 'POST',
+      body: { job_id: jobId, num_questions: numQuestions },
+    });
+    return r.interview;
+  },
+
+  // Submit one answer and get it scored. Returns the scored result + the running session status.
+  // Awaits the real POST — the score/feedback shown is only ever the server's, never optimistic.
+  async answerMockInterview(
+    interviewId: string,
+    questionIndex: number,
+    answer: string,
+  ): Promise<{ result: MockInterviewAnswer; status: string; answered_count: number; total: number }> {
+    return request<{
+      result: MockInterviewAnswer;
+      status: string;
+      answered_count: number;
+      total: number;
+    }>(`/api/prep/mock-interview/${encodeURIComponent(interviewId)}/answer`, {
+      method: 'POST',
+      body: { question_index: questionIndex, answer },
+    });
+  },
+
+  // Reload a full session (questions + scored answers) — the caller's own only.
+  async getMockInterview(interviewId: string): Promise<MockInterviewSession> {
+    const r = await request<{ interview: MockInterviewSession }>(
+      `/api/prep/mock-interview/${encodeURIComponent(interviewId)}`,
+    );
+    return r.interview;
+  },
+
+  // List the caller's mock-interview sessions for one job (most recent first).
+  async listMockInterviews(jobId: string): Promise<MockInterviewSummary[]> {
+    const r = await request<{ interviews: MockInterviewSummary[] }>(
+      `/api/prep/mock-interviews?job_id=${encodeURIComponent(jobId)}`,
+    );
+    return r.interviews;
   },
 
   // Cross-pipeline skill-gap heatmap — FREE, computed locally on the server (no LLM). Ranked
@@ -364,4 +408,39 @@ export interface SkillGapAnalysis {
   has_resume: boolean;
   gaps: SkillStat[];
   strengths: SkillStat[];
+}
+
+export interface MockInterviewQuestion {
+  question: string;
+  category: string; // "technical" | "behavioral"
+}
+
+export interface MockInterviewAnswer {
+  question_index: number;
+  answer: string;
+  relevance: number;
+  specificity: number;
+  star: number;
+  overall: number;
+  feedback: string;
+  model_answer: string;
+}
+
+export interface MockInterviewSession {
+  id: string;
+  job_id: string;
+  status: string; // "in_progress" | "completed"
+  questions: MockInterviewQuestion[];
+  answers: MockInterviewAnswer[];
+  answered_count: number;
+  total: number;
+  created_at: string | null;
+}
+
+export interface MockInterviewSummary {
+  id: string;
+  status: string;
+  total: number;
+  answered_count: number;
+  created_at: string | null;
 }
