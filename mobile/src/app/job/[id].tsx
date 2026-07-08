@@ -1,6 +1,6 @@
-import { router, Stack, useLocalSearchParams } from 'expo-router';
+import { router, Stack, useLocalSearchParams, type Href } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, type DimensionValue, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Button, Card, ErrorBanner, Field } from '@/components/ui';
 import { Markdown } from '@/components/markdown';
@@ -10,7 +10,7 @@ import { useAiConsent } from '@/components/ai-consent';
 import { useAuth } from '@/contexts/auth';
 import { api, ApiError } from '@/services/api';
 import { colors, radius, scoreColor, spacing } from '@/theme';
-import { STATUS_LABELS, type ApplicationStatus, type Job } from '@/types';
+import { STATUS_LABELS, type ApplicationStatus, type Job, type Readiness } from '@/types';
 
 const STATUS_ORDER: ApplicationStatus[] = [
   'saved',
@@ -26,6 +26,7 @@ export default function JobDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { user } = useAuth();
   const [job, setJob] = useState<Job | null>(null);
+  const [readiness, setReadiness] = useState<Readiness | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [prepLoading, setPrepLoading] = useState(false);
@@ -54,12 +55,23 @@ export default function JobDetailScreen() {
   const load = useCallback(async () => {
     if (!id) return;
     try {
-      setJob(await api.getJob(id));
+      // Readiness is a FREE, independent read — never let it break the job screen: on any error
+      // the card simply doesn't render (graceful degrade), the job still loads.
+      const [j, r] = await Promise.all([api.getJob(id), api.getReadiness(id).catch(() => null)]);
+      setJob(j);
+      setReadiness(r);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Could not load this job.');
     } finally {
       setLoading(false);
     }
+  }, [id]);
+
+  // Re-read readiness after a signal changes on THIS screen (a prep artifact generated) so the
+  // score reflects real, just-completed work. Best-effort — a failure never disturbs the screen.
+  const refreshReadiness = useCallback(async () => {
+    if (!id) return;
+    setReadiness(await api.getReadiness(id).catch(() => null));
   }, [id]);
 
   useEffect(() => {
@@ -87,6 +99,7 @@ export default function JobDetailScreen() {
       // Render the full pack inline (scrollable) instead of a truncated, ephemeral alert —
       // the prep pack is the value, the user needs to read all of it and come back to it.
       setPrep(await api.generatePrepPack(id));
+      refreshReadiness();
     } catch (e) {
       if (e instanceof ApiError && e.status === 403) {
         router.push('/paywall');
@@ -107,6 +120,7 @@ export default function JobDetailScreen() {
     setLetterLoading(true);
     try {
       setLetter(await api.generateCoverLetter(id));
+      refreshReadiness();
     } catch (e) {
       if (e instanceof ApiError && e.status === 403) {
         router.push('/paywall');
@@ -133,6 +147,7 @@ export default function JobDetailScreen() {
     setStudyLoading(true);
     try {
       setStudyPlan(await api.generateStudyPlan(id, days));
+      refreshReadiness();
     } catch (e) {
       if (e instanceof ApiError && e.status === 403) {
         router.push('/paywall');
@@ -153,6 +168,7 @@ export default function JobDetailScreen() {
     setResumeLoading(true);
     try {
       setResume(await api.generateTailoredResume(id));
+      refreshReadiness();
     } catch (e) {
       if (e instanceof ApiError && e.status === 403) {
         router.push('/paywall');
@@ -244,6 +260,8 @@ export default function JobDetailScreen() {
         <Text style={styles.scoreLabel}>Fit score</Text>
         {job.score_explanation ? <Text style={styles.explain}>{job.score_explanation}</Text> : null}
       </Card>
+
+      {readiness && id ? <ReadinessCard readiness={readiness} jobId={id} /> : null}
 
       <Text style={styles.section}>Pipeline status</Text>
       <View style={styles.statusGrid} accessibilityRole="radiogroup" accessibilityLabel="Pipeline status">
@@ -423,6 +441,81 @@ export default function JobDetailScreen() {
   );
 }
 
+// Where the single next-best-action sends the user. `generate_artifact` has no target — the prep
+// tools are already on THIS screen just below — and `ready` is a positive terminal state, so both
+// render guidance without a CTA button (never a dead button).
+const READINESS_ACTION_TARGET: Record<string, (jobId: string) => Href | null> = {
+  add_resume: () => '/(tabs)/settings',
+  start_mock_interview: (jobId) => `/interview/${jobId}`,
+  answer_question: (jobId) => `/interview/${jobId}`,
+  redo_answer: (jobId) => `/interview/${jobId}`,
+  generate_artifact: () => null,
+  study_skill: () => '/(tabs)/insights',
+  ready: () => null,
+};
+
+function ReadinessMeter({ label, value }: { label: string; value: number | null }) {
+  // value is 0..1 or null (unmeasurable — e.g. no extractable skills in the JD). Honest "n/a".
+  const pct = value == null ? null : Math.round(value * 100);
+  // Keep a visible sliver at a genuine 0% so an empty component reads as "0%", not a render glitch
+  // (matches the interview ProgressBar's Math.max(pct, 4)); n/a stays truly empty.
+  const fillPct = pct == null ? 0 : Math.max(pct, 4);
+  return (
+    <View style={styles.meterRow}>
+      <View style={styles.meterHead}>
+        <Text style={styles.meterLabel}>{label}</Text>
+        <Text style={styles.meterPct}>{pct == null ? 'n/a' : `${pct}%`}</Text>
+      </View>
+      <View
+        style={styles.meterTrack}
+        accessibilityRole="progressbar"
+        accessibilityLabel={`${label}: ${pct == null ? 'not measured' : `${pct}%`}`}
+        accessibilityValue={pct == null ? undefined : { min: 0, max: 100, now: pct }}
+      >
+        <View style={[styles.meterFill, { width: `${fillPct}%` as DimensionValue }]} />
+      </View>
+    </View>
+  );
+}
+
+function ReadinessCard({ readiness, jobId }: { readiness: Readiness; jobId: string }) {
+  const { score, components, next_action: next } = readiness;
+  const target = (READINESS_ACTION_TARGET[next.action] ?? (() => null))(jobId);
+  return (
+    <Card style={styles.readinessCard}>
+      <View style={styles.readinessHead}>
+        <View style={styles.readinessHeadText}>
+          <Text style={styles.readinessTitle}>Interview readiness</Text>
+          <Text style={styles.readinessSub}>
+            How ready you are for this role — it climbs only as you practice, cover its skills, and prep.
+          </Text>
+        </View>
+        <Text style={[styles.readinessScore, { color: scoreColor(score) }]}>
+          {score}
+          <Text style={styles.readinessScoreOut}> / 100</Text>
+        </Text>
+      </View>
+
+      <View style={styles.meters}>
+        <ReadinessMeter label="Practice" value={components.interview_practice} />
+        <ReadinessMeter label="Skill coverage" value={components.skill_coverage} />
+        <ReadinessMeter label="Materials" value={components.artifacts} />
+      </View>
+
+      <View style={styles.readinessNext}>
+        <Text style={styles.readinessEyebrow}>NEXT STEP</Text>
+        <Text style={styles.readinessActionLabel}>{next.label}</Text>
+        <Text style={styles.readinessActionDetail}>{next.detail}</Text>
+        {target ? (
+          <View style={styles.readinessCta}>
+            <Button label={`${next.label} →`} onPress={() => router.push(target)} />
+          </View>
+        ) : null}
+      </View>
+    </Card>
+  );
+}
+
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: colors.bg },
   center: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center', gap: spacing.md, padding: spacing.lg },
@@ -454,4 +547,23 @@ const styles = StyleSheet.create({
   prepTitle: { color: colors.text, fontSize: 16, fontWeight: '700' },
   upsellCard: { gap: spacing.md, alignItems: 'flex-start' },
   upsellText: { color: colors.text, lineHeight: 20 },
+  readinessCard: { marginBottom: spacing.md, gap: spacing.md },
+  readinessHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: spacing.md },
+  readinessHeadText: { flex: 1 },
+  readinessTitle: { color: colors.text, fontSize: 16, fontWeight: '700' },
+  readinessSub: { color: colors.textMuted, fontSize: 13, marginTop: 2, lineHeight: 18 },
+  readinessScore: { fontSize: 32, fontWeight: '800' },
+  readinessScoreOut: { fontSize: 14, color: colors.textMuted, fontWeight: '600' },
+  meters: { gap: spacing.sm },
+  meterRow: { gap: 4 },
+  meterHead: { flexDirection: 'row', justifyContent: 'space-between' },
+  meterLabel: { color: colors.textMuted, fontSize: 12 },
+  meterPct: { color: colors.textMuted, fontSize: 12 },
+  meterTrack: { height: 6, borderRadius: 999, backgroundColor: colors.surfaceAlt, overflow: 'hidden' },
+  meterFill: { height: '100%', borderRadius: 999, backgroundColor: colors.primary },
+  readinessNext: { borderTopWidth: 1, borderTopColor: colors.border, paddingTop: spacing.md },
+  readinessEyebrow: { color: colors.primary, fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
+  readinessActionLabel: { color: colors.text, fontSize: 15, fontWeight: '700', marginTop: 4 },
+  readinessActionDetail: { color: colors.textMuted, fontSize: 13, marginTop: 2, lineHeight: 18 },
+  readinessCta: { marginTop: spacing.md, alignItems: 'flex-start' },
 });

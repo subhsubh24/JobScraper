@@ -29,6 +29,7 @@ const mockUpdateStatus = jest.fn();
 const mockGenerateNeg = jest.fn();
 const mockGenerateLetter = jest.fn();
 const mockGenerateStudy = jest.fn();
+const mockGetReadiness = jest.fn();
 jest.mock('@/services/api', () => {
   class ApiError extends Error {
     status: number;
@@ -40,6 +41,7 @@ jest.mock('@/services/api', () => {
   return {
     api: {
       getJob: (id: string) => mockGetJob(id),
+      getReadiness: (id: string) => mockGetReadiness(id),
       generatePrepPack: (id: string) => mockGeneratePrep(id),
       updateJobStatus: (id: string, s: string) => mockUpdateStatus(id, s),
       generateSalaryNegotiation: (id: string, target: number) => mockGenerateNeg(id, target),
@@ -71,11 +73,23 @@ const JOB = {
   status: 'saved',
 };
 
+const READINESS = {
+  score: 42,
+  components: { interview_practice: 0.5, skill_coverage: 0.33, artifacts: 0 },
+  next_action: {
+    action: 'start_mock_interview',
+    label: 'Start a mock interview',
+    detail: 'Practice role-specific questions and get scored, actionable feedback.',
+  },
+  signals: { has_resume: true, answered_questions: 2, missing_skill_count: 3, artifacts_completed: [], sessions: 1 },
+};
+
 beforeEach(() => {
   // Default: consented, so the AI-consent gate is a no-op and these tests exercise the
   // prep/salary flows directly. A dedicated test below covers the not-consented gate.
   mockUser = { tier: 'free', ai_consent: true };
   mockGetJob.mockResolvedValue(JOB);
+  mockGetReadiness.mockResolvedValue(READINESS);
 });
 afterEach(() => jest.clearAllMocks());
 
@@ -85,6 +99,24 @@ describe('JobDetailScreen', () => {
     expect(await screen.findByText('Senior Backend Engineer')).toBeTruthy();
     expect(screen.getByText(/87/)).toBeTruthy();
     expect(screen.getByText('Strong Python + distributed systems match.')).toBeTruthy();
+  });
+
+  it('renders the interview-readiness card: score + next-best-action', async () => {
+    render(<JobDetailScreen />);
+    await screen.findByText('Senior Backend Engineer');
+    expect(screen.getByText('Interview readiness')).toBeTruthy();
+    expect(screen.getByText(/42/)).toBeTruthy(); // readiness score (distinct from the 87 fit score)
+    expect(screen.getByText('NEXT STEP')).toBeTruthy();
+    // The next-best-action label appears both as guidance and on the CTA button (start_mock_interview).
+    expect(screen.getAllByText(/Start a mock interview/).length).toBeGreaterThan(0);
+  });
+
+  it('degrades gracefully when readiness fails — the job still renders, no card, no error screen', async () => {
+    mockGetReadiness.mockRejectedValue(new Error('boom'));
+    render(<JobDetailScreen />);
+    // The job screen loads fully even though readiness threw (getReadiness().catch(() => null)).
+    expect(await screen.findByText('Senior Backend Engineer')).toBeTruthy();
+    expect(screen.queryByText('Interview readiness')).toBeNull();
   });
 
   it('labels prep generation as "(1 free)" for a free-tier user', async () => {
