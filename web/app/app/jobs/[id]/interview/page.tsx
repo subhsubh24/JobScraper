@@ -144,7 +144,6 @@ export default function MockInterviewPage() {
       {interview ? (
         <InterviewRunner
           interview={interview}
-          jobId={jobId}
           activeIndex={activeIndex}
           onSetActiveIndex={setActiveIndex}
           onUpdate={setInterview}
@@ -251,7 +250,7 @@ function StartScreen({
                 <button
                   type="button"
                   onClick={() => onOpen(s.id)}
-                  className="flex w-full items-center justify-between rounded-lg border border-slate-800 bg-slate-900/40 px-4 py-3 text-left hover:border-indigo-500/50"
+                  className="flex w-full items-center justify-between rounded-lg border border-slate-800 bg-slate-900/40 px-4 py-3 text-left hover:border-indigo-500/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
                 >
                   <span className="text-sm text-slate-200">
                     {s.status === 'completed' ? 'Completed' : 'In progress'} · {s.answered_count}/
@@ -272,14 +271,12 @@ function StartScreen({
 
 function InterviewRunner({
   interview,
-  jobId,
   activeIndex,
   onSetActiveIndex,
   onUpdate,
   onExit,
 }: {
   interview: MockInterviewSession;
-  jobId: string;
   activeIndex: number;
   onSetActiveIndex: (i: number) => void;
   onUpdate: (iv: MockInterviewSession) => void;
@@ -311,14 +308,18 @@ function InterviewRunner({
     setMsg(null);
     setSubmitting(true);
     try {
-      const res = await api.answerMockInterview(interview.id, activeIndex, answer.trim());
-      // Merge the scored result into the session (overwrite any prior answer at this index).
+      const submitted = answer.trim();
+      const res = await api.answerMockInterview(interview.id, activeIndex, submitted);
+      // Merge the scored result into the session (overwrite any prior answer at this index). The
+      // POST result echoes the scores but not the answer text; carry the answer we just submitted
+      // so the in-memory entry is complete and type-accurate (GET returns it on reload).
+      const scoredEntry: MockInterviewAnswer = { ...res.result, answer: submitted };
       const next: MockInterviewSession = {
         ...interview,
         status: res.status,
         answers: [
           ...interview.answers.filter((a) => a.question_index !== activeIndex),
-          res.result,
+          scoredEntry,
         ].sort((a, b) => a.question_index - b.question_index),
         answered_count: res.answered_count,
       };
@@ -349,6 +350,7 @@ function InterviewRunner({
         {scored && !reAnswer ? (
           <ScoreResult
             scored={scored}
+            contentRef={`${interview.id}:${activeIndex}`}
             onPracticeAgain={() => setReAnswer(true)}
           />
         ) : (
@@ -358,6 +360,7 @@ function InterviewRunner({
               onChange={(e) => setAnswer(e.target.value)}
               rows={6}
               maxLength={8000}
+              aria-label="Your answer"
               placeholder="Answer in your own words — be specific, use a real example."
               className="w-full rounded-lg border border-slate-700 bg-slate-800/60 px-3 py-2.5 text-slate-100 outline-none focus:border-indigo-500"
             />
@@ -369,7 +372,7 @@ function InterviewRunner({
                 <button
                   type="button"
                   onClick={() => setReAnswer(false)}
-                  className="text-sm text-slate-400 hover:text-slate-200"
+                  className="rounded text-sm text-slate-400 hover:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
                 >
                   Cancel
                 </button>
@@ -388,7 +391,6 @@ function InterviewRunner({
         >
           ← Previous
         </Button>
-        <span className="text-xs text-slate-500">{jobId ? '' : ''}</span>
         {activeIndex < total - 1 ? (
           <Button variant="secondary" onClick={() => onSetActiveIndex(activeIndex + 1)}>
             Next →
@@ -433,9 +435,11 @@ function ProgressBar({
 
 function ScoreResult({
   scored,
+  contentRef,
   onPracticeAgain,
 }: {
   scored: MockInterviewAnswer;
+  contentRef: string;
   onPracticeAgain: () => void;
 }) {
   return (
@@ -466,12 +470,13 @@ function ScoreResult({
         <button
           type="button"
           onClick={onPracticeAgain}
-          className="text-sm text-indigo-400 hover:text-indigo-300"
+          className="rounded text-sm text-indigo-400 hover:text-indigo-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
         >
           Practice this answer again
         </button>
         <ReportButton
           contentType="mock_interview"
+          contentRef={contentRef}
           contentExcerpt={`${scored.feedback}\n\n${scored.model_answer}`}
         />
       </div>
