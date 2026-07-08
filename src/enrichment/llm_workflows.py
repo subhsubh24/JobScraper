@@ -504,6 +504,15 @@ Include:
     # questions; the per-answer feedback + model answer) is moderated HERE via ``_moderate_prose``.
     # A flagged generation raises ``ModeratedContentError`` → the endpoint returns an honest 422
     # and persists nothing (§6, no fake success).
+    #
+    # NOTE — these two do NOT run the ``_refine`` drafter→reviewer pass the prose generators use.
+    # ``_refine`` review-and-revises ONE free-prose artifact (a cover letter / résumé / plan) to
+    # catch a fabricated claim. It does not fit here: the questions are a STRUCTURED JSON set
+    # (shape-validated + bounded, like ``parse_job_description`` which is also un-refined), and the
+    # scoring output is a rubric result whose numbers are computed server-side — re-writing it
+    # through a prose reviewer would risk decoupling the feedback from the clamped scores. Honesty
+    # is enforced instead by server-side clamping + a computed ``overall`` + moderation + the
+    # scoring prompt's explicit "score honestly, a weak answer scores low" instruction.
 
     def _moderate_prose(self, text: str) -> None:
         """Run the shared safety moderator over user-facing prose from a JSON-mode call.

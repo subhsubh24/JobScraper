@@ -1886,7 +1886,7 @@ def get_mock_interview(
     dependencies=[Depends(rate_limit_user("user_read", 120))],
 )
 def list_mock_interviews(
-    job_id: str,
+    job_id: str = Query(..., min_length=1, max_length=64),
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
