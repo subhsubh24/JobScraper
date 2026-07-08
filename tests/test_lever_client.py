@@ -83,3 +83,54 @@ def test_fetch_jobs_empty_board_returns_empty_with_no_error():
         jobs = client.fetch_jobs()
     assert jobs == []
     assert client.last_error is None
+
+
+def test_fetch_jobs_non_list_payload_degrades_not_crashes():
+    """A payload that is NOT a list (an error object, null, a string) degrades to an empty board
+    with last_error set — it must never crash the whole import-preview."""
+    for bad in ({"error": "not found"}, None, "oops", 42):
+        client = LeverClient("acme")
+        with patch("src.ingestion.lever.requests.get", return_value=_Resp(bad)):
+            jobs = client.fetch_jobs()
+        assert jobs == []
+        assert client.last_error is not None
+
+
+def test_fetch_jobs_skips_non_dict_posting():
+    """A non-object element in the postings array is skipped, not crashed on."""
+    payload = [
+        {"id": "1", "text": "Staff Engineer", "hostedUrl": "https://x/1"},
+        "not-an-object",
+        None,
+        {"id": "2", "text": "Backend Engineer", "hostedUrl": "https://x/2"},
+    ]
+    client = LeverClient("acme")
+    with patch("src.ingestion.lever.requests.get", return_value=_Resp(payload)):
+        jobs = client.fetch_jobs()
+    assert [j.external_id for j in jobs] == ["1", "2"]
+
+
+def test_fetch_jobs_handles_non_dict_categories_and_lists():
+    """A malformed posting whose "categories"/"lists" are non-object/non-list still parses
+    (the crash class that PR #306 fixed for greenhouse's "location") — degrades to empty fields,
+    never AttributeError-500s the batch."""
+    payload = [
+        {
+            "id": "1", "text": "Engineer", "hostedUrl": "https://x/1",
+            "categories": "should-be-an-object",   # non-dict → empty location/team/commitment
+            "lists": "should-be-a-list",            # non-list → no description sections
+        },
+        {
+            "id": "2", "text": "Engineer 2", "hostedUrl": "https://x/2",
+            "categories": {"location": "Remote"},
+            "lists": ["not-a-section", {"text": "About", "content": "We build things."}],
+        },
+    ]
+    client = LeverClient("acme")
+    with patch("src.ingestion.lever.requests.get", return_value=_Resp(payload)):
+        jobs = client.fetch_jobs()
+    assert [j.external_id for j in jobs] == ["1", "2"]
+    assert jobs[0].location == ""            # degraded from the non-dict categories
+    assert jobs[1].location == "Remote"
+    assert "We build things." in (jobs[1].description or "")  # the one valid section parsed
+    assert client.last_error is None

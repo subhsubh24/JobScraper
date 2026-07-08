@@ -170,6 +170,41 @@ def test_fetch_jobs_skips_malformed_job_missing_required_field():
     assert client.last_error is None
 
 
+@pytest.mark.parametrize("bad", [["jobs", "as", "a", "list"], None, "oops", 42])
+def test_fetch_jobs_non_dict_payload_degrades_not_crashes(bad):
+    """A top-level payload that is NOT an object (an array, null, a string) must degrade to an
+    empty board with last_error set — never AttributeError-500 on ``data.get("jobs")``. This is
+    the LIVE import-preview path over arbitrary third-party JSON."""
+    client = GreenhouseClient("acme")
+    with patch("src.ingestion.greenhouse.requests.get", return_value=_Resp(bad)):
+        jobs = client.fetch_jobs()
+    assert jobs == []
+    assert client.last_error is not None
+
+
+def test_fetch_jobs_skips_non_dict_job_entry():
+    """A non-object element inside the jobs array is skipped, not crashed on."""
+    payload = {"jobs": [
+        {"id": 1, "title": "Staff Engineer", "absolute_url": "https://x/1"},
+        "not-an-object",
+        None,
+        {"id": 2, "title": "Backend Engineer", "absolute_url": "https://x/2"},
+    ]}
+    client = GreenhouseClient("acme")
+    with patch("src.ingestion.greenhouse.requests.get", return_value=_Resp(payload)):
+        jobs = client.fetch_jobs()
+    assert [j.external_id for j in jobs] == ["1", "2"]
+    assert client.last_error is None
+
+
+def test_fetch_jobs_non_list_jobs_field_degrades_to_empty():
+    """If the "jobs" field itself is a non-list, degrade to an empty board (no crash)."""
+    client = GreenhouseClient("acme")
+    with patch("src.ingestion.greenhouse.requests.get", return_value=_Resp({"jobs": "nope"})):
+        jobs = client.fetch_jobs()
+    assert jobs == []
+
+
 def test_fetch_job_details_returns_none_on_malformed_payload_missing_title():
     """A detail payload present but missing "title" (partial upstream response) degrades to a
     failed fetch (None + last_error), never a KeyError-500 — same contract as an HTTP error."""
