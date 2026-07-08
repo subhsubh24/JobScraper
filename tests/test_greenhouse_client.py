@@ -7,6 +7,8 @@ detail-fetch failure is skipped (not raised) so one bad job never sinks the whol
 """
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from src.ingestion.greenhouse import GreenhouseClient
 
 
@@ -64,6 +66,35 @@ def test_fetch_job_details_survives_department_without_name():
         listing = client.fetch_job_details("7")
 
     assert listing is not None
+    assert listing.title == "Data Engineer"
+    assert listing.department is None  # gracefully absent, not a crash
+
+
+@pytest.mark.parametrize("bad_departments", [
+    [None],            # first element is null
+    ["Engineering"],   # first element is a bare string, not an object
+    [123],             # first element is a number
+    [[]],              # first element is a list
+])
+def test_fetch_job_details_survives_non_dict_department(bad_departments):
+    """A malformed ``departments`` whose FIRST element is not an object (null / string / number /
+    list) must NOT crash the detail fetch — ``.get`` on a non-dict raises AttributeError and would
+    500 the whole ``/api/jobs/import-preview`` on one bad job. It degrades to department=None while
+    the job still parses. The prior ``departments[0].get(...)`` handled a dict-missing-name but not
+    a non-dict element; this pins the broader graceful-degrade contract for third-party payloads."""
+    client = GreenhouseClient("acme")
+    payload = {
+        "id": 8,
+        "title": "Data Engineer",
+        "location": {"name": "NYC"},
+        "content": "ETL, warehousing.",
+        "departments": bad_departments,
+        "absolute_url": "https://example.com/jobs/8",
+    }
+    with patch("src.ingestion.greenhouse.requests.get", return_value=_Resp(payload)):
+        listing = client.fetch_job_details("8")
+
+    assert listing is not None  # did not 500 on the malformed payload
     assert listing.title == "Data Engineer"
     assert listing.department is None  # gracefully absent, not a crash
 
