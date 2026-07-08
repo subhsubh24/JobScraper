@@ -38,6 +38,17 @@ export default function WaitlistPage() {
             so your energy goes to the roles that actually fit. Join the waitlist for early access.
           </p>
 
+          <p className="mt-5 text-sm text-slate-400">
+            Want a taste first?{' '}
+            <Link
+              href="/demo"
+              className="rounded font-semibold text-indigo-300 underline-offset-4 hover:text-indigo-200 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
+            >
+              Try the free skill match
+            </Link>{' '}
+            — no account needed.
+          </p>
+
           <dl className="mt-10 space-y-5">
             {VALUE_PROPS.map(([title, body]) => (
               <div key={title} className="flex gap-3">
