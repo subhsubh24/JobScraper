@@ -8,6 +8,7 @@ import type {
   EnrichResult,
   Job,
   PipelineStats,
+  Readiness,
   ReferralStats,
   User,
 } from '@/types';
@@ -216,6 +217,12 @@ export const api = {
   async getJob(id: string): Promise<Job> {
     const r = await request<{ job: Job }>(`/api/jobs/${id}`);
     return r.job;
+  },
+
+  // FREE, fully-local read: the interview-readiness score + next-best-action for one job.
+  async getReadiness(id: string): Promise<Readiness> {
+    const r = await request<{ readiness: Readiness }>(`/api/jobs/${id}/readiness`);
+    return r.readiness;
   },
 
   async createJob(input: {

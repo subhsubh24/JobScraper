@@ -63,6 +63,35 @@ export interface PipelineStats {
   top_jobs: Job[];
 }
 
+// Interview readiness (GET /api/jobs/{id}/readiness) — a FREE, fully-local read that composites
+// the user's real signals for one job into a 0–100 score + the single next-best-action.
+export interface ReadinessComponents {
+  interview_practice: number | null;
+  skill_coverage: number | null;
+  artifacts: number | null;
+}
+
+export interface ReadinessAction {
+  // add_resume | start_mock_interview | answer_question | redo_answer | generate_artifact |
+  // study_skill | ready
+  action: string;
+  label: string;
+  detail: string;
+}
+
+export interface Readiness {
+  score: number;
+  components: ReadinessComponents;
+  next_action: ReadinessAction;
+  signals: {
+    has_resume: boolean;
+    answered_questions: number;
+    missing_skill_count: number;
+    artifacts_completed: string[];
+    sessions: number;
+  };
+}
+
 export interface ReferralStats {
   code: string;
   total_referred: number;
