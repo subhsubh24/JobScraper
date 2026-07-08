@@ -143,3 +143,59 @@ def test_pipeline_stats_is_not_n_plus_one(db_session):
     assert stats["status_breakdown"][ApplicationStatus.APPLIED.value] == 5
     assert stats["average_score"] == 72.0
     assert len(stats["top_jobs"]) == 5
+
+
+def test_pipeline_status_breakdown_and_avg_are_db_aggregated_correctly(db_session):
+    """The DB-aggregated pipeline stats must preserve the EXACT semantics of the old in-Python
+    loop: a job with NO application counts as SAVED, statuses group correctly, the average is
+    over SCORED jobs only, and top_jobs is the score-DESC top 5. Reverting the GROUP BY to a
+    naive query or dropping the NULL→SAVED coalesce reddens this."""
+    user = User(email="pipe-agg@example.com", password_hash="x", tier=UserTier.PREMIUM)
+    db_session.add(user)
+    db_session.flush()
+
+    def _job(title, *, status=None, score=None):
+        job = JobPosting(user_id=user.id, title=title, company_name="Acme")
+        db_session.add(job)
+        db_session.flush()
+        if status is not None:
+            db_session.add(Application(user_id=user.id, job_id=job.id, status=status))
+        if score is not None:
+            db_session.add(JobScore(job_id=job.id, overall_score=score, score_explanation="ok"))
+        return job
+
+    # 2 jobs with NO application (→ SAVED), 1 explicitly SAVED, 2 APPLIED, 1 INTERVIEWING.
+    _job("no-app-1")  # no application → SAVED
+    _job("no-app-2", score=40.0)  # no application → SAVED, and scored
+    _job("saved-1", status=ApplicationStatus.SAVED, score=90.0)
+    _job("applied-1", status=ApplicationStatus.APPLIED, score=80.0)
+    _job("applied-2", status=ApplicationStatus.APPLIED)  # unscored → excluded from avg
+    _job("interview-1", status=ApplicationStatus.INTERVIEW, score=100.0)
+    db_session.flush()
+
+    stats = asgi.pipeline_stats(user=user, db=db_session)["stats"]
+
+    assert stats["total_jobs"] == 6
+    # The two application-less jobs fold into SAVED alongside the explicit one → 3 SAVED.
+    assert stats["status_breakdown"] == {
+        ApplicationStatus.SAVED.value: 3,
+        ApplicationStatus.APPLIED.value: 2,
+        ApplicationStatus.INTERVIEW.value: 1,
+    }
+    # Average over the 4 SCORED jobs only: (40 + 90 + 80 + 100) / 4 = 77.5 (unscored excluded).
+    assert stats["average_score"] == 77.5
+    # Top jobs are score-DESC: 100, 90, 80, 40 (the two unscored jobs never appear).
+    top_titles = [j["title"] for j in stats["top_jobs"]]
+    assert top_titles == ["interview-1", "saved-1", "applied-1", "no-app-2"]
+
+
+def test_pipeline_stats_empty_user_is_zeroed_not_errored(db_session):
+    """A user with zero jobs returns an honest zero state (no divide-by-zero on the average)."""
+    user = User(email="pipe-empty@example.com", password_hash="x", tier=UserTier.PREMIUM)
+    db_session.add(user)
+    db_session.flush()
+    stats = asgi.pipeline_stats(user=user, db=db_session)["stats"]
+    assert stats["total_jobs"] == 0
+    assert stats["status_breakdown"] == {}
+    assert stats["average_score"] == 0.0
+    assert stats["top_jobs"] == []
