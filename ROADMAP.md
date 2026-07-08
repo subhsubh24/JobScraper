@@ -151,13 +151,22 @@ candidate for it." Each is an AI-output feature → obeys the eval-coverage ratc
 real-output eval in `tests/evals/`) + the third-party-AI consent gate; DoD = real generation +
 surfaced in web AND mobile + Premium-gated + honest paywall, never a stub. Build the text engine
 FIRST; voice/delivery is a later, owner-gated increment.
-- [ ] **Mock interview engine (text-first)** — a realistic, role-specific mock interview: the coach
-      asks JD-derived questions one at a time, the user answers, and each answer is **scored**
-      (relevance, specificity, STAR structure) with concrete feedback + a model answer, persisted
-      per job (a `PrepArtifact` `artifact_type="mock_interview"` or a dedicated model). Web + mobile
-      surface (real loading/empty/error states, ReportButton), Premium-gated, consent-gated,
-      moderated (§6 no-persist on decline). Deterministic eval (scoring/output SHAPE) + real-output
-      eval (feedback is substantive, on-topic to the role, never generic). This is surface 3's core.
+- [x] **Mock interview engine (text-first)** — SHIPPED (run 31, PRs #305 backend + #307 web + #308
+      mobile, 2 Sonnet reviewers each). A dedicated `MockInterview` model (migration `a7d3e1f0c92b`;
+      job-scoped cascade + a `user_id` scoping column for tenant isolation; multi-turn state —
+      questions + per-answer scores — as JSON on one row). `LLMWorkflows.generate_mock_interview_questions`
+      (JD-grounded, shape-validated, bounded 3–8, moderated) + `score_mock_interview_answer` (sub-scores
+      CLAMPED 0–5 server-side, `overall` COMPUTED not trusted from the model, feedback moderated,
+      FAIL-LOUD on malformed/empty — §6). 4 Pro+ endpoints (`POST /api/prep/mock-interview` start ·
+      `POST .../{id}/answer` score · `GET .../{id}` · `GET /api/prep/mock-interviews?job_id=`) with the
+      same tier→job→503→consent→ceiling→moderation gate chain as the siblings; re-answer overwrites
+      (readiness-loop redo); completes when all answered; account-deletion cascade proven. Web
+      (`/app/jobs/[id]/interview`) + mobile (`/interview/[jobId]`) runners: real loading/empty/error +
+      Retry, Pro+consent gated (never a dead-end — a mid-session 403 routes to the paywall), ReportButton
+      (`mock_interview`, contentRef traces the session), score shown ONLY after the real POST (no fake
+      success). Deterministic eval (`tests/evals/test_mock_interview_evals.py`) + nightly real-output eval
+      (role-specific questions; HONEST strong>weak scoring). PMF events `mock_interview_started/answered`.
+      This is surface 3's core.
 - [ ] **Interview-readiness score + autonomous next-best-action** — per target job, compute a
       readiness read from the user's REAL signals (skill-gap coverage + mock-interview scores +
       artifacts completed) and recommend the SINGLE next best action (drill question X, study skill
