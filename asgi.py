@@ -21,6 +21,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse
 from pydantic import BaseModel, Field, model_validator
+from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload, selectinload
 from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -40,6 +41,7 @@ from src.db.models import (
     ContentReport,
     EnrichedCompetency,
     JobPosting,
+    JobScore,
     MockInterview,
     PrepArtifact,
     RateCounter,
@@ -2328,37 +2330,64 @@ def clear_profile_enrichment(
 # ---------------------------------------------------------------------------
 @app.get("/api/analytics/pipeline", dependencies=[Depends(rate_limit_user("user_read", 120))])
 def pipeline_stats(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    # Eager-load application + score so the aggregate loop (and the top-5 sort, which both
-    # read job.score) never lazy-loads per row; also company, which job_public() reads when
-    # building the top_jobs payload (company_name may be empty for ATS-scraped jobs). Fully
-    # batched: 3 queries instead of 2N+1.
-    jobs = (
+    # Aggregate in the DATABASE, not in Python — a CONSTANT number of queries regardless of how
+    # many jobs the user has, and only the 5 top jobs are ever hydrated into objects. Previously
+    # this loaded EVERY job (with 3 selectinloads) into memory just to count statuses + sort for
+    # the top 5, so memory + transfer grew linearly with the pipeline. The query COUNT was already
+    # constant (no N+1), but the working set was O(jobs); this makes it O(distinct statuses + 5).
+    uid = user.id
+
+    total_jobs = db.query(func.count(JobPosting.id)).filter(JobPosting.user_id == uid).scalar() or 0
+
+    # Status breakdown via GROUP BY. A job with no Application row has no status and defaults to
+    # SAVED (the same rule the old Python loop applied) — the NULL bucket from the outer join is
+    # merged into SAVED here rather than in SQL, so the enum coalescing stays in one place.
+    status_rows = (
+        db.query(Application.status, func.count(JobPosting.id))
+        .outerjoin(Application, Application.job_id == JobPosting.id)
+        .filter(JobPosting.user_id == uid)
+        .group_by(Application.status)
+        .all()
+    )
+    status_counts: Dict[str, int] = {}
+    for status, count in status_rows:
+        # SQLAlchemy's Enum result-processor hands back an ApplicationStatus member (or None for
+        # the outer-joined application-less rows); the None bucket folds into SAVED, matching the
+        # old Python default. A non-enum value would AttributeError here (fail loud) rather than
+        # silently produce a wrong key.
+        key = ApplicationStatus.SAVED.value if status is None else status.value
+        status_counts[key] = status_counts.get(key, 0) + count
+
+    # Average score over SCORED jobs only — the INNER JOIN to JobScore excludes unscored jobs
+    # entirely (overall_score is NOT NULL), matching the old ``if j.score`` filter — rounded to
+    # match the previous Python round(mean, 1); 0.0 when the user has no scored jobs.
+    avg_raw = (
+        db.query(func.avg(JobScore.overall_score))
+        .join(JobPosting, JobPosting.id == JobScore.job_id)
+        .filter(JobPosting.user_id == uid)
+        .scalar()
+    )
+    avg = round(float(avg_raw), 1) if avg_raw is not None else 0.0
+
+    # Only the top 5 scored jobs are hydrated (with the relationships job_public() reads):
+    # ORDER BY score DESC LIMIT 5 in SQL instead of sorting the whole pipeline in Python.
+    top = (
         db.query(JobPosting)
-        .filter(JobPosting.user_id == user.id)
+        .join(JobScore, JobScore.job_id == JobPosting.id)
+        .filter(JobPosting.user_id == uid)
         .options(
             selectinload(JobPosting.application),
             selectinload(JobPosting.score),
             selectinload(JobPosting.company),
         )
+        .order_by(JobScore.overall_score.desc())
+        .limit(5)
         .all()
     )
-    status_counts: Dict[str, int] = {}
-    scores = []
-    for job in jobs:
-        status = job.application.status.value if job.application else ApplicationStatus.SAVED.value
-        status_counts[status] = status_counts.get(status, 0) + 1
-        if job.score:
-            scores.append(job.score.overall_score)
-    avg = round(sum(scores) / len(scores), 1) if scores else 0.0
-    top = sorted(
-        (j for j in jobs if j.score),
-        key=lambda j: j.score.overall_score,
-        reverse=True,
-    )[:5]
     return {
         "success": True,
         "stats": {
-            "total_jobs": len(jobs),
+            "total_jobs": total_jobs,
             "status_breakdown": status_counts,
             "average_score": avg,
             "top_jobs": [job_public(j) for j in top],
