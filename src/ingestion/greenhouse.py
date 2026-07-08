@@ -45,9 +45,20 @@ class GreenhouseClient(BaseATSClient):
             )
             return []
 
+        # A PRESENT-but-non-list "jobs" field is a malformed payload, not an empty board — so set
+        # last_error (like the top-level guard above) and degrade. This keeps the caller's honesty
+        # contract intact: import-preview must report "temporarily unreachable", never fall through
+        # to the "no open roles are posted" message on a broken response. (An ABSENT "jobs" key
+        # defaults to [], a list — a legitimately empty board, no error.)
         raw_jobs = data.get("jobs", [])
         if not isinstance(raw_jobs, list):
-            raw_jobs = []
+            self.last_error = "unexpected Greenhouse payload ('jobs' was not a list)"
+            logger.warning(
+                "Greenhouse board %s: 'jobs' field is not a list (%s), skipping",
+                self.company_identifier,
+                type(raw_jobs).__name__,
+            )
+            return []
 
         jobs = []
         for job_data in raw_jobs:

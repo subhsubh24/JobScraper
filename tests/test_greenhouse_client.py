@@ -197,12 +197,17 @@ def test_fetch_jobs_skips_non_dict_job_entry():
     assert client.last_error is None
 
 
-def test_fetch_jobs_non_list_jobs_field_degrades_to_empty():
-    """If the "jobs" field itself is a non-list, degrade to an empty board (no crash)."""
+@pytest.mark.parametrize("bad_jobs", [None, 42, "nope", {"not": "a list"}])
+def test_fetch_jobs_non_list_jobs_field_degrades_with_last_error(bad_jobs):
+    """A PRESENT-but-non-list "jobs" field is a malformed payload, not an empty board: degrade to
+    [] AND set last_error so import-preview reports "temporarily unreachable" (honest), never the
+    "no open roles" empty-board message. Non-iterable values (None/42) also prove the guard
+    prevents a `TypeError: not iterable` crash — reverting it reddens this."""
     client = GreenhouseClient("acme")
-    with patch("src.ingestion.greenhouse.requests.get", return_value=_Resp({"jobs": "nope"})):
+    with patch("src.ingestion.greenhouse.requests.get", return_value=_Resp({"jobs": bad_jobs})):
         jobs = client.fetch_jobs()
     assert jobs == []
+    assert client.last_error is not None
 
 
 def test_fetch_job_details_returns_none_on_malformed_payload_missing_title():
