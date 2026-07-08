@@ -495,3 +495,172 @@ Include:
         self.db.flush()
 
         return artifact
+
+    # ------------------------------------------------------------------ mock interview
+    # The interview-coaching pillar (ROADMAP Track A, surface 3): generate role-specific
+    # questions, then SCORE each answer honestly. Both calls use ``json_mode`` for a reliably
+    # parseable structured result — but ``_call_llm`` deliberately skips moderation on the JSON
+    # path (it is normally internal plumbing), so the USER-FACING prose these produce (the
+    # questions; the per-answer feedback + model answer) is moderated HERE via ``_moderate_prose``.
+    # A flagged generation raises ``ModeratedContentError`` → the endpoint returns an honest 422
+    # and persists nothing (§6, no fake success).
+
+    def _moderate_prose(self, text: str) -> None:
+        """Run the shared safety moderator over user-facing prose from a JSON-mode call.
+
+        ``_call_llm(json_mode=True)`` does not moderate (it is used for internal JSON plumbing),
+        so callers that surface prose extracted from a JSON response must screen it explicitly —
+        otherwise the mock-interview questions / feedback would be the one user-facing AI surface
+        that skips the moderation every other generator enforces. A flagged output FAILS LOUD.
+        """
+        if not text or not text.strip():
+            return
+        verdict = self.moderator.check_output(text)
+        if not verdict.allowed:
+            raise ModeratedContentError(verdict.safe_response or "")
+
+    def generate_mock_interview_questions(
+        self, job: JobPosting, num_questions: int = 5
+    ) -> list[dict]:
+        """Generate role-specific mock-interview questions derived from the job posting.
+
+        Returns a list of ``{"question": str, "category": "technical"|"behavioral"}`` (≤
+        ``num_questions``). The questions are grounded in the JD (title/requirements/description)
+        so they are specific to THIS role, not generic. The set is validated + bounded
+        server-side — a malformed/empty model response FAILS LOUD (``RuntimeError`` → 502) rather
+        than persisting an empty interview.
+        """
+        num_questions = max(3, min(int(num_questions or 5), 8))
+        system_prompt = """You are an experienced hiring manager preparing a realistic, \
+role-specific mock interview. Generate interview questions tailored to the SPECIFIC job posting \
+provided — grounded in its title, requirements, and responsibilities, not generic filler.
+
+Return a JSON object with this exact shape:
+{"questions": [{"question": "<the interview question>", "category": "technical" | "behavioral"}]}
+
+Rules:
+- Mix technical/role-specific questions with behavioral (STAR-style) questions.
+- Each question must be answerable by a candidate in a few sentences — no multi-part essays.
+- Be specific to the role; do NOT invent facts about the company.
+- "category" must be exactly "technical" or "behavioral"."""
+        user_prompt = f"""Generate {num_questions} mock interview questions for this role:
+
+Title: {job.title}
+Company: {job.company_name}
+Location: {job.location or 'N/A'}
+Description: {job.description or 'N/A'}
+Requirements: {job.requirements or 'N/A'}
+
+Return the JSON object with exactly {num_questions} questions."""
+
+        raw = self._call_llm(system_prompt, user_prompt, json_mode=True)
+        try:
+            parsed = json.loads(raw)
+        except (ValueError, TypeError):
+            raise RuntimeError("Mock-interview question generation returned malformed JSON.")
+
+        items = parsed.get("questions") if isinstance(parsed, dict) else None
+        if not isinstance(items, list):
+            raise RuntimeError("Mock-interview question generation returned no questions.")
+
+        questions: list[dict] = []
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            q = str(item.get("question", "")).strip()
+            if not q:
+                continue
+            category = str(item.get("category", "")).strip().lower()
+            if category not in ("technical", "behavioral"):
+                category = "behavioral"
+            questions.append({"question": q[:1000], "category": category})
+            if len(questions) >= num_questions:
+                break
+
+        if not questions:
+            # Every item was malformed/blank — that is not a usable interview; fail loud so the
+            # endpoint returns an honest error and persists nothing (never an empty session).
+            raise RuntimeError("Mock-interview question generation produced no valid questions.")
+
+        # Moderate the user-facing question prose (JSON path skips _call_llm's moderation).
+        self._moderate_prose("\n".join(x["question"] for x in questions))
+        return questions
+
+    def score_mock_interview_answer(
+        self, job: JobPosting, question: str, answer: str
+    ) -> dict:
+        """Score ONE mock-interview answer honestly, with concrete feedback + a model answer.
+
+        Returns ``{"relevance": int(0-5), "specificity": int(0-5), "star": int(0-5),
+        "overall": float(0-100), "feedback": str, "model_answer": str}``. The sub-scores are
+        CLAMPED to 0-5 server-side (never trust the model to stay in range) and ``overall`` is
+        computed here, not by the model — so the number always reflects the three real dimensions.
+
+        Honesty is the whole point: a blank, evasive, or off-topic answer must score LOW. The
+        feedback is specific and actionable; the model answer shows what a strong response looks
+        like for THIS role. Both prose fields are moderated (JSON path skips ``_call_llm``'s).
+        """
+        system_prompt = """You are a rigorous, supportive interview coach scoring a candidate's \
+answer to a mock-interview question. Score HONESTLY — a vague, evasive, off-topic, or empty \
+answer must receive LOW scores. Do not inflate to be encouraging.
+
+Return a JSON object with this exact shape:
+{"relevance": <int 0-5>, "specificity": <int 0-5>, "star": <int 0-5>,
+ "feedback": "<2-4 sentences of specific, actionable feedback>",
+ "model_answer": "<a concise example of a strong answer to THIS question for THIS role>"}
+
+Scoring dimensions (0 = absent, 5 = excellent):
+- relevance: does the answer actually address the question asked?
+- specificity: concrete details, real examples, numbers — not vague generalities.
+- star: for behavioral questions, is it structured (Situation, Task, Action, Result)? For a \
+technical question, is the reasoning structured and complete?
+
+The model_answer must be realistic and honest — never invent credentials for the candidate; it \
+is an EXAMPLE of good structure/content, phrased generally."""
+        user_prompt = f"""ROLE: {job.title} at {job.company_name}
+Requirements: {job.requirements or job.description or 'General role'}
+
+INTERVIEW QUESTION:
+{question}
+
+CANDIDATE'S ANSWER:
+{answer}
+
+Score the answer and return the JSON object."""
+
+        raw = self._call_llm(system_prompt, user_prompt, json_mode=True)
+        try:
+            parsed = json.loads(raw)
+        except (ValueError, TypeError):
+            raise RuntimeError("Mock-interview answer scoring returned malformed JSON.")
+        if not isinstance(parsed, dict):
+            raise RuntimeError("Mock-interview answer scoring returned no result.")
+
+        def _clamp_score(value) -> int:
+            try:
+                return max(0, min(int(round(float(value))), 5))
+            except (TypeError, ValueError):
+                return 0
+
+        relevance = _clamp_score(parsed.get("relevance"))
+        specificity = _clamp_score(parsed.get("specificity"))
+        star = _clamp_score(parsed.get("star"))
+        # Computed here, never trusted from the model — always reflects the three real dimensions.
+        overall = round((relevance + specificity + star) / 15 * 100, 1)
+
+        feedback = str(parsed.get("feedback", "")).strip()
+        model_answer = str(parsed.get("model_answer", "")).strip()
+        if not feedback:
+            # Feedback is the deliverable — an empty one is a malformed result, not a usable
+            # score. Fail loud rather than persist a scored answer with no coaching.
+            raise RuntimeError("Mock-interview answer scoring returned empty feedback.")
+
+        self._moderate_prose(feedback + "\n" + model_answer)
+        return {
+            "relevance": relevance,
+            "specificity": specificity,
+            "star": star,
+            "overall": overall,
+            "feedback": feedback,
+            "model_answer": model_answer,
+        }

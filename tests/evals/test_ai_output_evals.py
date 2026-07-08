@@ -165,6 +165,58 @@ def test_salary_negotiation_real_output_is_substantive_and_on_topic(db_session, 
         "salary guide lacks any structure (no heading or list)"
 
 
+def test_mock_interview_questions_real_output_are_role_specific(db_session, monkeypatch):
+    """The mock-interview question set must be real, bounded, correctly shaped, and GROUNDED in
+    the role (referencing the JD's domain), not generic filler. Tolerant assertions (count in
+    range / valid categories / at least one role-relevant term across the set)."""
+    monkeypatch.setenv("GEMINI_API_KEY", LIVE_KEY)
+    from src.enrichment.llm_workflows import LLMWorkflows
+
+    _, job = _seed(db_session)  # Senior Backend Engineer — Python/FastAPI/AWS/Kubernetes
+    questions = LLMWorkflows(db_session).generate_mock_interview_questions(job, num_questions=5)
+
+    assert isinstance(questions, list) and 1 <= len(questions) <= 5, \
+        f"unexpected question count: {len(questions)}"
+    for q in questions:
+        assert q["question"].strip(), "a generated question is blank"
+        assert q["category"] in ("technical", "behavioral"), f"bad category: {q['category']!r}"
+    blob = " ".join(q["question"].lower() for q in questions)
+    # At least one question is grounded in the role's actual domain (not a generic essay set).
+    assert any(t in blob for t in
+               ("python", "aws", "kubernetes", "backend", "system", "api", "distributed", "sql")), \
+        f"mock-interview questions read off-topic for the role: {blob[:200]!r}"
+
+
+def test_mock_interview_scoring_real_output_is_honest_and_structured(db_session, monkeypatch):
+    """Real answer scoring must return clamped sub-scores, a computed overall, and substantive
+    feedback — AND be HONEST: a strong, detailed answer must out-score a blank/evasive one.
+    Tolerant on absolute values (model variation) but strict on the honesty ORDERING."""
+    monkeypatch.setenv("GEMINI_API_KEY", LIVE_KEY)
+    from src.enrichment.llm_workflows import LLMWorkflows
+
+    _, job = _seed(db_session)
+    wf = LLMWorkflows(db_session)
+    question = "Tell me about a time you improved the reliability of a backend system."
+    strong = (
+        "At Acme our checkout API had a 2% error rate under load. I profiled it, found an "
+        "N+1 query, added connection pooling and a Redis cache, and cut p99 latency from 800ms "
+        "to 120ms and errors to 0.1% over two weeks — measured via our Grafana dashboards."
+    )
+    weak = "I don't really know, I guess I just fixed some stuff and it got better."
+
+    strong_res = wf.score_mock_interview_answer(job, question, strong)
+    weak_res = wf.score_mock_interview_answer(job, question, weak)
+
+    for res in (strong_res, weak_res):
+        for dim in ("relevance", "specificity", "star"):
+            assert 0 <= res[dim] <= 5, f"{dim} not clamped: {res[dim]}"
+        assert 0 <= res["overall"] <= 100
+        assert res["feedback"].strip(), "feedback is empty"
+    # HONESTY: the detailed, quantified answer must score strictly higher than the evasive one.
+    assert strong_res["overall"] > weak_res["overall"], \
+        f"scoring is not honest: strong={strong_res['overall']} !> weak={weak_res['overall']}"
+
+
 def test_coach_real_answer_is_substantive_and_on_topic(db_session, monkeypatch):
     monkeypatch.setenv("GEMINI_API_KEY", LIVE_KEY)
     from src.ai_coach.career_coach import CareerCoach
