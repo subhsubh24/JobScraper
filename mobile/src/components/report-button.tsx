@@ -26,7 +26,7 @@ export function ReportButton({
   contentRef,
   contentExcerpt,
 }: {
-  contentType: 'coach' | 'prep_pack';
+  contentType: 'coach' | 'prep_pack' | 'mock_interview';
   contentRef?: string;
   contentExcerpt?: string;
 }) {

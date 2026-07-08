@@ -295,6 +295,15 @@ export default function JobDetailScreen() {
         </Card>
       ) : null}
 
+      <Text style={styles.section}>Practice interview</Text>
+      <Card style={styles.prepCard}>
+        <Text style={styles.toolHint}>
+          Run a role-specific mock interview — the coach asks questions from this job, scores each
+          answer, and shows a model answer.
+        </Text>
+        <Button label="Start mock interview →" onPress={() => router.push(`/interview/${id}`)} />
+      </Card>
+
       <Text style={styles.section}>Application tools</Text>
       {isPaid ? (
         <>
