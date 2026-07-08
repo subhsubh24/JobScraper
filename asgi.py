@@ -53,6 +53,7 @@ from src.enrichment.github_enricher import (
     parse_github_username,
     replace_github_competencies,
 )
+from src.insights.demo_match import analyze_demo_match
 from src.insights.readiness import compute_readiness
 from src.insights.skill_gaps import analyze_skill_gaps
 from src.llm import llm_available
@@ -608,6 +609,15 @@ class WaitlistJoin(BaseModel):
     captcha_token: Optional[str] = Field(default=None, max_length=4096)
 
 
+class DemoSkillMatchRequest(BaseModel):
+    """Public, no-account demo input (FACTORY_STANDARD §34). Bounded to cap request size — the
+    skills match is KEY-FREE + local, so there is no LLM-spend risk, only body-spam to fence."""
+
+    job_description: str = Field(min_length=1, max_length=25000)
+    resume_text: Optional[str] = Field(default=None, max_length=30000)
+    captcha_token: Optional[str] = Field(default=None, max_length=4096)
+
+
 # Cap the preview so one request can't fan out into a huge payload / long fetch.
 ATS_PREVIEW_LIMIT = 50
 
@@ -959,6 +969,44 @@ def confirm_waitlist(
         row.confirmed_at = datetime.utcnow()
         db.commit()
     return RedirectResponse(dest + "?status=ok", status_code=303)
+
+
+# ---------------------------------------------------------------------------
+# Public, no-account DEMO of the core "aha" (FACTORY_STANDARD §34 / ROADMAP §34).
+# Lets a visitor try the real fit read before signing up: paste a job description
+# (+ optionally a résumé) and see, instantly, which of the role's skills their résumé
+# already shows and which it is missing — the SAME key-free signal the logged-in
+# skill-gap heatmap uses. Deliberately the LOCAL half of the fit read (no embeddings /
+# no Gemini): it needs NO owner secret (works the moment the app deploys — a DECISION
+# COROLLARY call so the demo can never 503 on a missing key), sends NO data to a third
+# party, and is deterministic + O(text) so it cannot be turned into an LLM-spend or
+# compute amplifier. HARDENED like a live public surface (Track H / §12): bounded input
+# (the Pydantic model), a burst + a daily IP rate limit, and the captcha seam (a no-op
+# until the owner connects Turnstile, then fail-closed). No auth, no DB write, no PII.
+# ---------------------------------------------------------------------------
+@app.post(
+    "/api/demo/skill-match",
+    dependencies=[
+        Depends(rate_limit("demo", 20, 60)),
+        Depends(rate_limit("demo_daily", 200, 86400)),
+    ],
+)
+def demo_skill_match(data: DemoSkillMatchRequest, request: Request):
+    """Return a KEY-FREE skills match for one job description vs an optional résumé.
+
+    No account, no DB, no third-party AI. The captcha seam runs first (enumeration-safe 403
+    when the owner has connected Turnstile; a pure no-op otherwise), then the match is computed
+    from the shared heuristic vocabulary. The response makes no false claim: when no résumé is
+    supplied, ``has_resume`` is False and every detected role skill is reported as missing so the
+    UI can honestly invite the visitor to paste a résumé rather than imply a real 0% verdict.
+    """
+    _enforce_captcha(data.captcha_token, request)
+    result = analyze_demo_match(
+        data.job_description,
+        data.resume_text or "",
+        JobScorer.extract_skills,
+    )
+    return result.to_dict()
 
 
 @app.post("/api/auth/verify-purchase", dependencies=[Depends(rate_limit("auth", 10))])
