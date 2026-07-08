@@ -55,6 +55,11 @@ Keep this current as routes are added. A new route with no journey coverage is a
   (`tests/test_mock_interview.py`): Pro+; same tier→job→503→consent→ceiling→moderation gate chain;
   multi-turn state on one `MockInterview` row scoped to `user.id` (tenant-isolated); honest scoring
   (weak answer scores low, `overall` computed server-side); account-deletion cascade proven.
+- **interview readiness** — `GET /api/jobs/{job_id}/readiness` (`tests/test_readiness.py`): FREE,
+  fully-local (no LLM/consent); a readiness score (0–100) + the single next-best-action computed
+  from the user's REAL signals (résumé-vs-JD skill coverage + answered/scored mock questions +
+  completed prep artifacts); scoped to `user.id` (404 on another user's job); honest 0-state,
+  climbs only on real practice. The math is pinned by `tests/evals/test_readiness_evals.py`.
 
 ## Mobile screens (`mobile/src/app/**`, jest-expo component/integration tests)
 | Screen / unit | Covered by | Outcome asserted |
