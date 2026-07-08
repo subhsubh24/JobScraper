@@ -1,6 +1,6 @@
 // Typed client for the Career Operator FastAPI backend.
 // Base URL: NEXT_PUBLIC_API_URL (set in Vercel) -> the live API default.
-import type { Job, PipelineStats, User } from '@/lib/types';
+import type { Job, PipelineStats, Readiness, User } from '@/lib/types';
 
 // Single Vercel deployment (Vercel Services): the FastAPI backend is mounted at /api on
 // the SAME origin as this web app, so the default base URL is empty (relative). Each
@@ -273,6 +273,11 @@ export const api = {
 
   async getJob(id: string): Promise<Job> {
     return (await request<{ job: Job }>(`/api/jobs/${id}`)).job;
+  },
+
+  // FREE, fully-local read: the interview-readiness score + next-best-action for one job.
+  async getReadiness(id: string): Promise<Readiness> {
+    return (await request<{ readiness: Readiness }>(`/api/jobs/${id}/readiness`)).readiness;
   },
 
   async createJob(input: {

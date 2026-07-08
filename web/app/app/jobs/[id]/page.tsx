@@ -9,7 +9,7 @@ import { ArtifactActions } from '@/components/artifact-actions';
 import { useAiConsent } from '@/components/ai-consent';
 import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
-import { STATUS_LABELS, STATUS_ORDER, scoreColor, type ApplicationStatus, type Job } from '@/lib/types';
+import { STATUS_LABELS, STATUS_ORDER, scoreColor, type ApplicationStatus, type Job, type Readiness } from '@/lib/types';
 
 // A small lock glyph for the Career+-gated affordance — a real icon, not an emoji. Decorative.
 function LockIcon() {
@@ -41,6 +41,7 @@ export default function JobDetailPage() {
   // Third-party-AI consent gate (Apple 5.1.2(i)) — every prep tool sends resume/JD to Gemini.
   const { ensureConsent, dialog: consentDialog } = useAiConsent();
   const [job, setJob] = useState<Job | null>(null);
+  const [readiness, setReadiness] = useState<Readiness | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [prep, setPrep] = useState<{ id: string; title: string; content: string } | null>(null);
@@ -64,12 +65,22 @@ export default function JobDetailPage() {
 
   const load = useCallback(async () => {
     try {
-      setJob(await api.getJob(id));
+      // Readiness is a FREE, independent read — never let it break the job page: on any error the
+      // card simply doesn't render (graceful degrade), the job still loads.
+      const [j, r] = await Promise.all([api.getJob(id), api.getReadiness(id).catch(() => null)]);
+      setJob(j);
+      setReadiness(r);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Could not load this job.');
     } finally {
       setLoading(false);
     }
+  }, [id]);
+
+  // Re-read readiness after a signal changes on THIS page (a prep artifact generated) so the score
+  // reflects real, just-completed work. Best-effort — a failure never disturbs the page.
+  const refreshReadiness = useCallback(async () => {
+    setReadiness(await api.getReadiness(id).catch(() => null));
   }, [id]);
 
   useEffect(() => {
@@ -95,6 +106,7 @@ export default function JobDetailPage() {
     setPrepLoading(true);
     try {
       setPrep(await api.generatePrepPack(id));
+      refreshReadiness();
     } catch (e) {
       if (e instanceof ApiError && e.status === 403) router.push('/pricing');
       else setPrepMsg(e instanceof ApiError ? e.message : 'Could not generate.');
@@ -109,6 +121,7 @@ export default function JobDetailPage() {
     setLetterLoading(true);
     try {
       setLetter(await api.generateCoverLetter(id));
+      refreshReadiness();
     } catch (e) {
       // A free user should never reach here (the UI gates it), but the server is the source of
       // truth — a 403 routes to pricing rather than dead-ends.
@@ -131,6 +144,7 @@ export default function JobDetailPage() {
     setStudyLoading(true);
     try {
       setStudyPlan(await api.generateStudyPlan(id, days));
+      refreshReadiness();
     } catch (e) {
       if (e instanceof ApiError && e.status === 403) router.push('/pricing');
       else setStudyMsg(e instanceof ApiError ? e.message : 'Could not generate.');
@@ -145,6 +159,7 @@ export default function JobDetailPage() {
     setResumeLoading(true);
     try {
       setResume(await api.generateTailoredResume(id));
+      refreshReadiness();
     } catch (e) {
       if (e instanceof ApiError && e.status === 403) router.push('/pricing');
       // 400 (no saved résumé), 503 (no key), and other API errors surface honestly inline.
@@ -208,6 +223,8 @@ export default function JobDetailPage() {
         {job.score_explanation && <p className="mt-3 text-slate-300">{job.score_explanation}</p>}
       </Card>
 
+      {readiness && <ReadinessCard readiness={readiness} jobId={id} />}
+
       <div>
         <h2 className="mb-2 text-lg font-semibold">Pipeline status</h2>
         <div className="flex flex-wrap gap-2">
@@ -228,7 +245,7 @@ export default function JobDetailPage() {
         {statusMsg && <p role="alert" className="mt-2 text-sm text-amber-400">{statusMsg}</p>}
       </div>
 
-      <div>
+      <div id="interview-prep" className="scroll-mt-6">
         <h2 className="mb-2 text-lg font-semibold">Interview prep</h2>
         <Button onClick={generatePrep} disabled={prepLoading}>
           {prepLoading ? 'Generating…' : 'Generate prep pack'}
@@ -424,6 +441,80 @@ export default function JobDetailPage() {
         )}
       </div>
     </div>
+  );
+}
+
+// Where the single next-best-action sends the user. Keys match the backend `action` values;
+// `generate_artifact` scrolls to the prep tools already on this page (#interview-prep), `ready`
+// has no onward step (a positive terminal state), so it renders no CTA.
+const READINESS_ACTION_HREF: Record<string, (jobId: string) => string | null> = {
+  add_resume: () => '/app/settings',
+  start_mock_interview: (jobId) => `/app/jobs/${jobId}/interview`,
+  answer_question: (jobId) => `/app/jobs/${jobId}/interview`,
+  redo_answer: (jobId) => `/app/jobs/${jobId}/interview`,
+  generate_artifact: () => '#interview-prep',
+  study_skill: () => '/app/insights',
+  ready: () => null,
+};
+
+function ReadinessMeter({ label, value }: { label: string; value: number | null }) {
+  // value is 0..1 or null (unmeasurable — e.g. no extractable skills in the JD). Honest "n/a".
+  const pct = value == null ? null : Math.round(value * 100);
+  // Keep a visible sliver at a genuine 0% so an empty component reads as "0%", not a render glitch
+  // (matches the interview ProgressBar's Math.max(pct, 4)); n/a stays truly empty.
+  const fillPct = pct == null ? 0 : Math.max(pct, 4);
+  return (
+    <div>
+      <div className="mb-1 flex items-center justify-between text-xs">
+        <span className="text-slate-400">{label}</span>
+        <span className="text-slate-500">{pct == null ? 'n/a' : `${pct}%`}</span>
+      </div>
+      <div
+        className="h-1.5 w-full overflow-hidden rounded-full bg-slate-800"
+        role="img"
+        aria-label={`${label}: ${pct == null ? 'not measured' : `${pct}%`}`}
+      >
+        <div className="h-full rounded-full bg-indigo-500 transition-all" style={{ width: `${fillPct}%` }} />
+      </div>
+    </div>
+  );
+}
+
+function ReadinessCard({ readiness, jobId }: { readiness: Readiness; jobId: string }) {
+  const { score, components, next_action: next } = readiness;
+  const href = (READINESS_ACTION_HREF[next.action] ?? (() => null))(jobId);
+  return (
+    <Card>
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <h2 className="text-lg font-semibold">Interview readiness</h2>
+          <p className="text-sm text-slate-400">
+            How ready you are for this role — it climbs only as you practice, cover its skills, and prep.
+          </p>
+        </div>
+        <div className={`shrink-0 text-4xl font-extrabold ${scoreColor(score)}`}>
+          {score}
+          <span className="text-base text-slate-500"> / 100</span>
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-3 sm:grid-cols-3">
+        <ReadinessMeter label="Practice" value={components.interview_practice} />
+        <ReadinessMeter label="Skill coverage" value={components.skill_coverage} />
+        <ReadinessMeter label="Materials" value={components.artifacts} />
+      </div>
+
+      <div className="mt-4 border-t border-slate-800 pt-4">
+        <p className="text-xs font-semibold uppercase tracking-wide text-indigo-400">Next step</p>
+        <p className="mt-1 font-semibold text-slate-100">{next.label}</p>
+        <p className="mt-0.5 text-sm text-slate-400">{next.detail}</p>
+        {href && (
+          <div className="mt-3">
+            <LinkButton href={href}>{next.label} →</LinkButton>
+          </div>
+        )}
+      </div>
+    </Card>
   );
 }
 
