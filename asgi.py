@@ -53,6 +53,7 @@ from src.enrichment.github_enricher import (
     parse_github_username,
     replace_github_competencies,
 )
+from src.insights.readiness import compute_readiness
 from src.insights.skill_gaps import analyze_skill_gaps
 from src.llm import llm_available
 from src.ranking.scorer import JobScorer
@@ -1238,6 +1239,53 @@ def get_job(
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
     return {"success": True, "job": job_public(job)}
+
+
+@app.get(
+    "/api/jobs/{job_id}/readiness",
+    dependencies=[Depends(rate_limit_user("user_read", 120))],
+)
+def job_interview_readiness(
+    job_id: str,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Interview-readiness read + next-best-action for one tracked job — FREE, fully local.
+
+    Computes a readiness score (0–100) and the SINGLE next best action from the user's REAL
+    signals for this job: résumé-vs-JD skill coverage, answered + scored mock-interview
+    questions, and completed prep artifacts. No LLM, no third-party call, no consent needed —
+    the read is free and works with no ``GEMINI_API_KEY``. It climbs only on real practice
+    (never a vanity number). Scoped to the caller server-side (tenant isolation — never trust
+    the client); 404 when the job isn't theirs. ``prep_artifacts`` + ``mock_interviews`` are
+    eager-loaded so the whole read is a bounded, N+1-free set of queries.
+    """
+    job = (
+        db.query(JobPosting)
+        .options(
+            selectinload(JobPosting.prep_artifacts),
+            selectinload(JobPosting.mock_interviews),
+        )
+        .filter(JobPosting.id == job_id, JobPosting.user_id == user.id)
+        .first()
+    )
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    jd_text = f"{job.description or ''} {job.requirements or ''}"
+    artifact_types = [a.artifact_type for a in job.prep_artifacts]
+    sessions = [
+        {"questions": mi.questions or [], "answers": mi.answers or []}
+        for mi in job.mock_interviews
+    ]
+    report = compute_readiness(
+        jd_text=jd_text,
+        resume_text=user.resume_text or "",
+        artifact_types=artifact_types,
+        sessions=sessions,
+        extract=JobScorer(db).extract_skills,
+    )
+    return {"success": True, "readiness": report.to_dict()}
 
 
 VALID_STATUSES = {s.value for s in ApplicationStatus}
