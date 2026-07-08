@@ -94,6 +94,10 @@ export default function MockInterviewPage() {
       const firstUnanswered = iv.questions.findIndex((_q, i) => !answered.has(i));
       setActiveIndex(firstUnanswered === -1 ? Math.max(iv.questions.length - 1, 0) : firstUnanswered);
     } catch (e) {
+      if (e instanceof ApiError && e.status === 403) {
+        router.push('/pricing');
+        return;
+      }
       setStartMsg(e instanceof ApiError ? e.message : 'Could not open that session.');
     }
   }
@@ -282,6 +286,7 @@ function InterviewRunner({
   onUpdate: (iv: MockInterviewSession) => void;
   onExit: () => void;
 }) {
+  const router = useRouter();
   const [answer, setAnswer] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -326,6 +331,12 @@ function InterviewRunner({
       onUpdate(next);
       setReAnswer(false);
     } catch (e) {
+      // Server is the source of truth: a 403 mid-session (Pro lapsed / consent revoked elsewhere)
+      // routes to pricing, never traps the user with an inline-only error and no way forward.
+      if (e instanceof ApiError && e.status === 403) {
+        router.push('/pricing');
+        return;
+      }
       setMsg(e instanceof ApiError ? e.message : 'Could not score your answer — try again.');
     } finally {
       setSubmitting(false);
