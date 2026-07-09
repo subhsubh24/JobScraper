@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from src.ai_coach.moderation import ContentModerator
 from src.db.models import ApplicationStatus, ChatMessage, User, JobPosting, Application
-from src.llm import get_llm_client, llm_available, chat_model
+from src.llm import get_llm_client, llm_available, chat_model, resilient_chat_completion
 
 
 class CareerCoach:
@@ -147,8 +147,10 @@ burnout) supportively is in scope; generating harmful content is not."""
         messages.extend(history)
         messages.append({"role": "user", "content": message})
 
-        # Call LLM
-        response = self.client.chat.completions.create(
+        # Call LLM through the resilient wrapper: a decommissioned primary model falls back to a
+        # live one instead of 502-ing the coach (src/llm.py).
+        response = resilient_chat_completion(
+            self.client,
             model=self.MODEL,
             messages=messages,
             temperature=0.7,
@@ -268,7 +270,8 @@ burnout) supportively is in scope; generating harmful content is not."""
             for m in messages
         ])
 
-        response = self.client.chat.completions.create(
+        response = resilient_chat_completion(
+            self.client,
             model=self.MODEL,
             messages=[
                 {
