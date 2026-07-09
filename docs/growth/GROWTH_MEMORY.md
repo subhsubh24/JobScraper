@@ -91,6 +91,80 @@ pre-launch.
 
 ---
 
+### 2026-07-09 — Daily GTM review (site-gate reframe + engine_pct honesty fix + GTM_SCORECARD gap closed)
+- **Observed:** Phase still `pre_launch`. `ListConnectors` confirms only Gmail (connected,
+  enabled) + Google Drive (connected, not enabled-in-chat) + Google Calendar (unknown/not
+  enabled) — no analytics/billing/email-provider MCP available; shell env has no `PROD_URL` or
+  `ANALYTICS_READ_TOKEN` (`BROWSERBASE_API_KEY`/`BROWSERBASE_PROJECT_ID` ARE present, but that
+  is FACTORY_STANDARD §29 deployed-app-validator infra, not a GTM source) —
+  `channels_connected: []` stays honest. Both independent scorecards happened to re-grade the
+  SAME DAY: **QUALITY_SCORECARD's 5th audit (2026-07-09) dropped B→C** — a NEW ship-critical
+  regression, functional-reality A+→D: the shipped default LLM model (`gemini-2.5-flash`) was
+  decommissioned upstream by Google, 502ing every paid AI feature (mock interview, coach, prep
+  pack, cover letter, tailored résumé, salary-negotiation, learning plan). Per `git log`, the
+  product factory shipped a same-day fix AFTER that audit landed (`fbb61ca` resilient
+  model-fallback, `51020ad` cross-instance login-lockout) — but per GTM_STANDARD §4/
+  FACTORY_STANDARD §28 this loop does NOT self-certify from adjacent commits: the scorecard
+  stays read AS-IS (C, `ship_gate_met: false`) until its own independent auditor re-grades, so
+  outreach stays hard-blocked regardless. **GTM_SCORECARD also re-graded** (2026-07-09, overall
+  A, `ship_gate_met: true`, unchanged) — one named top_gap: `roadmap_steer_justification` A, not
+  A+ (see "Did" below).
+- **The two real corrections this run (both genuine artifact-freshness bugs owned by THIS
+  loop, not the product factory):**
+  1. **Site-gate framing was stale and would have kept being wrong.** `PENDING_OPS.md` and
+     `ROADMAP.md:421-435` were updated by the product factory (run 34, same day) disclosing
+     that the pre-launch SITE GATE was **deleted at owner request on 2026-07-02** —
+     `web/middleware.ts` is now a literal pass-through (verified by reading the live file this
+     run). This GTM loop had asked the owner to "apply `SITE_GATE_PASSWORD`" as the single
+     highest-leverage 2-minute fix for **5 straight reads** (06-29 → 07-07) — that ask does
+     literally nothing against the current code and would have kept recurring, incorrectly,
+     every run without this catch. Rewrote `GROWTH_STATUS.md`'s `site_gate_up` commentary +
+     `owner_blockers` + `next_actions` to the real open item: an owner **decision** (reinstate a
+     rebuilt gate, or keep the app public and drop the §34 gated-beta track) — not an env-var
+     task. `site_gate_up` stays `false` (still literally accurate), only the surrounding
+     narrative was wrong.
+  2. **`engine_pct: 0` / "not built" had been asserted for 6 GTM reads while ROADMAP Track G+H
+     actually show 8/16 checked items** (waitlist+double-opt-in, email-provider seam, analytics
+     read-API, CONNECT runbook, brand kit, analytics instrumentation, waitlist landing, public
+     demo). Wrote `analysis/gtm_engine_pct.py` (parses ROADMAP.md Track G+H checkboxes,
+     deterministic, FACTORY_STANDARD §22) → **50**, registered in `figures.json`, verified by
+     `scripts/validate-computation.mjs`. `engine_built` stays `false` (50 < 100, satisfies
+     `check_blocks.py`'s `engine_built` iff `engine_pct==100` invariant) — a build-completeness
+     correction, NOT a claim that any channel is connected (`channels_connected` stays `[]`).
+- **Closed GTM_SCORECARD's one named top_gap:** the auditor flagged that GTM commit `24e9b84`'s
+  B2B2C packaging recommendation in `BUSINESS_CASE.md` lever 2 reads as a steer while its own
+  commit message said "no steer," and that run's `demand_signal` explicitly could neither
+  confirm nor refute B2B2C demand. Added an inline "Demand caveat" paragraph to
+  `BUSINESS_CASE.md` lever 2 stating plainly the packaging note is a *competitor-pricing-comp*
+  recommendation only, not demand-validated — per the auditor's own suggested fix (b). No ARR
+  number or `floor_met_year1` changed.
+- **Concluded:** No real funnel/PMF data justifies a ROADMAP/BUSINESS_CASE ARR/VISION steer this
+  run (same reasoning as every prior pre-launch read — 0 users, 0 funnel data). The BUSINESS_CASE
+  caveat edit is a reconciliation of THIS loop's own prior packaging note, not a new steer.
+  Demand_signal cadence checked: last run 2026-07-03 (6 days), ~quarterly refresh not due until
+  ~October. Zero outreach drafts (correct): `QUALITY_SCORECARD.ship_gate_met` is false.
+- **Did:** All three changes (site-gate/engine_pct reconciliation in `GROWTH_STATUS.md`, the new
+  `analysis/gtm_engine_pct.py` + `figures.json` registration, and the `BUSINESS_CASE.md` lever-2
+  caveat) bundled into one PR and run through an independent reviewer (maker≠checker, fresh
+  subagent) told to check: is the engine_pct computation methodology sound and non-gamed? does
+  the site-gate reframe accurately reflect PENDING_OPS/ROADMAP without overclaiming or
+  underclaiming? does the BUSINESS_CASE caveat honestly close the auditor's named gap without
+  introducing a new speculative claim? — see PR for the verdict.
+- **Meta / operational note (circuit breaker resolved, differently than expected):** The
+  `SITE_GATE_PASSWORD` circuit-breaker item that had persisted across 5 consecutive GTM reads
+  did NOT resolve by the owner acting on it — it resolved because the underlying premise turned
+  out to be wrong (the owner had already made a DIFFERENT decision — removing the gate entirely
+  — on 2026-07-02, and this loop kept re-asking the stale question for 5 more reads before the
+  product factory's run-34 correction surfaced it). **Lesson for future circuit-breaker
+  escalations:** an owner action that goes unaddressed for many consecutive reads is not only
+  "the owner hasn't gotten to it yet" — it is also worth periodically re-verifying the action is
+  STILL live against the current code/config, not just repeating the same ask by rote. Also
+  worth noting: `engine_pct` had been silently wrong (hardcoded stale value, never recomputed)
+  since bootstrap — a reminder to apply FACTORY_STANDARD §22's "compute it, don't eyeball it"
+  discipline to EVERY GROWTH_STATUS numeric field, not just the ARR figures.
+
+---
+
 ### 2026-07-07 — Daily GTM review (quiet run; VISION-pivot reconciliation, no steer)
 - **Observed:** Phase still `pre_launch`. `ListConnectors` confirms only Gmail (connected,
   enabled) + Google Drive (connected, not enabled-in-chat) + Google Calendar (unknown/not

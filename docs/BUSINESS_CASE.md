@@ -77,6 +77,14 @@ These are *named, buildable* items (the only valid weak-case loop-back triggers)
    RECOMMEND-tier packaging input for the product factory when it builds the tier (GTM_STANDARD
    §3) — it does not change `floor_met_year1` or any ARR scenario above, since no product
    exists yet and crediting a number pre-build would be gaming the business case.
+   **Demand caveat (honesty correction, 2026-07-09):** this is a *competitor-pricing-comp*
+   recommendation only — the GTM_STANDARD §10 job-seeker demand-signal pass
+   (`docs/growth/GROWTH_STATUS.md` `demand_signal.disconfirming`) found ZERO consumer-side
+   evidence either confirming or refuting demand for a team/B2B2C tier specifically (that
+   question is a distribution-partner economics decision, out of scope for job-seeker pain
+   mining — it is neither confirmed nor refuted, not silently assumed). Do not read the
+   structure recommendation above as demand-validated; it is a "here is how the market prices
+   this if you build it," not a "users are asking for this."
 3. **AI-prep value expansion** — the FIRST Career+ exclusive (AI salary-negotiation
    coaching) is now **BUILT** (see lever 6); mock-interview voice sessions + company-specific
    dossiers remain future Career+ wedges to raise the upgrade rate further.

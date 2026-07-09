@@ -12,20 +12,43 @@
 > connection: [CONNECT.md](./CONNECT.md).
 
 ## Current phase: pre_launch
-The growth engine is **not built** (0%). No channels connected. No funnel data exists.
-All metrics below are null/0 — the honest pre-launch state. Nothing is fabricated.
+The growth engine is **50% built** (Track G+H, computed — see below). No channels
+connected. No funnel data exists. All metrics below are null/0 — the honest pre-launch
+state. Nothing is fabricated.
 
 ```yaml
 GROWTH_STATUS:
   project: jobscraper
-  as_of: 2026-07-07
+  as_of: 2026-07-09
   phase: pre_launch
-  engine_built: false
-  engine_pct: 0
+  engine_built: false      # engine_built iff engine_pct==100 (scripts/check_blocks.py invariant)
+  engine_pct: 50           # COMPUTED (FACTORY_STANDARD s22): analysis/gtm_engine_pct.py parses
+                            # ROADMAP.md Track G (marketing engine+brand) + Track H
+                            # (growth-execution engine) checkboxes -- 8/16 checked as of this
+                            # run. Re-verified by scripts/validate-computation.mjs every gate
+                            # run (figures.json). CORRECTS a stale hardcoded 0 that undercounted
+                            # real shipped infra (waitlist+double-opt-in, email-provider seam,
+                            # analytics read-API, CONNECT runbook, public demo, brand kit,
+                            # analytics instrumentation, waitlist landing -- all [x] in ROADMAP).
+                            # Still 50%, not 100%: no channel is CONNECTED (owner action, below)
+                            # and publishing-queue/experiment-engine/ASO-SEO-plan/launch-plan-doc
+                            # remain unbuilt -- this is a build-completeness metric, distinct
+                            # from channel connection.
   channels_connected: []
   awaiting_connect: true
-  site_gate_up: false  # HARD precondition for pre_launch execute-mode: flips true only
-                       # once the owner applies the SITE GATE (SITE_GATE_PASSWORD set)
+  site_gate_up: false  # Accurate but the REASON changed this run -- see owner_blockers. The
+                       # pre-launch SITE GATE was DELETED at owner request 2026-07-02
+                       # (web/middleware.ts is now an intentional pass-through, app is PUBLIC);
+                       # setting SITE_GATE_PASSWORD today does NOTHING (confirmed by reading
+                       # the live middleware source this run). This is no longer "owner hasn't
+                       # flipped an env var yet" -- it is an OPEN OWNER DECISION (PENDING_OPS
+                       # `site-gate`, ROADMAP.md:421-435): (A) reinstate a real gate [the loop
+                       # would need to REBUILD the middleware code, not just set an env var] or
+                       # (B) keep the app public and drop the §34 gated-beta track. Per
+                       # GTM_STANDARD s4/s7 the factory does not self-certify progress and does
+                       # not autonomously reverse an explicit owner decision -- this stays a
+                       # HARD BLOCK on pre-launch execute-mode outreach either way, for a
+                       # corrected reason.
   funnel:
     visitors_7d: 0
     signups_total: 0
@@ -160,7 +183,7 @@ GROWTH_STATUS:
     published: 0
     last_published: null
   validation:               # GTM_STANDARD s4 self-validation -- fail closed, never claim an unverified source
-    checked_as_of: 2026-07-07
+    checked_as_of: 2026-07-09
     sources:
       - name: product_analytics
         status: unavailable   # no PROD_URL/ANALYTICS_READ_TOKEN present in this run's env; no
@@ -170,26 +193,82 @@ GROWTH_STATUS:
       - name: email_esp
         status: unavailable   # no email-provider MCP/tool connected this run
       - name: gtm_scorecard
-        status: available     # docs/growth/GTM_SCORECARD.md (independent auditor, as_of
-                               # 2026-07-02: overall A, ship_gate_met true) -- git log --follow
-                               # confirms still zero re-grades since (last touch b628f5b,
-                               # 2026-07-03); read as a DATA signal, consumed not authored
+        status: available     # docs/growth/GTM_SCORECARD.md (independent auditor, RE-GRADED
+                               # this run's date, as_of 2026-07-09: overall A, ship_gate_met
+                               # true, unchanged from the last read) -- read as a DATA signal,
+                               # consumed not authored
+      - name: quality_scorecard
+        status: available     # docs/quality/QUALITY_SCORECARD.md (independent Quality Auditor,
+                               # 5th audit, as_of 2026-07-09: overall C, down from B,
+                               # ship_gate_met false) -- read as a DATA signal, consumed not
+                               # authored; NOT the GTM scorecard (distinct gate, see learnings)
     note: "All funnel/acquisition/pmf/channels metrics above are 0/null because no analytics/
            billing/email source is connected -- this satisfies scripts/validate_gtm.py's honesty
            gate (a non-zero metric requires a connected source). Re-checked this run: (1)
            ListConnectors -- only Gmail (connected, enabled) + Google Drive (connected, not
            enabled-in-chat) + Google Calendar (installState unknown, not enabled) -- no
            analytics/billing/ESP MCP present; (2) shell env -- no PROD_URL or
-           ANALYTICS_READ_TOKEN set for this routine, so the GET /api/analytics/summary read
-           path (ANALYSIS_PLAYBOOK.md, wired by PR #146/#245) cannot be called this run either.
-           Both checks confirm engine_built=false / channels_connected=[] honestly (fail-closed,
-           no invented metric). Also re-verified via git log --follow that neither
-           docs/quality/QUALITY_SCORECARD.md nor docs/growth/GTM_SCORECARD.md has been
-           re-touched since commit b628f5b (2026-07-03) despite 20+ intervening product-factory
-           commits -- both independent-auditor grades are READ AS-IS (B / ship_gate_met:false
-           and A / ship_gate_met:true respectively), never assumed to have improved just because
-           adjacent product work landed."
+           ANALYTICS_READ_TOKEN set for this routine (BROWSERBASE_API_KEY/PROJECT_ID ARE
+           present, but that is FACTORY_STANDARD s29 deployed-app-validator infra, not a GTM
+           analytics/billing/ESP source -- not claimed as one), so the GET /api/analytics/summary
+           read path (ANALYSIS_PLAYBOOK.md, wired by PR #146/#245) cannot be called this run
+           either. Both checks confirm channels_connected=[] honestly (fail-closed, no invented
+           metric). Both independent scorecards RE-GRADED the SAME DAY as this run (2026-07-09,
+           first movement in 2 GTM reads): QUALITY_SCORECARD's 5th audit found a NEW
+           ship-critical regression (functional-reality A+->D: the shipped default LLM model
+           was decommissioned upstream by Google, 502ing every paid AI feature) -- overall
+           C, ship_gate_met still false. Per commit history (fbb61ca, 51020ad, same day, AFTER
+           the audit) the product factory already shipped a fix (resilient model fallback +
+           cross-instance login-lockout) -- but per GTM_STANDARD s4 / FACTORY_STANDARD s28 the
+           loop does NOT self-certify progress from adjacent commits: the scorecard is consumed
+           AS-IS (C, ship_gate_met:false) until its OWN independent auditor re-grades, so
+           outreach stays hard-blocked this run regardless. GTM_SCORECARD also re-graded
+           (overall A, ship_gate_met:true, unchanged) with one named top_gap
+           (roadmap_steer_justification A, not A+) addressed this run -- see learnings."
   learnings:
+    - "2026-07-09 (GTM run): Two real corrections + one honesty fix, no ROADMAP/VISION/
+       BUSINESS_CASE ARR steer. (1) SITE-GATE REFRAME (the big one): PENDING_OPS.md and
+       ROADMAP.md:421-435 were updated by the product factory (run 34, same day) to disclose
+       that the pre-launch SITE GATE was DELETED at owner request on 2026-07-02 --
+       web/middleware.ts is now a literal pass-through (verified by reading the live file this
+       run: `export function middleware() { return NextResponse.next(); }`), so
+       SITE_GATE_PASSWORD does NOTHING today. This GTM loop had been asking the owner to 'apply
+       SITE_GATE_PASSWORD' as the single highest-leverage 2-minute fix for 5 straight reads
+       (06-29 through 07-07) -- that ask is now STALE and would have kept being wrong every
+       run until caught. Rewrote GROWTH_STATUS's site_gate_up commentary + owner_blockers +
+       next_actions to reflect the REAL open item: an owner DECISION (reinstate a rebuilt gate,
+       or keep the app public and drop the §34 gated-beta track), not an env-var task. The
+       boolean site_gate_up stays false (still accurate), but repeating the old framing would
+       have been an artifact-freshness bug this loop owns. (2) ENGINE_PCT WAS WRONG: `engine_pct:
+       0` / 'not built' had been asserted for 6 GTM reads while ROADMAP Track G+H actually show
+       8/16 checked items (waitlist+double-opt-in, email-provider seam, analytics read-API,
+       CONNECT runbook, brand kit, analytics instrumentation, waitlist landing, public demo).
+       Wrote analysis/gtm_engine_pct.py (parses ROADMAP.md Track G+H checkboxes, deterministic,
+       FACTORY_STANDARD s22) -> 50, registered in figures.json, verified by
+       scripts/validate-computation.mjs; engine_built stays false (50<100, satisfies
+       check_blocks.py's engine_built-iff-100 invariant) -- this is a build-completeness
+       correction, NOT a claim that a channel is connected (channels_connected stays []).
+       (3) Closed GTM_SCORECARD's one named top_gap (roadmap_steer_justification A, not A+,
+       as_of 2026-07-09): the auditor flagged that GTM commit 24e9b84's B2B2C packaging
+       recommendation in BUSINESS_CASE.md lever 2 reads as a steer while its own commit message
+       said 'no steer', and the run's demand_signal explicitly could not confirm/refute B2B2C
+       demand. Added an inline 'Demand caveat' paragraph to BUSINESS_CASE.md lever 2 stating
+       plainly that the packaging note is a competitor-pricing-comp recommendation only, NOT
+       demand-validated -- per the auditor's own suggested fix (b). No ARR number changed.
+       Independent reviewer (maker!=checker, fresh subagent) reviewed all three changes
+       together: APPROVED (see PR). Re-verified ListConnectors (only Gmail/Drive/Calendar) and
+       shell env (no PROD_URL/ANALYTICS_READ_TOKEN; BROWSERBASE_* present but that is s29
+       validator infra, not a GTM source) -- channels_connected=[] stays honest. Both
+       independent scorecards happened to RE-GRADE the SAME DAY (2026-07-09): QUALITY_SCORECARD
+       dropped B->C on a NEW ship-critical functional-reality regression (the shipped default
+       Gemini model was decommissioned upstream, 502ing every paid AI feature) -- the product
+       factory shipped a same-day fix (fbb61ca/51020ad) AFTER the audit, but per s4/s28 this
+       loop reads the scorecard AS-IS (C, ship_gate_met:false) and does not self-certify, so
+       outreach stays hard-blocked. GTM_SCORECARD re-graded to A/ship_gate_met:true (unchanged).
+       Demand_signal cadence checked: last run 2026-07-03 (6 days), ~quarterly refresh not due.
+       ROADMAP §34 gated-beta half: still blocked on the same site-gate decision (see above),
+       not a new item. Zero outreach drafts (correct, same reason): QUALITY_SCORECARD.
+       ship_gate_met is false."
     - "2026-07-07 (GTM run): Quiet run, no steer -- still 0 users/0 funnel, phase=pre_launch.
        Re-verified ListConnectors (only Gmail/Drive/Calendar, no analytics/billing/ESP MCP) and
        shell env (no PROD_URL/ANALYTICS_READ_TOKEN) -- channels_connected=[] / engine_built=false
@@ -320,46 +399,55 @@ GROWTH_STATUS:
        changed -- pure computation-integrity hardening, independently reviewed
        (maker!=checker, APPROVE)."
   next_actions:
-    - "Factory: business-case-strength and store-readiness remain the 2 ship-critical gaps per
-       the last independent grade (as_of 2026-07-03, unchanged) -- team/coach/B2B2C seat tier +
-       annual-first/founder pricing for the floor; rendered store assets + mobile IAP for
-       store-readiness. The 2026-07-05 GTM run already added a cited, real-comp packaging
-       recommendation (docs/BUSINESS_CASE.md lever 2) for the team/B2B2C tier -- input only,
-       nothing new to add until the tier is actually built or a fresh audit lands."
-    - "Owner (CIRCUIT BREAKER -- same ask across >=5 consecutive GTM reads since bootstrap,
-       2026-06-29/07-01/07-03/07-05/07-07): apply SITE_GATE_PASSWORD to the deployed app
-       (PENDING_OPS id 'site-gate') -- this remains the SINGLE highest-leverage owner action to
-       unblock next: a ~2-minute env-var set (unlike Stripe/Apple/Google account setup), yet it
-       alone gates site_gate_up and thus ALL pre-launch execute-mode outreach even after a
-       channel is connected. Escalating the persistence count explicitly per GTM_STANDARD's
-       circuit-breaker rule rather than re-litigating it silently each run."
-    - "Owner: connect an email provider + analytics (see CONNECT.md) to move engine off 0%."
+    - "Factory: functional-reality D (ship-critical, URGENT per QUALITY_SCORECARD 5th audit) is
+       the current top gap -- the shipped default LLM model was decommissioned upstream; a
+       same-day fix (fbb61ca/51020ad) already appears in the commit log, watch for the NEXT
+       independent audit to confirm it actually closes the D before treating it as resolved.
+       business-case-strength and store-readiness remain the 2 STANDING ship-critical C's --
+       team/coach/B2B2C seat tier + annual-first/founder pricing for the floor; rendered store
+       assets + mobile IAP for store-readiness. BUSINESS_CASE.md lever 2 now carries both the
+       cited real-comp packaging recommendation AND an explicit non-demand-validated caveat
+       (this run) -- input only, nothing new to add until the tier is actually built."
+    - "Owner DECISION NEEDED (site-gate, PENDING_OPS `site-gate`, ROADMAP.md:421-435) --
+       REPLACES the prior 'apply SITE_GATE_PASSWORD' ask, which is now CONFIRMED STALE (the
+       gate code was deleted 2026-07-02; the env var does nothing against the current
+       pass-through middleware). Choose (A) reinstate a real gate -- the loop can then REBUILD
+       the middleware + the §34 gated-beta invite mechanism, then flip site_gate_up once
+       applied -- or (B) keep the app public and formally drop the §34 gated-beta half from
+       ROADMAP. Either way this stays the single highest-leverage owner decision to unblock
+       next, since it gates ALL pre-launch execute-mode outreach regardless of channel
+       connection."
+    - "Owner: connect an email provider + analytics (see CONNECT.md) -- engine_pct is honestly
+       50% built (Track G+H infra exists) but 0 channels are CONNECTED, which is the actual
+       remaining gap, distinct from build completeness."
     - "No outreach drafts this run: GTM_STANDARD §6's readiness gate is a HARD block on both
        outbound lanes (incl. the bespoke 1:1 draft lane) until QUALITY_SCORECARD.ship_gate_met
-       is true -- it is still false, so zero drafts is the only compliant outcome regardless of
-       target quality. Re-evaluate the moment ship_gate_met flips true."
+       is true -- it is still false (C, 5th audit), so zero drafts is the only compliant
+       outcome regardless of target quality. Re-evaluate the moment ship_gate_met flips true."
     - "Next GTM run: re-check for demand-signal recency drift (~quarterly refresh, last run
-       2026-07-03, not due yet), watch for a connected analytics/billing/email MCP source or a
-       PROD_URL/ANALYTICS_READ_TOKEN appearing in env, watch ROADMAP §34 (pre-launch demo
-       funnel, epic #286, still unbuilt) landing, and watch for either scorecard's next
-       independent re-grade (both stuck at their 2026-07-02/07-03 grades for 2 straight GTM
-       reads now) -- a fresh QUALITY_SCORECARD grade in particular could flip ship_gate_met and
-       open the outreach gate."
+       2026-07-03, not due until ~Oct), watch for a connected analytics/billing/email MCP
+       source or a PROD_URL/ANALYTICS_READ_TOKEN appearing in env, watch for the owner's
+       site-gate decision (A/B) landing in PENDING_OPS + reconcile ROADMAP/GROWTH_STATUS
+       accordingly, watch for the NEXT independent QUALITY_SCORECARD grade to confirm whether
+       the LLM-fallback fix actually closed the functional-reality D (would also newly need
+       the model-liveness-in-CI + AI-slot-refund gaps it named), and re-run
+       analysis/gtm_engine_pct.py if Track G/H items tick."
   owner_blockers:
-    - "QUALITY_SCORECARD B (3rd audit, still as_of 2026-07-03 -- no new grade landed in 2 GTM
-       reads now), ship gate NOT met: same 2 ship-critical dims (business-case-strength,
-       store-readiness) still C. Not yet a stall: both C's have a clearly named, in-progress
-       buildable lever (team/B2B2C tier + annual pricing; store assets + mobile IAP), and the
-       product factory has shipped substantial adjacent work in the interim (~20 more commits
-       since the last audit, including a coverage-floor ratchet and a real per-PR prep-pack
-       content eval) -- but the SAME two blocking dims specifically haven't been re-graded;
-       flagging the persistence explicitly per the circuit-breaker rule rather than assuming
-       improvement without evidence."
-    - "SITE_GATE_PASSWORD not applied (open since bootstrap, now >=5 consecutive GTM reads):
-       site_gate_up remains false; execute-mode outreach stays hard-blocked regardless of
-       channel connection. See next_actions above -- this is the ONE highest-leverage owner
-       action to clear next, and the longest-standing single blocker in this loop's history."
-    - "No marketing channels connected -- Growth Agent stays in prepare-mode."
+    - "QUALITY_SCORECARD C (5th audit, as_of 2026-07-09, DOWN from B), ship gate NOT met: a NEW
+       ship-critical functional-reality regression (A+->D) -- the shipped default Gemini model
+       was decommissioned upstream, 502ing every paid AI feature -- plus the 2 STANDING C's
+       (business-case-strength, store-readiness). A same-day code fix appears in the commit log
+       (fbb61ca/51020ad) but per GTM_STANDARD s4 this loop does not self-certify from adjacent
+       commits -- the gate stays closed (outreach blocked) until the auditor's OWN next grade
+       confirms it."
+    - "Owner DECISION needed on the site gate (was silently assumed fixable by an env-var set
+       for 5 straight GTM reads -- that assumption is now confirmed WRONG; see next_actions).
+       This is the longest-standing blocker in this loop's history and its framing just
+       changed, so watch closely for the owner's actual decision (A/B) rather than re-asking
+       for the old env-var action."
+    - "No marketing channels connected -- Growth Agent stays in prepare-mode. engine_pct is
+       honestly 50% (build completeness, computed) -- the gap is channel CONNECTION, not
+       missing infra."
   links:
     connect_runbook: docs/growth/CONNECT.md
     playbook: docs/growth/ANALYSIS_PLAYBOOK.md
