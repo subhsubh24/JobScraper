@@ -1,23 +1,51 @@
 """Per-user rate limiting on authed endpoints (ROADMAP Track F; security A→A+).
 
-The authed reads/writes (coach suggestions, skill-gaps, profile résumé, report, job
-create/update, enrichment, ai-consent) were IP-keyed, so MANY distinct users behind one
+The authed reads/writes below were IP-keyed, so MANY distinct users behind one
 carrier-grade-NAT public IP shared a single limit — one busy user (or a stranger on the same
 NAT) could false-429 everyone else, and a compromised token got no per-account bound. These
-endpoints now key the limiter by USER id (``rate_limit_user``), so each account has its own
-budget.
+endpoints now key the limiter by USER id (``rate_limit_user``, subject ``user:<id>``), like the
+read endpoints already covered by ``test_read_rate_limit.py``.
 
-This regression proves the KEYING at the HTTP layer: once user A's per-user budget for an
-endpoint is spent, A gets a 429 while user B on the SAME client IP is untouched. Reverting any
-of these endpoints back to the IP-keyed ``rate_limit`` reddens this test — A's seeded
-``user:<id>`` counter would be ignored (the endpoint would tally the shared client IP
-instead), so A's first call would pass AND B would share A's IP tally.
+This suite pins the KEYING for EVERY migrated endpoint (mirroring test_read_rate_limit.py's
+parametrized approach): once user A's per-user window for an endpoint's bucket is exhausted, A
+gets a 429 while user B on the SAME client IP is untouched. Reverting any one endpoint back to
+the IP-keyed ``rate_limit`` reddens the parametrized case for that endpoint — the seeded
+``user:<id>`` counter is ignored, so A's call passes (the endpoint would tally the shared
+client IP instead).
 
-The LLM/ingest/auth-preauth buckets are intentionally left IP-keyed as deliberate
-wallet-drain / account-rotation defenses and are out of scope here.
+The LLM / ingest / pre-auth (register/login/verify-purchase/delete-account) buckets are
+intentionally left IP-keyed as deliberate wallet-drain / account-rotation defenses and are out
+of scope here.
 """
+import time
+
+import pytest
+from sqlalchemy.orm import sessionmaker
+
 import asgi
-from src.db.models import User
+from src.db.models import RateCounter, User
+
+# (method, path, bucket, body) for every endpoint migrated to rate_limit_user. Paths that take
+# a body get a VALID one so the only possible error is the seeded limiter's 429 (never a 422
+# that would mask the keying). Bucket is the counter the endpoint checks — seeding it past the
+# limit for user A must 429 A while leaving user B (unseeded) free. jobs PATCH uses a
+# non-existent id on purpose: the limiter fires before the handler's 404 lookup.
+MIGRATED_ENDPOINTS = [
+    ("POST", "/api/ai-consent", "auth", None),
+    ("DELETE", "/api/ai-consent", "auth", None),
+    ("POST", "/api/jobs", "write",
+     {"title": "Engineer", "company_name": "Acme", "description": "Build and run services."}),
+    ("PATCH", "/api/jobs/does-not-exist", "write", {"status": "applied"}),
+    ("GET", "/api/coach/suggestions", "suggest", None),
+    ("POST", "/api/report", "report", {"content_type": "coach", "reason": "other"}),
+    ("GET", "/api/insights/skill-gaps", "suggest", None),
+    ("GET", "/api/profile/resume", "read", None),
+    ("PATCH", "/api/profile/resume", "write", {"resume_text": "Senior engineer, Python + React."}),
+    ("POST", "/api/profile/enrich/github", "write", {"github": "torvalds"}),
+    ("DELETE", "/api/profile/enrichment", "write", None),
+]
+
+_OVER_ANY_LIMIT = 1000  # ≥ every per-endpoint limit, so the current window is exhausted
 
 
 def _register(client, email):
@@ -30,51 +58,50 @@ def _uid(db, email):
     return db.query(User).filter(User.email == email).one().id
 
 
-def test_coach_suggestions_is_per_user_not_per_ip(client, db_session):
-    token_a = _register(client, "peruser-a@example.com")
-    token_b = _register(client, "peruser-b@example.com")
-    uid_a = _uid(db_session, "peruser-a@example.com")
+def _seed_bucket(engine, user_id, bucket):
+    """Seed the per-user counter for (user:<id>, bucket, current window) past every limit, so
+    the next call to any endpoint on that bucket 429s — exactly what _consume_counter would
+    compute, without driving hundreds of real requests."""
+    session = sessionmaker(bind=engine)()
+    session.add(
+        RateCounter(
+            subject=f"user:{user_id}",
+            bucket=bucket,
+            window_key=int(time.time() // 60),
+            count=_OVER_ANY_LIMIT,
+        )
+    )
+    session.commit()
+    session.close()
 
-    # Spend user A's per-user "suggest" budget (limit 30) on the exact subject the endpoint
-    # keys by. _consume_counter commits each increment to the shared rate_counters table.
+
+@pytest.mark.parametrize("method,path,bucket,body", MIGRATED_ENDPOINTS)
+def test_migrated_endpoint_is_per_user_not_per_ip(client, _engine, method, path, bucket, body):
+    token_a = _register(client, "pu-a@example.com")
+    token_b = _register(client, "pu-b@example.com")
+    uid_a = _uid(sessionmaker(bind=_engine)(), "pu-a@example.com")
+    _seed_bucket(_engine, uid_a, bucket)
+
+    # User A's window for this bucket is exhausted -> 429 (the limiter fires before the handler).
+    ra = client.request(method, path, headers={"Authorization": f"Bearer {token_a}"}, json=body)
+    assert ra.status_code == 429, f"{method} {path}: expected 429 for exhausted user, got {ra.status_code} {ra.text}"
+
+    # User B shares the SAME TestClient IP but has an untouched per-user budget -> NOT 429.
+    # (Under the reverted IP-keyed limiter, B would 429 off A's shared client-IP tally.)
+    rb = client.request(method, path, headers={"Authorization": f"Bearer {token_b}"}, json=body)
+    assert rb.status_code != 429, f"{method} {path}: user B wrongly throttled off user A's tally ({rb.status_code})"
+
+
+def test_coach_suggestions_round_trip_via_real_consume_counter(client, db_session):
+    """A full HTTP round-trip that exhausts the budget through the REAL _consume_counter path
+    (not a seeded row): A is 429, B on the same IP gets a real 200 with suggestions."""
+    token_a = _register(client, "rt-a@example.com")
+    token_b = _register(client, "rt-b@example.com")
+    uid_a = _uid(db_session, "rt-a@example.com")
     for _ in range(30):
         assert asgi._consume_counter(db_session, f"user:{uid_a}", "suggest", 30, 60) is True
 
-    # User A is now over budget -> 429.
-    ra = client.get(
-        "/api/coach/suggestions", headers={"Authorization": f"Bearer {token_a}"}
-    )
+    ra = client.get("/api/coach/suggestions", headers={"Authorization": f"Bearer {token_a}"})
     assert ra.status_code == 429, ra.text
-
-    # User B shares the SAME TestClient IP but has an untouched per-user budget -> allowed.
-    # (Under the reverted IP-keyed limiter, B would 429 off A's shared client-IP tally.)
-    rb = client.get(
-        "/api/coach/suggestions", headers={"Authorization": f"Bearer {token_b}"}
-    )
+    rb = client.get("/api/coach/suggestions", headers={"Authorization": f"Bearer {token_b}"})
     assert rb.status_code == 200, rb.text
-
-
-def test_job_create_budget_is_isolated_per_user(client, db_session):
-    """A second authed endpoint (POST /api/jobs, "write" bucket) proves the migration holds
-    for writes too: exhausting A's per-user write budget never blocks B on the same IP."""
-    token_a = _register(client, "peruser-w-a@example.com")
-    token_b = _register(client, "peruser-w-b@example.com")
-    uid_a = _uid(db_session, "peruser-w-a@example.com")
-
-    for _ in range(30):
-        assert asgi._consume_counter(db_session, f"user:{uid_a}", "write", 30, 60) is True
-
-    payload = {
-        "title": "Backend Engineer",
-        "company_name": "Acme",
-        "description": "Build and operate Python services.",
-    }
-    ra = client.post(
-        "/api/jobs", headers={"Authorization": f"Bearer {token_a}"}, json=payload
-    )
-    assert ra.status_code == 429, ra.text
-
-    rb = client.post(
-        "/api/jobs", headers={"Authorization": f"Bearer {token_b}"}, json=payload
-    )
-    assert rb.status_code != 429, rb.text

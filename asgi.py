@@ -398,6 +398,16 @@ def rate_limit_user(bucket: str, limit: int, window_seconds: int = 60):
     that shared-IP hazard AND gives real per-account abuse protection: a single compromised
     token can't hammer these DB-reading endpoints unbounded. The subject is prefixed ``user:``
     so its counter rows never collide with the IP-keyed limiter's, even in a shared bucket.
+
+    TRADE-OFF (deliberate): because ``get_current_user`` resolves BEFORE this dependency runs,
+    a request with a missing/invalid/expired token 401s without ever reaching the limiter — so
+    an INVALID-token flood is not throttled here (unlike the IP-keyed ``rate_limit``, which runs
+    pre-auth). That is accepted: ``verify_token`` fails fast with NO DB hit, so a rejected
+    request is cheap, and volumetric anonymous floods are an edge/CDN (WAF) concern, not an
+    app-layer one. The surfaces where an unauthenticated flood is actually expensive or
+    sensitive — LLM/ingest generation, and the pre-auth register/login/verify-purchase — keep
+    the IP-keyed ``rate_limit`` for exactly this reason; only AUTHED, cheap-on-reject endpoints
+    move here, where per-account fairness (no shared-NAT false-429) is the goal.
     """
     def _dep(
         user: User = Depends(get_current_user),
