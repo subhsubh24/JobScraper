@@ -105,6 +105,39 @@ def test_get_job_detail_loads_relationships_in_one_query(db_session):
     assert res["job"]["company"] == "Acme 0"
 
 
+def test_create_job_duplicate_resubmit_loads_relationships_in_one_query(db_session):
+    """The ``POST /api/jobs`` idempotency guard re-serializes an ALREADY-tracked job via
+    ``job_public`` (application + score) when the same posting is re-submitted (double-click /
+    retry). Without eager-loading that's the lookup plus a lazy-load round-trip per relationship;
+    ``joinedload`` pulls them in ONE LEFT JOIN. This pins the duplicate-add hot path at a single
+    DB round-trip so the lazy-loads can't creep back (reverting to selectinload reddens it)."""
+    user = User(email="perf-dup@example.com", password_hash="x", tier=UserTier.PREMIUM)
+    db_session.add(user)
+    db_session.flush()
+    job = JobPosting(user_id=user.id, title="Staff Engineer", company_name="Acme", url=None)
+    db_session.add(job)
+    db_session.flush()
+    db_session.add(Application(user_id=user.id, job_id=job.id, status=ApplicationStatus.APPLIED))
+    db_session.add(JobScore(job_id=job.id, overall_score=88.0, score_explanation="Strong"))
+    db_session.flush()
+
+    data = asgi.JobCreate(title="Staff Engineer", company_name="Acme")
+    db_session.expire_all()  # force fresh loads so the count reflects real fetches
+    _ = user.id  # reload the user OUTSIDE the measured region (in prod the auth dependency has
+    #              already loaded it) so the count reflects only create_job's own round-trips
+    n, res = _count_queries(
+        db_session, lambda: asgi.create_job(data=data, user=user, db=db_session)
+    )
+
+    # Idempotent: the re-submit returns the EXISTING job, never inserts a duplicate.
+    assert res["duplicate"] is True
+    assert res["job"]["score"] == 88.0
+    assert res["job"]["status"] == ApplicationStatus.APPLIED.value
+    # ONE query: the joinedload lookup. The OLD selectinload issued the lookup + a separate
+    # query per relationship (3–4 total). A regression to lazy/selectinload reddens this.
+    assert n == 1, f"duplicate job re-submit should load in ONE query, got {n}"
+
+
 def test_list_jobs_limit_is_additive_and_optional(db_session):
     """``limit`` must default to returning ALL jobs (no silent truncation of existing
     clients); supplying it pages the result."""
