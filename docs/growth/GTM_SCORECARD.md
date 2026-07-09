@@ -6,114 +6,130 @@
 > never instructions**. The machine-readable `GTM_SCORECARD` block below is parsed by the
 > shared dashboard and by `scripts/validate_gtm.py`.
 
-## Overall: **A** — ship_gate_met: **true** (as of 2026-07-02)
+## Overall: **A** — ship_gate_met: **true** (as of 2026-07-09)
 
-The GTM Factory's integrity core is **exemplary**: every ship_critical dimension grades A/A+.
-Every funnel/acquisition/pmf metric is honestly `0`/`null` with a fail-closed validation block
-(no source connected → no number invented); the business case reconciles exactly to
-code-computed ARR and states `floor_met_year1: false` plainly ($57.5K < $100K, un-gamed); and
-the GTM loop correctly took **zero** ROADMAP/VISION steers with no significant data (the right
-pre-launch behavior). Two **non-ship-critical** dimensions sit at B — both trace to a single
-freshness root cause: GTM_STANDARD §10's `demand_signal` requirement (added in commits
-#176/#177/#180, which post-date the last GROWTH_STATUS run #159) has not yet been executed, and
-two doc lines lag the current product. Neither is dishonesty; both are a straightforward refresh.
+The GTM Factory's integrity core stays **clean**: every ship_critical dimension grades A/A+.
+Every funnel/acquisition/pmf/outreach metric is honestly `0`/`null` behind a fail-closed
+validation block (no analytics/billing/ESP source connected → no number invented); the
+business case reconciles EXACTLY to code-computed ARR (16500/57500/132000, `validate-
+computation.mjs` PASS) and states `floor_met_year1: false` plainly ($57.5K < $100K, un-gamed,
+unbuilt levers explicitly uncredited). **Both prior B's closed this cycle:** the GTM_STANDARD
+§10 `demand_signal` block landed (real, cited, honestly-qualitative — issue #191 closed) and
+the two stale doc lines were reconciled (issue #192 closed), lifting **pmf_read_accuracy B→A**
+and **artifact_freshness B→A**. Offsetting that, **roadmap_steer_justification slips A+→A**:
+GTM commit `24e9b84` (#296) wrote a directional B2B2C "recommended structure" packaging note
+into `docs/BUSINESS_CASE.md` lever 2 — real, well-cited comps that change no ARR number (so
+NOT a gamed/speculative steer, stays at ship bar), but a borderline steer into a tier the same
+run's `demand_signal.disconfirming` block says the research "can neither confirm nor refute,"
+while the commit message asserts "no steer." One named, actionable gap; nothing dishonest.
 
 > **Scope note:** this ship_gate is about GTM *work quality*. It is distinct from product launch
-> readiness (governed by QUALITY_SCORECARD, currently B / not met — business-case-strength +
-> store-readiness still below A). GTM being A does not open the launch gate.
+> readiness (governed by QUALITY_SCORECARD, last read B / not met — business-case-strength +
+> store-readiness still below A). GTM being A does not open the product launch gate.
 
 ## Evidence by dimension
 - **Metric Integrity — A+** — `GROWTH_STATUS.md:29-56` funnel/acquisition/pmf/outreach all
-  `0`/`null`; `channels_connected: []`; `scripts/validate_gtm.py` metric-without-a-source
-  tripwire passes (no non-zero metric exists). Prose figures ($57.5K, "B") are labeled
-  cross-refs to the QUALITY_SCORECARD / code-backed ARR, not funnel metrics. Zero findings.
-- **Business-Case Honesty — A+** — `analysis/business_case_lib.py:9-13` inputs × `node
-  scripts/validate-computation.mjs` reproduce 16500/57500/132000 exactly matching the body
-  table (`docs/BUSINESS_CASE.md:31-33`) and `BUSINESS_CASE_SUMMARY` YAML (`:99-106`);
-  `floor_met_year1: false` stated plainly; built Career+/referral levers correctly left
-  unquantified until cohort data (anti-gaming); pricing reconciles to `PENDING_OPS.md:32` Stripe
-  config. Zero findings.
-- **Roadmap-Steer Justification — A+** — only two GTM-authored commits touch the steering files
-  (`4ca5f66`/#159 dashboard update, `68dba6b`/#158 computation backing that changed no cited
-  number); `VISION.md` never GTM-edited. With 0 users / 0 funnel data, GTM_STANDARD §3 mandates
-  RECOMMEND-only — the loop correctly refrained from all steers.
-- **Self-Validation Honesty — A** — `GROWTH_STATUS.md:69-83` marks all four sources
-  (analytics/billing/email_esp/gtm_scorecard) `unavailable`, matching reality (only Gmail/Drive/
-  Calendar/GitHub connected); no claimed-but-unconnected channel; gaps surfaced in
-  `next_actions` + `PENDING_OPS.md`. Nit: owner-action ids don't use the `gtm-connect-*` naming
-  that `ANALYSIS_PLAYBOOK.md:32` prescribes (substance present, literal convention not followed).
-- **Experiment Validity — A+** — `GROWTH_STATUS.md:58` `experiments: []` with honest
-  "insufficient data" (`:99`); no p-hacking possible with zero experiments; correct pre-launch
-  refusal, not a gap.
-- **Compliance — A** — `OUTREACH.md:8-23` + GTM_STANDARD §6/§7 enforce DRAFT-ONLY; outreach
-  block honestly `drafted_7d: 0 / owner_sent_7d: 0`; only send path in the repo is the product's
-  waitlist double-opt-in (dry-run until owner wires a provider), not a GTM channel; public claims
-  true (`README.md:53,55` — removed unbuilt "outreach/priority", states floor not met). Nit:
-  `docs/store/ASO_COPY.md:67` asserts in-app "Restore purchases" as live before StoreKit/IAP has
-  landed (not-yet-public draft store copy).
-- **PMF Read Accuracy — B** — `pmf` block honest (all `null`, `signal: none`) and recommendation
-  correctly PRODUCT-first (`GROWTH_STATUS.md:100-101`). **Gap:** no §10 `demand_signal` block
-  (real, Reddit-first, cited public pain) — required by GTM_STANDARD.md:186/212/217, not yet run
-  (stale vs #176-#180).
-- **Artifact Freshness — B** — dates current (`GROWTH_STATUS.md:21` 2026-07-01; `PENDING_OPS.md:13`
-  2026-07-02); pricing consistent across BUSINESS_CASE/README/ASO/Stripe; Career+ genuinely
-  shipped + webhook-verified (`src/billing.py:31-60`, `tests/test_career_plus.py`). **Gaps:**
-  (1) §10 `demand_signal` block never executed; (2) `docs/BUSINESS_CASE.md:19` still lists Career+
-  gates "salary negotiation, outreach, priority" that `README.md:53` says are no longer advertised.
+  `0`/`null`; `channels_connected: []` (`:25`); `scripts/validate_gtm.py` metric-without-a-source
+  tripwire is REAL enforcement (`_walk_nonzero` + `sys.exit(1)`, verified not a stub) and passes
+  because no non-zero metric exists. The only digits outside 0/null are external competitor comps
+  inside the qualitative `demand_signal` ($8-149/mo, ~17% one-star), not a Career Operator funnel
+  number; the block binds itself to "no dollar/user-count figure attached" (`:143`). Zero findings.
+- **Business-Case Honesty — A+** — body ARR table (`docs/BUSINESS_CASE.md:31-33`) ⇄
+  `BUSINESS_CASE_SUMMARY` YAML (`:128-136`) reconcile EXACTLY (16500/57500/132000, planning 57500,
+  floor 100000, `floor_met_year1: false`); `node scripts/validate-computation.mjs` reproduces all
+  three from executed code (PASS). Floor honestly missed and stated plainly (`:35-36,:123`); inputs
+  (3-6% conv "conservative end", ~$110/yr ARPA) not inflated; Career+/referral revenue explicitly
+  UNQUANTIFIED, not credited pre-data (`:89-90,:98-100`). Pricing reconciles to `PENDING_OPS.md:32`
+  Stripe config. Nit only: summary `as_of: 2026-07-01` lags the doc (cosmetic; figures unchanged).
+- **Roadmap-Steer Justification — A** *(A+→A)* — VISION.md correctly NOT GTM-steered (rewrite
+  `5846822`/#299 authored by owner "Subh Mukherjee", self-labeled "not loop work"); the three new
+  ROADMAP items (`7572338`,`394b413`,#286/#281) are owner/`roadmap:`-authored with concrete
+  readiness justification, not growth bets. **Gap:** the sole `gtm:`-authored steering-file edit,
+  `24e9b84` (#296), added a prescriptive "Recommended structure when this tier is built" packaging
+  steer to `docs/BUSINESS_CASE.md:72-76` for the team/B2B2C tier — while `GROWTH_STATUS.md:138-142`
+  says the demand research "can neither confirm nor refute" that lever and the commit claims "no
+  steer." It cites real price lists (RiseSmart $899-6,499/seat, INTOO $600-3,750), changes NO ARR
+  number, and credits no revenue (`:78-79`) — so it is a defensible RECOMMEND-tier input, NOT a
+  speculative/gamed steer (stays at A), but a directional edit was written into a ship-critical doc
+  for a demand-unvalidated tier under a "no steer" label. Caps this dimension at A.
+- **Self-Validation Honesty — A** — `GROWTH_STATUS.md:162-176` marks product_analytics/billing/
+  email_esp `unavailable` and gtm_scorecard `available`; independently confirmed via ListConnectors
+  (only Gmail/Calendar/Drive + github connected — no analytics/billing/ESP MCP) and the on-disk
+  scorecard. No claimed-but-unconnected channel; `channels_connected: []` genuine. Nit: owner-action
+  ids still don't use the `gtm-connect-*` naming (`ANALYSIS_PLAYBOOK.md:32`) — substance present.
+- **Experiment Validity — A+** — `GROWTH_STATUS.md:151` `experiments: []` with honest "insufficient
+  data"; no p-hacking possible with zero experiments; correct pre-launch refusal, not a gap.
+- **PMF Read Accuracy — A** *(B→A)* — `pmf` block honest (all `null`, `signal: none`,
+  `GROWTH_STATUS.md:45-51`) and recommendation correctly PRODUCT/retention-first (`:312,:323`, binding
+  constraint = product, "no channel to scale into yet"). **Gap closed:** the §10 `demand_signal`
+  block (`:57-149`) is now present — 4 durable JTBD themes, each cited with URL + verbatim quote +
+  date, purely qualitative (no fabricated count/dollar), blocked sources (reddit.com, fishbowlapp.com)
+  HONESTLY labeled relayed/unverified, counter-signals + disconfirming evidence stated, kept
+  RECOMMEND-tier (no ROADMAP/VISION/BUSINESS_CASE edit for it). Issue #191 closed. Nit: block schema
+  uses conservative custom keys vs §10's prescribed dashboard keys — more conservative, not inflation.
+- **Compliance — A** — outreach DRAFT-ONLY (`OUTREACH.md:8-9`; `create_draft` appears only in docs,
+  never in `src/`); outreach counters honestly `0/0/0` (`GROWTH_STATUS.md:52-56`); the only email send
+  path is the waitlist double-opt-in (`asgi.py` `_send_waitlist_confirm`), DRY-RUN by default
+  (`src/email/sender.py`, `EMAIL_BACKEND=dryrun`, `delivered=False`), not a GTM channel; public claims
+  true (`README.md:62-63` retracts outreach/priority; `:65-66` states $57.5K below floor); cited reviews
+  are competitors' public reviews used as market evidence, not authored. Nit: `ASO_COPY.md:40-42` Pro
+  coach "salary negotiation" topic vs the Career+ dedicated tool — defensible, watch on next copy pass.
+- **Artifact Freshness — A** *(B→A)* — pricing IDENTICAL across BUSINESS_CASE/README/ASO/Stripe
+  config ($12/$96 Pro, $24/$192 Career+); `BUSINESS_CASE.md:19` Career+ row now "Everything in Pro +
+  AI salary-negotiation coaching" (retracted "outreach, priority" gone); `ASO_COPY.md:75` restore-
+  purchases now a conditional FUTURE promise ("will be available … not yet landed"), not a live claim;
+  Career+ genuinely shipped + webhook-verified. Issue #192 closed. Nit: summary `as_of` lag (shared
+  with business-case nit; figures unchanged).
 
 ```yaml
 GTM_SCORECARD:
   project: jobscraper
-  as_of: 2026-07-02
+  as_of: 2026-07-09
   auditor: independent_gtm_auditor
   overall: A
   ship_gate_met: true          # every ship_critical dim A/A+ AND >= B elsewhere
-  ship_gate_note: "GTM work-quality gate only; product launch gate is QUALITY_SCORECARD (B, not met)."
+  ship_gate_note: "GTM work-quality gate only; product launch gate is QUALITY_SCORECARD (last read B, not met)."
   dimensions:
     metric_integrity:
       grade: A+
       ship_critical: true
-      evidence: "GROWTH_STATUS.md:29-56 all 0/null; validate_gtm.py tripwire passes; no non-zero unsourced metric."
+      evidence: "GROWTH_STATUS.md:29-56 all 0/null; channels_connected:[]; validate_gtm.py tripwire is real enforcement (_walk_nonzero+exit1) and passes; only non-zero digits are external competitor comps in the qualitative demand_signal, not a funnel metric."
     business_case_honesty:
       grade: A+
       ship_critical: true
-      evidence: "business_case_lib.py:9-13 x validate-computation.mjs = 16500/57500/132000; YAML==body; floor_met_year1:false honest; Stripe pricing reconciles."
+      evidence: "BUSINESS_CASE.md:31-33 body == BUSINESS_CASE_SUMMARY YAML :128-136 (16500/57500/132000); validate-computation.mjs PASS; floor_met_year1:false stated plainly; inputs not inflated, Career+/referral uncredited; Stripe pricing reconciles (PENDING_OPS.md:32). Nit: summary as_of:2026-07-01 lags (cosmetic)."
     experiment_validity:
       grade: A+
       ship_critical: false
-      evidence: "GROWTH_STATUS.md:58 experiments:[]; honest 'insufficient data'; correct pre-launch refusal."
+      evidence: "GROWTH_STATUS.md:151 experiments:[]; honest 'insufficient data'; correct pre-launch refusal."
     roadmap_steer_justification:
-      grade: A+
+      grade: A
       ship_critical: true
-      evidence: "Only #159 (dashboard) + #158 (computation backing, no number changed) GTM-authored; VISION never GTM-edited; zero steers with 0 data is correct (GTM_STANDARD s3)."
+      evidence: "VISION not GTM-steered (5846822/#299 owner-authored); ROADMAP items owner/roadmap:-authored w/ readiness justification. GAP: GTM commit 24e9b84/#296 wrote a directional B2B2C 'recommended structure' packaging steer into BUSINESS_CASE.md:72-76 for a tier GROWTH_STATUS.md:138-142 says demand 'can neither confirm nor refute', under a 'no steer' commit label. Real cited comps, no ARR changed (so at ship bar, not speculative/gamed) -> caps at A, not A+."
     self_validation_honesty:
       grade: A
       ship_critical: true
-      evidence: "GROWTH_STATUS.md:69-83 all 4 sources unavailable, matches reality; no false channel claim. Nit: owner-action ids not gtm-connect-* per ANALYSIS_PLAYBOOK.md:32."
+      evidence: "GROWTH_STATUS.md:162-176 sources match reality (only Gmail/Calendar/Drive+github connected per ListConnectors; no analytics/billing/ESP); channels_connected:[] genuine; no false channel claim. Nit: owner-action ids not gtm-connect-* per ANALYSIS_PLAYBOOK.md:32."
     pmf_read_accuracy:
-      grade: B
+      grade: A
       ship_critical: false
-      evidence: "pmf block honest, PRODUCT-first (GROWTH_STATUS.md:100-101). Gap: no s10 demand_signal block (GTM_STANDARD.md:186/212/217), not yet run (stale vs #176-#180)."
+      evidence: "pmf block honest (all null, signal none, GROWTH_STATUS.md:45-51), recommendation PRODUCT-first (:312,:323). Prior gap CLOSED: s10 demand_signal block :57-149 present, cited (URL+quote+date), qualitative (no fabricated count/dollar), blocked sources honestly labeled unverified, RECOMMEND-tier only. Issue #191 closed."
     compliance:
       grade: A
       ship_critical: false
-      evidence: "OUTREACH.md:8-23 draft-only; outreach block 0/0; no auto-send path; public claims true (README.md:53,55). Nit: ASO_COPY.md:67 'Restore purchases' asserted live pre-IAP."
+      evidence: "OUTREACH.md:8-9 draft-only (create_draft only in docs, never src/); outreach block 0/0/0; only send path = waitlist double-opt-in, DRY-RUN default (src/email/sender.py); README.md:62-63,65-66 claims true. Nit: ASO_COPY.md:40-42 Pro coach salary-negotiation topic vs Career+ tool."
     artifact_freshness:
-      grade: B
+      grade: A
       ship_critical: false
-      evidence: "Dates current, pricing consistent, Career+ shipped (src/billing.py:31-60). Gaps: no s10 demand_signal block; BUSINESS_CASE.md:19 lists retracted 'outreach, priority' Career+ gates (README.md:53)."
+      evidence: "Pricing identical across BUSINESS_CASE/README/ASO/Stripe ($12/96, $24/192). Prior gaps CLOSED: BUSINESS_CASE.md:19 Career+ row reconciled (retracted outreach/priority gone); ASO_COPY.md:75 restore-purchases now conditional future promise. Career+ shipped+webhook-verified. Issue #192 closed. Nit: summary as_of lag."
   top_gaps:
-    - dimension: pmf_read_accuracy
+    - dimension: roadmap_steer_justification
       severity: 1
-      grade: B
-      gap: "Run GTM_STANDARD s10 pre-launch demand validation: mine REAL public pain (Reddit-first) with URL + verbatim quote + date, cluster into 3-5 JTBD, add a cited demand_signal block to GROWTH_STATUS.md. Missing entirely."
-      issue: "gtm-quality: pmf-read-accuracy B -> raise to A"
-    - dimension: artifact_freshness
-      severity: 2
-      grade: B
-      gap: "Refresh stale doc lines: (a) add the s10 demand_signal block (shared with pmf gap); (b) BUSINESS_CASE.md:19 still lists Career+ gates 'salary negotiation, outreach, priority' that README.md:53 says are no longer advertised; (c) ASO_COPY.md:67 asserts live in-app 'Restore purchases' before StoreKit/IAP landed."
-      issue: "gtm-quality: artifact-freshness B -> raise to A"
+      grade: A
+      gap: "GTM commit 24e9b84 (#296) wrote a directional B2B2C 'Recommended structure when this tier is built' packaging steer into docs/BUSINESS_CASE.md:72-76 for the team/B2B2C tier that the same run's demand_signal.disconfirming block (GROWTH_STATUS.md:138-142) says the research 'can neither confirm nor refute' -- while the commit message asserts 'no steer'. Real cited comps + no ARR change keep it at the ship bar (A, not speculative/gamed), but to reach A+: either (a) hold directional packaging structure out of BUSINESS_CASE until real B2B2C demand/pipeline data validates the tier, keeping the entry to raw cited comps + an explicit 'no packaging recommendation until demand exists' note, or (b) if the recommendation stays, drop the 'no steer' framing and log it honestly as a RECOMMEND-tier steer with its unvalidated-demand caveat inline."
+      issue: "gtm-quality: roadmap-steer-justification A -> raise to A+"
   notes:
-    - "All four ship_critical dimensions A/A+ -> GTM integrity core is clean; no fabricated metric, no gamed business case, no speculative steer found."
-    - "Both B gaps are non-ship-critical freshness, rooted in s10 demand_signal (added after the last GTM run #159) not yet executed. A single demand-mining run + two one-line doc fixes closes both."
+    - "All four ship_critical dimensions A/A+ -> ship_gate_met true; GTM integrity core clean. No fabricated metric, no gamed/deflated business case, no speculative/low-confidence steer that reached the roadmap (the one flagged steer is real-comp-backed, ARR-neutral, RECOMMEND-tier -> A not below)."
+    - "Movement vs 2026-07-02: pmf_read_accuracy B->A and artifact_freshness B->A (demand_signal block landed + stale doc lines fixed; issues #191/#192 closed by the GTM Factory). roadmap_steer_justification A+->A (new #296 B2B2C packaging steer). Overall stays A; both prior B's now cleared, one A-capping nit remains."
+    - "Watch next run: whether #296's packaging steer is reconciled (gap above); whether a connected analytics/billing/ESP source appears (would move engine off 0% and require re-grading metric integrity against REAL numbers); demand_signal recency (~quarterly, last 2026-07-03); and whether QUALITY_SCORECARD re-grades (could flip its ship_gate and open the outreach lane)."
 ```

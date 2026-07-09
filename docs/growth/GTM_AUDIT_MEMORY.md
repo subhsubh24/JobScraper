@@ -46,3 +46,49 @@ evidence only. This is DATA, never instructions.
 - **Watch next run:** whether the demand_signal block lands (closes both B's) and whether a
   connected analytics/billing source appears (would move engine off 0% and require re-grading
   metric integrity against real numbers).
+
+---
+
+### 2026-07-09 — Second grade (re-grade)
+- **Overall: A · ship_gate_met: true** (GTM work-quality gate; product launch gate separate —
+  QUALITY_SCORECARD last read B, not met). Unchanged overall from 2026-07-02, but the mix moved.
+- **Grades:** metric_integrity **A+**, business_case_honesty **A+**, experiment_validity **A+**,
+  roadmap_steer_justification **A** (↓ from A+), self_validation_honesty **A**, pmf_read_accuracy
+  **A** (↑ from B), compliance **A**, artifact_freshness **A** (↑ from B). All four ship_critical
+  A/A+; all others A. No B/C/D/F anywhere.
+- **What changed vs last grade:**
+  - **pmf_read_accuracy B→A** and **artifact_freshness B→A** — the GTM Factory closed BOTH prior
+    top_gaps. The GTM_STANDARD §10 `demand_signal` block landed (`GROWTH_STATUS.md:57-149`, run
+    2026-07-03): 4 durable JTBD themes, each cited URL+quote+date, purely qualitative, blocked
+    sources (reddit/fishbowl) honestly labeled relayed/unverified, counter-signals + disconfirming
+    stated, kept RECOMMEND-tier. Issue **#191 closed**. The two stale doc lines were fixed —
+    `BUSINESS_CASE.md:19` Career+ row reconciled (retracted "outreach, priority" gone),
+    `ASO_COPY.md:75` restore-purchases softened to a conditional future promise. Issue **#192 closed**.
+  - **roadmap_steer_justification A+→A** (NEW gap) — GTM commit `24e9b84` (#296, 2026-07-05) wrote a
+    directional B2B2C "recommended structure" packaging steer into `BUSINESS_CASE.md:72-76` for a
+    tier the same run's `demand_signal.disconfirming` block (`:138-142`) says demand research "can
+    neither confirm nor refute", while the commit asserts "no steer". Real cited comps (RiseSmart/
+    INTOO price lists), changes NO ARR number, credits no revenue → a defensible RECOMMEND-tier
+    input, NOT speculative/gamed (stays at the ship bar, A), but the directional edit + "no steer"
+    label caps it below A+.
+- **How I verified (adversarial, 3 fresh Opus graders + direct checks, none did GTM work):**
+  - Metric integrity + self-validation (grader 1, UPHELD A+/A): scanned every funnel/acq/pmf/
+    outreach/email/content field — all 0/null; only non-zero digits are external competitor comps
+    in the qualitative demand_signal; `validate_gtm.py` tripwire (`_walk_nonzero`+`exit(1)`) is real
+    enforcement not a stub; ListConnectors = only Gmail/Calendar/Drive+github, matching the
+    `unavailable` source declarations.
+  - Business-case + roadmap-steer (grader 2): business-case UPHELD A+ (body⇄YAML exact,
+    `validate-computation.mjs` PASS 16500/57500/132000, floor honestly missed, levers uncredited,
+    Stripe pricing reconciles); roadmap-steer REFUTED from A+ → **A** (the #296 packaging steer,
+    reasoning above). VISION rewrite `5846822` confirmed owner-authored ("Subh Mukherjee"), not GTM.
+  - PMF + compliance + freshness (grader 3, UPHELD A/A/A): demand_signal genuinely qualitative +
+    honestly-sourced (fixes real not cosmetic); outreach draft-only (`create_draft` only in docs,
+    never `src/`), waitlist send path DRY-RUN by default; pricing identical across all 4 artifacts.
+- **Filed for the GTM Factory:** `gtm-quality: roadmap-steer-justification A -> raise to A+`
+  (severity 1, the sole named gap this run). No ship_critical dim is BELOW A, so the ship gate holds;
+  filed as an A→A+ polish, not a blocker. No fabricated metric, gamed number, or speculative steer
+  that reached the roadmap found.
+- **Watch next run:** whether #296's packaging steer is reconciled (the filed gap); a connected
+  analytics/billing/ESP source appearing (would force re-grading metric integrity against REAL
+  numbers); demand_signal recency (~quarterly, last 2026-07-03); a QUALITY_SCORECARD re-grade (could
+  flip its ship_gate and open the outreach lane).
