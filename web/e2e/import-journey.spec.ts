@@ -101,8 +101,14 @@ test('import happy path: preview -> pick a role -> pre-filled form -> REAL job i
 
   const title = page.getByLabel(/Job title/i);
   await expect(title).toHaveValue('Senior Backend Engineer');
-  await expect(page.getByLabel(/Company/i)).toHaveValue('acme');
+  // The ATS board token ("acme") is prettified into a best-guess company the user confirms.
+  // (Exact label — the import panel's "Company careers URL" field also contains "Company".)
+  await expect(page.getByLabel('Company *')).toHaveValue('Acme');
   await expect(page.getByText(/Imported from the careers page/i)).toBeVisible();
+
+  // Shell guard: adding an imported role with NO description is blocked (no unscoreable shell).
+  await page.getByRole('button', { name: /Add & score/i }).click();
+  await expect(page.getByText(/Paste the job description so we can score this role/i)).toBeVisible();
 
   // Paste the JD and add for real — this hits the REAL backend (no mock on POST /api/jobs).
   await page.getByLabel(/Job description/i).fill(
@@ -113,6 +119,31 @@ test('import happy path: preview -> pick a role -> pre-filled form -> REAL job i
   // The real side-effect: the job now appears in the pipeline list (backend created + scored it).
   await expect(page.getByText('Senior Backend Engineer')).toBeVisible({ timeout: 20_000 });
   await expect(page.getByText(/No jobs yet/i)).toHaveCount(0);
+});
+
+test('switching tabs never discards half-typed input (both panels stay mounted)', async ({
+  page,
+  request,
+}) => {
+  const email = freshEmail('import-tabkeep');
+  await seedUser(request, email);
+  await mockPreview(page, TWO_ROLES);
+  await signIn(page, email);
+
+  // Type in the manual form, switch to Import (and preview), then switch back.
+  await page.getByRole('button', { name: /\+ Add a job/i }).click();
+  await page.getByLabel(/Job title/i).fill('My hand-typed role');
+  await page.getByRole('tab', { name: /Import from a careers page/i }).click();
+  await page.getByLabel(/careers URL/i).fill('https://boards.greenhouse.io/acme');
+  await page.getByRole('button', { name: /Preview roles/i }).click();
+  await expect(page.getByText('Senior Backend Engineer')).toBeVisible();
+  await page.getByRole('tab', { name: /Add manually/i }).click();
+
+  // The manual input survived the round-trip (not wiped by an unmount).
+  await expect(page.getByLabel(/Job title/i)).toHaveValue('My hand-typed role');
+  // And the import panel kept its fetched listings too.
+  await page.getByRole('tab', { name: /Import from a careers page/i }).click();
+  await expect(page.getByText('Senior Backend Engineer')).toBeVisible();
 });
 
 test('import honest state: an unsupported board shows the server message, no listings', async ({

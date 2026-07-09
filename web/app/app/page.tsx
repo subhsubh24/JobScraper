@@ -133,6 +133,17 @@ function Stat({ label, value }: { label: string; value: string }) {
 
 type Prefill = { title: string; company: string; location: string; url: string };
 
+// The ATS board token ("acme", "acme-corp") is not a display name. Turn it into a best-guess
+// company label ("Acme", "Acme Corp") the user confirms — never render the raw slug as the name.
+function prettifyCompanySlug(slug: string | null): string {
+  if (!slug) return '';
+  return slug
+    .split(/[-_]+/)
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ');
+}
+
 // The add-a-job surface: a manual form OR an ATS careers-page import. Import is a two-step,
 // honest flow — preview roles from a Greenhouse/Lever URL, then pick one to PRE-FILL the manual
 // form. Listings carry no job description (the board's list API omits it), so we never create an
@@ -148,39 +159,59 @@ function AddSection({ onAdded }: { onAdded: () => void }) {
         aria-label="How to add a job"
         className="mb-4 flex gap-1 rounded-lg bg-slate-800/60 p-1"
       >
-        <TabButton selected={mode === 'manual'} onClick={() => setMode('manual')}>
+        <TabButton
+          id="add-tab-manual"
+          controls="add-panel-manual"
+          selected={mode === 'manual'}
+          onClick={() => setMode('manual')}
+        >
           Add manually
         </TabButton>
-        <TabButton selected={mode === 'import'} onClick={() => setMode('import')}>
+        <TabButton
+          id="add-tab-import"
+          controls="add-panel-import"
+          selected={mode === 'import'}
+          onClick={() => setMode('import')}
+        >
           Import from a careers page
         </TabButton>
       </div>
 
-      {mode === 'manual' ? (
-        // Remount on a new prefill so the form fields re-seed from the picked listing.
-        <AddJobForm key={prefill ? `${prefill.url}|${prefill.title}` : 'blank'} prefill={prefill} onAdded={onAdded} />
-      ) : (
+      {/* Both panels stay MOUNTED (toggled with `hidden`) so switching tabs never discards
+          half-typed input — the manual form's fields and the import panel's URL/results both
+          survive a round-trip. A picked listing seeds the form via `prefill` (applied by effect). */}
+      <div id="add-panel-manual" role="tabpanel" aria-labelledby="add-tab-manual" hidden={mode !== 'manual'}>
+        <AddJobForm prefill={prefill} onAdded={onAdded} />
+      </div>
+      <div id="add-panel-import" role="tabpanel" aria-labelledby="add-tab-import" hidden={mode !== 'import'}>
         <ImportPanel
           onPick={(listing) => {
             setPrefill({
               title: listing.title,
-              company: listing.company_slug ?? '',
+              // company_slug is the ATS BOARD TOKEN (e.g. "acme"), not a display name — prettify it
+              // into a best-GUESS company ("acme-corp" → "Acme Corp") the banner asks the user to
+              // confirm, rather than dumping the raw lowercase slug into the Company field.
+              company: prettifyCompanySlug(listing.company_slug),
               location: listing.location ?? '',
               url: listing.url ?? '',
             });
             setMode('manual');
           }}
         />
-      )}
+      </div>
     </Card>
   );
 }
 
 function TabButton({
+  id,
+  controls,
   selected,
   onClick,
   children,
 }: {
+  id: string;
+  controls: string;
   selected: boolean;
   onClick: () => void;
   children: React.ReactNode;
@@ -188,8 +219,10 @@ function TabButton({
   return (
     <button
       type="button"
+      id={id}
       role="tab"
       aria-selected={selected}
+      aria-controls={controls}
       onClick={onClick}
       className={`flex-1 rounded-md px-3 py-2 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 ${
         selected ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-slate-200'
@@ -209,11 +242,39 @@ function AddJobForm({ prefill, onAdded }: { prefill?: Prefill | null; onAdded: (
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  // The form stays mounted across tab switches (so manual typing isn't lost), so re-seed the
+  // fields when a NEW listing is picked (prefill identity changes) — clearing the description
+  // since it belongs to the previously-picked role. A pure tab toggle leaves prefill unchanged,
+  // so nothing is overwritten.
+  useEffect(() => {
+    if (prefill) {
+      // Syncing picked-listing props into local field state (same accepted prop→state pattern
+      // the pipeline/insights load() effects use).
+      /* eslint-disable react-hooks/set-state-in-effect */
+      setTitle(prefill.title);
+      setCompany(prefill.company);
+      setLocation(prefill.location);
+      setUrl(prefill.url);
+      setDescription('');
+      setError(null);
+      /* eslint-enable react-hooks/set-state-in-effect */
+    }
+  }, [prefill]);
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     if (!title.trim() || !company.trim()) {
       setError('Title and company are required.');
+      return;
+    }
+    // An imported listing carries NO job description, so require one on this path — otherwise the
+    // import would create the exact unscoreable shell this flow exists to avoid. (The manual path
+    // keeps description optional: a user typing by hand may deliberately track a role first.)
+    if (prefill && !description.trim()) {
+      setError(
+        'Paste the job description so we can score this role — or use “Add manually” to track it without a score.',
+      );
       return;
     }
     setLoading(true);
@@ -237,8 +298,8 @@ function AddJobForm({ prefill, onAdded }: { prefill?: Prefill | null; onAdded: (
     <form onSubmit={submit} className="space-y-4">
       {prefill && (
         <p className="rounded-lg border border-indigo-500/30 bg-indigo-500/10 px-3 py-2 text-sm text-indigo-200">
-          Imported from the careers page. Paste the job description below to get an accurate fit
-          score, then add it.
+          Imported from the careers page. We guessed the company name from the board — double-check
+          it, then paste the job description below to get an accurate fit score.
         </p>
       )}
       <div className="grid gap-4 sm:grid-cols-2">
@@ -248,7 +309,9 @@ function AddJobForm({ prefill, onAdded }: { prefill?: Prefill | null; onAdded: (
       <Field label="Location" value={location} onChange={(e) => setLocation(e.target.value)} />
       <Field label="Posting URL" value={url} onChange={(e) => setUrl(e.target.value)} />
       <label className="block">
-        <span className="mb-1 block text-sm text-slate-400">Job description (powers the fit score)</span>
+        <span className="mb-1 block text-sm text-slate-400">
+          {prefill ? 'Job description * (powers the fit score)' : 'Job description (powers the fit score)'}
+        </span>
         <textarea
           value={description}
           onChange={(e) => setDescription(e.target.value)}
@@ -312,7 +375,10 @@ function ImportPanel({ onPick }: { onPick: (listing: ImportListing) => void }) {
       </form>
 
       {message && (
-        <p className="rounded-lg border border-slate-700 bg-slate-800/40 px-3 py-2 text-sm text-slate-300">
+        <p
+          role="status"
+          className="rounded-lg border border-slate-700 bg-slate-800/40 px-3 py-2 text-sm text-slate-300"
+        >
           {message}
         </p>
       )}
