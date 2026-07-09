@@ -793,7 +793,7 @@ def me(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     return {"success": True, "user": user_public(user, db)}
 
 
-@app.post("/api/ai-consent", dependencies=[Depends(rate_limit("auth", 10))])
+@app.post("/api/ai-consent", dependencies=[Depends(rate_limit_user("auth", 10))])
 def grant_ai_consent(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """Record explicit, revocable third-party-AI consent (Apple 5.1.2(i)).
 
@@ -806,7 +806,7 @@ def grant_ai_consent(user: User = Depends(get_current_user), db: Session = Depen
     return {"success": True, "user": user_public(user, db)}
 
 
-@app.delete("/api/ai-consent", dependencies=[Depends(rate_limit("auth", 10))])
+@app.delete("/api/ai-consent", dependencies=[Depends(rate_limit_user("auth", 10))])
 def revoke_ai_consent(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """Revoke third-party-AI consent (Apple 5.1.2(i) requires consent be revocable).
 
@@ -1130,7 +1130,7 @@ async def revenuecat_webhook(request: Request, db: Session = Depends(get_db)):
 # ---------------------------------------------------------------------------
 # Job endpoints
 # ---------------------------------------------------------------------------
-@app.post("/api/jobs", dependencies=[Depends(rate_limit("write", 30))])
+@app.post("/api/jobs", dependencies=[Depends(rate_limit_user("write", 30))])
 def create_job(
     data: JobCreate,
     user: User = Depends(get_current_user),
@@ -1345,7 +1345,7 @@ def job_interview_readiness(
 VALID_STATUSES = {s.value for s in ApplicationStatus}
 
 
-@app.patch("/api/jobs/{job_id}", dependencies=[Depends(rate_limit("write", 60))])
+@app.patch("/api/jobs/{job_id}", dependencies=[Depends(rate_limit_user("write", 60))])
 def update_job_status(
     job_id: str,
     data: JobUpdate,
@@ -2059,7 +2059,7 @@ def coach_chat(
     return {"success": True, "message": reply}
 
 
-@app.get("/api/coach/suggestions", dependencies=[Depends(rate_limit("suggest", 30))])
+@app.get("/api/coach/suggestions", dependencies=[Depends(rate_limit_user("suggest", 30))])
 def coach_suggestions(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -2074,7 +2074,7 @@ def coach_suggestions(
 # ---------------------------------------------------------------------------
 # Report AI-generated content (Apple/Google 2026 GenAI/UGC requirement)
 # ---------------------------------------------------------------------------
-@app.post("/api/report", dependencies=[Depends(rate_limit("report", 20))])
+@app.post("/api/report", dependencies=[Depends(rate_limit_user("report", 20))])
 def report_content(
     data: ReportRequest,
     user: User = Depends(get_current_user),
@@ -2110,7 +2110,7 @@ def report_content(
 _SKILL_GAP_JOB_CAP = 500
 
 
-@app.get("/api/insights/skill-gaps", dependencies=[Depends(rate_limit("suggest", 30))])
+@app.get("/api/insights/skill-gaps", dependencies=[Depends(rate_limit_user("suggest", 30))])
 def skill_gap_heatmap(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -2231,7 +2231,7 @@ def _enrichment_payload(db: Session, user: User) -> list:
     ]
 
 
-@app.get("/api/profile/resume", dependencies=[Depends(rate_limit("read", 60))])
+@app.get("/api/profile/resume", dependencies=[Depends(rate_limit_user("read", 60))])
 def get_resume(user: User = Depends(get_current_user)):
     """Return the signed-in user's saved résumé text (their OWN data) so Settings can show + edit it.
 
@@ -2243,7 +2243,7 @@ def get_resume(user: User = Depends(get_current_user)):
     return {"success": True, "resume_text": user.resume_text or ""}
 
 
-@app.patch("/api/profile/resume", dependencies=[Depends(rate_limit("write", 20))])
+@app.patch("/api/profile/resume", dependencies=[Depends(rate_limit_user("write", 20))])
 def update_resume(
     data: ResumeUpdate,
     user: User = Depends(get_current_user),
@@ -2261,7 +2261,7 @@ def update_resume(
     return {"success": True, "has_resume": bool(text)}
 
 
-@app.post("/api/profile/enrich/github", dependencies=[Depends(rate_limit("write", 20))])
+@app.post("/api/profile/enrich/github", dependencies=[Depends(rate_limit_user("write", 20))])
 def enrich_profile_github(
     data: GithubEnrichRequest,
     user: User = Depends(get_current_user),
@@ -2315,7 +2315,7 @@ def get_profile_enrichment(
     return {"success": True, "competencies": _enrichment_payload(db, user)}
 
 
-@app.delete("/api/profile/enrichment", dependencies=[Depends(rate_limit("write", 20))])
+@app.delete("/api/profile/enrichment", dependencies=[Depends(rate_limit_user("write", 20))])
 def clear_profile_enrichment(
     user: User = Depends(get_current_user), db: Session = Depends(get_db)
 ):
