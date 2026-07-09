@@ -72,6 +72,31 @@ export interface PipelineStats {
   top_jobs: Job[];
 }
 
+// ATS import preview (POST /api/jobs/import-preview) — a single previewed role from a
+// Greenhouse/Lever careers board. Listings carry no description (the board's list API omits
+// it), so the UI pre-fills the add-job form and asks the user to paste the JD before scoring.
+export interface ImportListing {
+  external_id: string | null;
+  title: string;
+  company_slug: string | null;
+  location: string | null;
+  url: string | null;
+  department: string | null;
+  remote_type: string | null;
+}
+
+export interface ImportPreviewResult {
+  success: boolean;
+  ats: string;
+  supported: boolean;
+  reachable?: boolean;
+  jobs: ImportListing[];
+  truncated: boolean;
+  // Present when there is nothing to show: unsupported board, unreachable board, or an
+  // honestly-empty board. Null when jobs were returned.
+  message: string | null;
+}
+
 // Interview readiness (GET /api/jobs/{id}/readiness) — a FREE, fully-local read that composites
 // the user's real signals for one job into a 0–100 score + the single next-best-action.
 export interface ReadinessComponents {

@@ -1,6 +1,6 @@
 // Typed client for the Career Operator FastAPI backend.
 // Base URL: NEXT_PUBLIC_API_URL (set in Vercel) -> the live API default.
-import type { Job, PipelineStats, Readiness, User } from '@/lib/types';
+import type { ImportPreviewResult, Job, PipelineStats, Readiness, User } from '@/lib/types';
 
 // Single Vercel deployment (Vercel Services): the FastAPI backend is mounted at /api on
 // the SAME origin as this web app, so the default base URL is empty (relative). Each
@@ -285,8 +285,19 @@ export const api = {
     company_name: string;
     location?: string;
     description?: string;
+    url?: string;
   }): Promise<Job> {
     return (await request<{ job: Job }>('/api/jobs', { method: 'POST', body: input })).job;
+  },
+
+  // Preview open roles from a Greenhouse/Lever careers URL (SSRF-guarded server-side). Returns
+  // an honest empty/unsupported/unreachable state (with a `message`) rather than throwing, so the
+  // UI can distinguish "no supported board" / "temporarily unreachable" / "no open roles".
+  async importPreview(careersUrl: string): Promise<ImportPreviewResult> {
+    return request<ImportPreviewResult>('/api/jobs/import-preview', {
+      method: 'POST',
+      body: { careers_url: careersUrl },
+    });
   },
 
   async updateJobStatus(id: string, status: string): Promise<Job> {
