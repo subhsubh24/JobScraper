@@ -26,17 +26,6 @@ from src.db import get_db  # noqa: E402
 from src.db.models import Base  # noqa: E402
 
 
-@pytest.fixture(autouse=True)
-def _reset_rate_limit_state():
-    """The rate-limit + LLM-ceiling counters are now in the shared ``rate_counters`` table,
-    which is recreated empty per test by the function-scoped ``_engine`` fixture — so no
-    reset is needed for those. The per-account login lockout is still a process-global
-    in-memory dict; clear it before each test so an earlier failed-login test can't leak a
-    lockout into a later one (flaky, order-dependent)."""
-    asgi._LOGIN_FAILURES.clear()
-    yield
-
-
 @pytest.fixture()
 def _engine():
     engine = create_engine(
