@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from src.ai_coach.moderation import ContentModerator
 from src.db.models import JobPosting, PrepArtifact, User
-from src.llm import get_llm_client, chat_model
+from src.llm import get_llm_client, chat_model, resilient_chat_completion
 
 logger = logging.getLogger("career_operator.llm_workflows")
 
@@ -120,7 +120,9 @@ class LLMWorkflows:
         if json_mode:
             kwargs["response_format"] = {"type": "json_object"}
 
-        response = self.client.chat.completions.create(**kwargs)
+        # Route through the resilient wrapper so a decommissioned primary model transparently
+        # falls back to a live one instead of 502-ing the whole paid AI surface (src/llm.py).
+        response = resilient_chat_completion(self.client, **kwargs)
         try:
             content = response.choices[0].message.content
         except (IndexError, AttributeError):
