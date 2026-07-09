@@ -1145,12 +1145,16 @@ def create_job(
     # the free-tier cap, and a corrupted analytics funnel (job_added counted twice). Placed BEFORE
     # the usage-limit check so re-submitting a job you already track never trips the cap (you are
     # not adding a NEW job). ``url`` may be NULL — SQLAlchemy renders ``== None`` as ``IS NULL``.
+    # job_public() reads application + score + company. This is a SINGLE-row lookup (``.first()``),
+    # so joinedload pulls all three in ONE LEFT JOIN instead of the object plus three extra
+    # per-relationship queries — 4 queries → 1 on the job-add hot path — exactly as ``get_job``
+    # does for the same single-row/job_public() pattern (selectinload only wins for many rows).
     existing = (
         db.query(JobPosting)
         .options(
-            selectinload(JobPosting.application),
-            selectinload(JobPosting.score),
-            selectinload(JobPosting.company),
+            joinedload(JobPosting.application),
+            joinedload(JobPosting.score),
+            joinedload(JobPosting.company),
         )
         .filter(
             JobPosting.user_id == user.id,
