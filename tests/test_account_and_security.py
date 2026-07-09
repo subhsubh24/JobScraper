@@ -79,6 +79,34 @@ def test_login_locks_after_repeated_failures(client):
     assert "too many" in locked.json()["detail"].lower()
 
 
+def test_lockout_tally_is_db_backed_cross_instance(client, db_session):
+    """The whole point of the fix: the failure tally lives in the shared ``rate_counters``
+    table, NOT a per-instance in-memory dict (which never accumulated on serverless because a
+    distributed brute-force hits a different instance each time). ``db_session`` is a SEPARATE
+    session on the same DB — standing in for a second serverless instance — and it must SEE the
+    failures recorded through the API and observe the lock. A regression back to in-memory state
+    would make this assertion fail (the second 'instance' would see zero failures).
+    """
+    from src.db.models import RateCounter
+    import asgi
+
+    _reg(client, "cross@example.com", "correct-horse-battery")
+    for _ in range(5):
+        client.post("/api/auth/login", json={"email": "cross@example.com", "password": "wrong-pass-xx"})
+
+    # A different session (a different "instance") sees the durable tally in the shared table.
+    rows = (
+        db_session.query(RateCounter)
+        .filter(RateCounter.bucket == "login_fail", RateCounter.subject == "login:cross@example.com")
+        .all()
+    )
+    assert rows and rows[0].count >= asgi.LOGIN_MAX_FAILURES
+    # …and the lockout gate, evaluated on that second session, agrees the account is locked.
+    assert asgi._login_locked(db_session, "cross@example.com") is True
+    # There is no in-memory lockout dict left to leak between instances.
+    assert not hasattr(asgi, "_LOGIN_FAILURES")
+
+
 def test_login_lockout_does_not_enumerate_emails(client):
     # An email that was never registered locks out exactly the same way (no signal that
     # the account doesn't exist).

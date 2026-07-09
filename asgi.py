@@ -12,7 +12,7 @@ import re
 import time
 import uuid
 from datetime import datetime
-from typing import Dict, List, Literal, Optional, Tuple
+from typing import Dict, List, Literal, Optional
 from urllib.parse import quote
 
 from dotenv import load_dotenv
@@ -320,54 +320,83 @@ def _consume_counter(
     return False
 
 
-# Per-ACCOUNT login lockout (defends one account against a distributed password
-# brute-force that spreads across IPs, which the per-IP rate limit alone misses). In-memory
-# like the rate limiter above, so it's per-instance on serverless. Keyed by email so it
-# never reveals whether the account exists.
-# KNOWN TRADEOFF (honest): a hard lockout is a targeted-DoS vector — someone who knows a
-# victim's email can keep the account locked by failing 5 logins every window. Moving to a
-# shared store (Track F) does NOT fix this (it would centralize the lock). The real fix is
-# CAPTCHA on the auth form (Track F / PENDING_OPS, needs owner keys) so automated failure
-# floods are stopped before they count. The short window (15 min) bounds the harm meanwhile.
-_LOGIN_FAILURES: Dict[str, Tuple[int, float]] = {}  # email -> (consecutive_failures, locked_until_ts)
+def _peek_counter(db: Session, subject: str, bucket: str, window_seconds: int) -> int:
+    """Read the current hit count for a fixed window WITHOUT incrementing it (cross-instance).
+
+    The read-only companion to ``_consume_counter`` for checks that must NOT themselves count as
+    a hit — e.g. the pre-auth login-lockout gate, which reads the failure tally on every login
+    attempt but only INCREMENTS it on an actual failed password. Returns 0 when no row exists.
+    """
+    window_key = int(time.time() // window_seconds)
+    row = (
+        db.query(RateCounter)
+        .filter(
+            RateCounter.subject == subject,
+            RateCounter.bucket == bucket,
+            RateCounter.window_key == window_key,
+        )
+        .first()
+    )
+    return row.count if row else 0
+
+
+# Per-ACCOUNT login lockout — DB-backed so it holds ACROSS serverless instances. The old design
+# was an in-memory per-instance dict: on Vercel a distributed password brute-force that spreads
+# across IPs hits a DIFFERENT instance each time, so no single instance ever accumulated enough
+# failures to trip the lock — the defense was effectively absent in production. The failure tally
+# now lives in the SAME cross-instance ``rate_counters`` table the rate limiter + LLM ceiling use,
+# so the lock is global. Keyed by a ``login:<email>`` subject so the 429 never reveals whether the
+# account exists (enumeration defense).
+# WINDOW SEMANTICS (honest): a fixed LOGIN_LOCKOUT_SECONDS window — once LOGIN_MAX_FAILURES
+# failures land within it, further attempts (including the check) see the account locked until the
+# window rolls over. Like every fixed-window limiter this permits a small burst across a window
+# boundary; that is an accepted trade-off (the belt-and-suspenders is CAPTCHA on the form —
+# PENDING_OPS, owner keys). A hard lockout is also a targeted-DoS vector (someone who knows a
+# victim's email can keep it locked) — unchanged from before and bounded by the short window.
 LOGIN_MAX_FAILURES = int(os.getenv("LOGIN_MAX_FAILURES", "5"))
 LOGIN_LOCKOUT_SECONDS = int(os.getenv("LOGIN_LOCKOUT_SECONDS", "900"))  # 15 min
-_LOGIN_FAILURES_MAXSIZE = 50000  # bound memory: ghost-email floods can't grow this unbounded
+_LOGIN_FAIL_BUCKET = "login_fail"
 
 
-def _login_locked(email: str) -> bool:
-    record = _LOGIN_FAILURES.get(email)
-    if not record:
-        return False
-    failures, locked_until = record
-    if locked_until and time.time() < locked_until:
-        return True
-    if locked_until and time.time() >= locked_until:
-        _LOGIN_FAILURES.pop(email, None)  # lockout expired — reset
-    return False
+def _login_subject(email: str) -> str:
+    # ``login:`` namespaces the tally off the IP/user-id counter rows; bounded to the subject
+    # column width so a pathologically long email can never raise a DB truncation error.
+    return f"login:{email}"[:255]
 
 
-def _sweep_login_failures() -> None:
-    """Drop expired/decayed entries when the map gets large (ghost-email flood defense).
-    Entries with no active lock and stale activity are evicted; if still too large after
-    that, clear the whole map (correctness-safe: it only loosens lockouts, never tightens)."""
-    now = time.time()
-    for key in [k for k, (_, lu) in _LOGIN_FAILURES.items() if lu and now >= lu]:
-        _LOGIN_FAILURES.pop(key, None)
-    if len(_LOGIN_FAILURES) > _LOGIN_FAILURES_MAXSIZE:
-        _LOGIN_FAILURES.clear()
+def _login_locked(db: Session, email: str) -> bool:
+    """True once this account has hit LOGIN_MAX_FAILURES failures in the current window."""
+    return (
+        _peek_counter(db, _login_subject(email), _LOGIN_FAIL_BUCKET, LOGIN_LOCKOUT_SECONDS)
+        >= LOGIN_MAX_FAILURES
+    )
 
 
-def _record_login_failure(email: str) -> None:
-    if len(_LOGIN_FAILURES) >= _LOGIN_FAILURES_MAXSIZE:
-        _sweep_login_failures()
-    failures = _LOGIN_FAILURES.get(email, (0, 0.0))[0] + 1
-    locked_until = time.time() + LOGIN_LOCKOUT_SECONDS if failures >= LOGIN_MAX_FAILURES else 0.0
-    _LOGIN_FAILURES[email] = (failures, locked_until)
+def _record_login_failure(db: Session, email: str) -> None:
+    """Count one failed login (durable, cross-instance).
+
+    Reuses the tested, concurrency-safe ``_consume_counter`` for the atomic increment + commit.
+    Its bool return (whether the count is within ``limit``) is irrelevant here and ignored — we
+    only need the side-effect of incrementing. The count naturally caps at LOGIN_MAX_FAILURES:
+    once reached, ``_login_locked`` 429s the attempt at the gate ABOVE, so this line is never
+    reached again within the window.
+    """
+    _consume_counter(
+        db, _login_subject(email), _LOGIN_FAIL_BUCKET, LOGIN_MAX_FAILURES, LOGIN_LOCKOUT_SECONDS
+    )
 
 
-def _clear_login_failures(email: str) -> None:
-    _LOGIN_FAILURES.pop(email, None)
+def _clear_login_failures(db: Session, email: str) -> None:
+    """Reset an account's failure tally (a genuine login succeeded, or the account was deleted).
+
+    Deletes across all windows for the subject and commits, so the reset is durable
+    cross-instance (mirroring ``_consume_counter``'s immediate-commit contract).
+    """
+    db.query(RateCounter).filter(
+        RateCounter.subject == _login_subject(email),
+        RateCounter.bucket == _LOGIN_FAIL_BUCKET,
+    ).delete(synchronize_session=False)
+    db.commit()
 
 
 # TEST-ONLY rate-limit bypass. The functional-journey CI job replays every journey from a
@@ -782,7 +811,7 @@ def login(data: UserLogin, request: Request, db: Session = Depends(get_db)):
     email_key = (data.email or "").lower()
     # Per-account lockout. Same generic 429 whether or not the account exists, so it can't
     # be used to enumerate emails.
-    if _login_locked(email_key):
+    if _login_locked(db, email_key):
         raise HTTPException(
             status_code=429,
             detail=f"Too many failed attempts. Try again in about {LOGIN_LOCKOUT_SECONDS // 60} minutes.",
@@ -791,9 +820,9 @@ def login(data: UserLogin, request: Request, db: Session = Depends(get_db)):
     try:
         user, token = auth.login(data.email, data.password)
     except ValueError:
-        _record_login_failure(email_key)
+        _record_login_failure(db, email_key)
         raise HTTPException(status_code=401, detail="Invalid email or password")
-    _clear_login_failures(email_key)
+    _clear_login_failures(db, email_key)
     db.commit()
     return {"success": True, "token": token, "user": user_public(user, db)}
 
@@ -846,9 +875,10 @@ def delete_account(user: User = Depends(get_current_user), db: Session = Depends
     so nothing user-owned is left orphaned. Honest by design — we only report success after
     the row is actually gone.
     """
+    email_key = (user.email or "").lower()
     AuthService(db).delete_user(user)
     db.commit()
-    _clear_login_failures((user.email or "").lower())
+    _clear_login_failures(db, email_key)
     return {"success": True, "deleted": True}
 
 
