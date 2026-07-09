@@ -48,7 +48,7 @@ mkdir -p data/cache
 # Initialize database
 echo ""
 echo "Initializing database..."
-python cli.py init
+python scripts/init_db.py
 
 echo ""
 echo "======================================"
@@ -58,8 +58,8 @@ echo ""
 echo "Next steps:"
 echo "1. Edit .env and add your GEMINI_API_KEY (optional — AI degrades gracefully without it)"
 echo "2. Activate the virtual environment: source venv/bin/activate"
-echo "3. Run: python cli.py ingest"
-echo "4. View top jobs: python cli.py top"
+echo "3. Start the API: ./start_api.sh   (or: python -m uvicorn asgi:app --reload)"
+echo "4. Run the tests: pytest"
 echo ""
-echo "For help: python cli.py --help"
+echo "The web app lives in web/ (npm run dev); the mobile app in mobile/ (npx expo start)."
 echo ""
