@@ -106,7 +106,7 @@ test('import happy path: preview -> pick a role -> pre-filled form -> REAL job i
   await expect(page.getByLabel('Company *')).toHaveValue('Acme');
   await expect(page.getByText(/Imported from the careers page/i)).toBeVisible();
 
-  // Shell guard: adding an imported role with NO description is blocked (no unscoreable shell).
+  // Shell guard: "Add & score" with NO description is blocked (no silent unscoreable shell).
   await page.getByRole('button', { name: /Add & score/i }).click();
   await expect(page.getByText(/Paste the job description so we can score this role/i)).toBeVisible();
 
@@ -118,6 +118,30 @@ test('import happy path: preview -> pick a role -> pre-filled form -> REAL job i
 
   // The real side-effect: the job now appears in the pipeline list (backend created + scored it).
   await expect(page.getByText('Senior Backend Engineer')).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByText(/No jobs yet/i)).toHaveCount(0);
+});
+
+test('import escape hatch: "Track without a score" adds the role with no JD (explicit opt-out)', async ({
+  page,
+  request,
+}) => {
+  const email = freshEmail('import-noscore');
+  await seedUser(request, email);
+  await mockPreview(page, TWO_ROLES);
+  await signIn(page, email);
+
+  await openImportTab(page);
+  await page.getByLabel(/careers URL/i).fill('https://boards.greenhouse.io/acme');
+  await page.getByRole('button', { name: /Preview roles/i }).click();
+  await page
+    .getByRole('listitem')
+    .filter({ hasText: 'Product Designer' })
+    .getByRole('button', { name: /Use this/i })
+    .click();
+
+  // No JD pasted — but the explicit opt-out really creates the job on the REAL backend.
+  await page.getByRole('button', { name: /Track without a score/i }).click();
+  await expect(page.getByText('Product Designer')).toBeVisible({ timeout: 20_000 });
   await expect(page.getByText(/No jobs yet/i)).toHaveCount(0);
 });
 

@@ -261,22 +261,7 @@ function AddJobForm({ prefill, onAdded }: { prefill?: Prefill | null; onAdded: (
     }
   }, [prefill]);
 
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
-    if (!title.trim() || !company.trim()) {
-      setError('Title and company are required.');
-      return;
-    }
-    // An imported listing carries NO job description, so require one on this path — otherwise the
-    // import would create the exact unscoreable shell this flow exists to avoid. (The manual path
-    // keeps description optional: a user typing by hand may deliberately track a role first.)
-    if (prefill && !description.trim()) {
-      setError(
-        'Paste the job description so we can score this role — or use “Add manually” to track it without a score.',
-      );
-      return;
-    }
+  async function doCreate() {
     setLoading(true);
     try {
       await api.createJob({
@@ -292,6 +277,36 @@ function AddJobForm({ prefill, onAdded }: { prefill?: Prefill | null; onAdded: (
     } finally {
       setLoading(false);
     }
+  }
+
+  // "Add & score" — the scoring path. An imported listing carries NO job description, so require
+  // one here (otherwise scoring on title alone is the unscoreable shell this flow avoids). The
+  // manual path keeps it optional. If a user really has no JD, the "Track without a score" button
+  // below is the honest, explicit opt-out (only shown on the imported path).
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    if (!title.trim() || !company.trim()) {
+      setError('Title and company are required.');
+      return;
+    }
+    if (prefill && !description.trim()) {
+      setError('Paste the job description so we can score this role — or use “Track without a score” below.');
+      return;
+    }
+    await doCreate();
+  }
+
+  // The imported-path escape hatch the scoring gate points to: add the role now WITHOUT a fit
+  // score, an EXPLICIT informed choice (not a silent shell). Keeps the already-imported
+  // title/company/location/url instead of forcing the user to close and retype.
+  async function trackWithoutScore() {
+    setError(null);
+    if (!title.trim() || !company.trim()) {
+      setError('Title and company are required.');
+      return;
+    }
+    await doCreate();
   }
 
   return (
@@ -320,7 +335,14 @@ function AddJobForm({ prefill, onAdded }: { prefill?: Prefill | null; onAdded: (
         />
       </label>
       <ErrorText>{error}</ErrorText>
-      <Button type="submit" disabled={loading}>{loading ? 'Adding…' : 'Add & score'}</Button>
+      <div className="flex flex-wrap gap-3">
+        <Button type="submit" disabled={loading}>{loading ? 'Adding…' : 'Add & score'}</Button>
+        {prefill && (
+          <Button type="button" variant="secondary" disabled={loading} onClick={trackWithoutScore}>
+            Track without a score
+          </Button>
+        )}
+      </div>
     </form>
   );
 }
