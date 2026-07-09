@@ -318,9 +318,9 @@ FIRST; voice/delivery is a later, owner-gated increment.
 ### E — World-class quality
 - [x] Lint floor: `flake8` (backend) + ESLint (mobile) clean
 - [x] Type floor: `mypy`/type checks (backend, where adopted) + `tsc --noEmit` (mobile)
-- [x] Test coverage floor defined and met — branch-coverage floor `fail_under=65` in
-      `setup.cfg`, enforced by `scripts/preflight.sh ci` (`--cov-fail-under`); measured ~69%
-      this run (PR #52). Conservative ratchet; raise as legacy unused modules are covered/retired.
+- [x] Test coverage floor defined and met — branch-coverage floor `fail_under=85` in
+      `setup.cfg`, enforced by `scripts/preflight.sh ci` (`--cov-fail-under`); measured ~91.8%
+      this run. Ratcheted 65→85 (#293); raise toward ~90 as coverage genuinely improves.
 - [x] Eval suite for LLM workflows (scoring/prep/coach) with golden expectations — golden
       evals pin the deterministic heuristic scorer (`overall = 30 + 40*skills_score` → 70/30/50)
       + context-adaptive coach suggestions; deterministic (key-free), so they guard regressions
