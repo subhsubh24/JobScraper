@@ -56,6 +56,12 @@ Keep this current as routes are added. A new route with no journey coverage is a
   (`tests/test_mock_interview.py`): Pro+; same tier→job→503→consent→ceiling→moderation gate chain;
   multi-turn state on one `MockInterview` row scoped to `user.id` (tenant-isolated); honest scoring
   (weak answer scores low, `overall` computed server-side); account-deletion cascade proven.
+- **ATS import preview** — `POST /api/jobs/import-preview` (`tests/test_ingestion_endpoint.py`):
+  authed, unmetered; previews a live Greenhouse/Lever careers-page's job listings (or honest
+  unsupported / unreachable / no-roles states); SSRF-hardened (public HTTP(S) only, per-hop
+  redirect guard); mocked in E2E for CI determinism (a live board can't be reached repeatably).
+  `web/e2e/import-journey.spec.ts` exercises the full flow: preview → select → pre-fill → create
+  a real job (incl. the degraded states).
 - **interview readiness** — `GET /api/jobs/{job_id}/readiness` (`tests/test_readiness.py`): FREE,
   fully-local (no LLM/consent); a readiness score (0–100) + the single next-best-action computed
   from the user's REAL signals (résumé-vs-JD skill coverage + answered/scored mock questions +
