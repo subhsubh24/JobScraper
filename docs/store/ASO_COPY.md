@@ -50,6 +50,14 @@ needs attention so nothing slips.
 - Your data is yours: export-free deletion in one tap removes everything.
 - Encrypted in transit. No ads. No data sold. No tracking.
 
+**Honest about the AI.**
+Career Operator uses generative AI (Google Gemini) to produce prep packs, career-coach
+replies, and to compute resume↔job fit. AI can be imperfect — treat it as guidance, not
+professional, legal, or financial advice. Generated content is filtered by an in-app safety
+guardrail, the coach stays on career topics, and you can report any AI response for review
+with one tap. When the AI service isn't configured, fit scoring falls back to heuristic
+matching and AI features say so plainly rather than faking a result.
+
 **Plans**
 - **Free:** track up to 5 jobs, 1 prep pack/month, fit scoring.
 - **Pro — $12/mo or $96/yr:** unlimited jobs, AI prep packs, tailored résumés, cover letters, and study plans, plus the AI Career Coach.
@@ -81,9 +89,11 @@ Start free today and run your search like an operator.
   coach input AND output), so this is mitigated, not just planned.
 
 ## AI & generated content (disclosure)
-> Both stores expect apps that produce AI-generated content to disclose it, and Apple's
-> UGC guidelines (§1.2) expect a content-safety mechanism. State this in the listing and
-> near the relevant features:
+> Both stores expect apps that produce AI-generated content to disclose it (Google Play's
+> AI-Generated Content policy; Apple's UGC guidelines §1.2 also expect a content-safety
+> mechanism). A condensed disclosure is now embedded in the **Full description** above
+> ("Honest about the AI."); this is the canonical long-form version to also surface near the
+> relevant in-app features:
 > *Career Operator uses generative AI (Google Gemini) to produce interview prep packs and
 > career-coach replies, and to compute resume↔job fit. AI output can be imperfect — treat it
 > as guidance, not professional, legal, or financial advice. Generated content is filtered by
