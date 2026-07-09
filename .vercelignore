@@ -9,6 +9,5 @@ data/
 .venv/
 venv/
 __pycache__/
-# Flask web app + CLI are not part of the serverless API deploy.
+# Flask web app is not part of the serverless API deploy.
 app.py
-cli.py
