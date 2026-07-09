@@ -202,3 +202,55 @@ issues (both still C, both unchanged) — updated with this audit's fresh eviden
 duplicated. No dimension regressed below A; no new ship-critical issue needed. (Latent config gaps
 in #222 — Career+ prod-503 price-env validation + DATABASE_URL SQLite default — remain honestly
 disclosed, keeping artifact-integrity at A+; they are tracked there, not re-filed.)
+
+## 2026-07-09 — 5th independent audit
+
+**Overall: C (↓ from B) · ship_gate_met: false.** First overall DROP since the bootstrap. A
+ship-critical **regression** dominates: **functional-reality A+ → D**. The shipped default LLM
+model `gemini-2.5-flash` (`src/llm.py:20`) was **decommissioned by Google** between 2026-07-05
+(when these live evals last passed) and today. This is NOT the sandbox-proxy artifact prior
+audits noted — the auditor probed the REAL `generativelanguage.googleapis.com` endpoint with the
+live key: `gemini-2.5-flash`→`404 "no longer available"`, `gemini-2.0-flash`→404, but
+`gemini-flash-latest`→"OK" on the same key. So every monetized AI feature (mock-interview coaching
+— the VISION north-star — coach, prep pack, cover letter, tailored résumé, salary-negotiation,
+learning plan) **502s against the live provider**; `.env.example:8` steers ops to the SAME dead
+model; there's no live-model fallback. Free/heuristic journeys (15/15 `tests/journeys`) still work,
+keeping it off F.
+
+Per-dimension (Δ vs 2026-07-05): functional-reality **D** (▼ from A+), correctness **A** (▼ from A+,
+code unchanged), security **A** (=), design-taste **A** (=), store-readiness **C** (=),
+artifact-integrity **A** (▼ from A+), business-case-strength **C** (=), tests-evals **A** (=),
+performance **A+** (▲ from A).
+
+Method: 9 fresh independent adversarial grader subagents (maker ≠ checker), each ran its own signal
++ cited file/line. Auditor pre-ran the gate at HEAD `a70e20e`: flake8 clean, **565 pass @ 91.82%
+cov** (floor ratcheted 75→85 in #293), **15 journeys**, **62 evals** (was 46) on the per-PR
+`-m "not live"` lane; `readiness`→FAIL, `arr_base`→57500, `floor_met_year1=false`, no tracked
+secrets. The auditor then **independently verified the model-decommission** by calling the real
+Gemini endpoint (above) — the functional-reality grader's D is confirmed, not taken on faith.
+
+**Grade corrections (code unchanged, tightened to the zero-findings A+ bar — anti-inflation):**
+- **correctness A+→A** — the 502-burns-a-daily-AI-slot item (`asgi.py:423-429`, slot consumed
+  before the call, no refund on provider 502) is a real named finding; prior audits carried it as a
+  "documented tradeoff" at A+, but the rubric's A+ requires ZERO findings, so A is the honest grade.
+- **artifact-integrity A+→A** — two honest-direction doc-lags found this run: ROADMAP Track-E
+  coverage box still reads `fail_under=65/~69%` while setup.cfg is `85`/actual 91.8%; `ROUTE_INVENTORY.md`
+  omits `/api/jobs/import-preview` (which HAS e2e coverage). Zero fabrications; code tighter than doc.
+
+**Genuine improvement (A→A+):** performance — #317 replaced `/api/analytics/pipeline`'s in-Python
+top-5 sort with real SQL `GROUP BY` + `ORDER BY … LIMIT 5` (`asgi.py:2354-2400`), independently
+verified as constant-query, no in-Python full scan; #319 collapsed `create_job` re-serialize to one
+`joinedload` LEFT JOIN.
+
+**Standing ship-critical C's (unchanged, both block the gate):** store-readiness (no rendered store
+assets, mobile IAP client absent, 4 open ACCEPTANCE FAILs) and business-case ($57.5K < $100K, team/
+B2B2C seat tier still unbuilt — only GTM packaging research added).
+
+**tests-evals lesson (held at A):** the live real-output evals that WOULD catch a model decommission
+are nightly-only, so this product-breaking regression passed every per-PR merge gate green — the exact
+"large regression lands silently green" hole. Named as the A→A+ gap: add a per-PR/CI-required model-
+liveness or real-output smoke.
+
+**Issues:** filed a NEW ship-critical issue for functional-reality D (decommissioned model). #92
+(business-case) + #93 (store-readiness) remain the correct open ship-critical issues (both still C,
+unchanged) — updated with this audit's fresh evidence, not duplicated.
