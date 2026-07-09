@@ -418,17 +418,21 @@ FIRST; voice/delivery is a later, owner-gated increment.
       remains for mobile billing.
 
 ### G — Marketing engine + brand
-- [ ] **Pre-launch SITE GATE** — env-driven middleware (`SITE_GATE_PASSWORD`; gate ON
-      whenever the var is set) that password-protects the deployed web app but EXEMPTS the
-      public marketing routes (waitlist / "coming soon" landing + its API + legal pages) so
-      people can still join the waitlist. Mechanism built in `web/middleware.ts` (exempt
-      allowlist: `/`, `/waitlist`, `/coming-soon`, `/privacy`, `/terms`, `/legal`); mobile
-      pre-launch gated via TestFlight / internal track. Password VALUE is human-applied
-      (PENDING_OPS: set `SITE_GATE_PASSWORD=deepster` pre-launch; UNSET at launch). Tick
-      only when the waitlist landing + legal pages exist AND the gate is applied.
-      **BLOCKING:** pre-launch execute-mode outreach is FORBIDDEN until
-      `GROWTH_STATUS.site_gate_up: true` (see docs/growth/ANALYSIS_PLAYBOOK.md marketing
-      maturity gate).
+- [ ] **Pre-launch SITE GATE** — **⚠️ CONTRADICTION (run 34, 2026-07-09): this gate was
+      DELETED at owner request 2026-07-02 — `web/middleware.ts` is now an intentional
+      pass-through and the app is PUBLIC; setting `SITE_GATE_PASSWORD` currently does NOTHING.**
+      This item + the §34 gated-beta below assume a gate that no longer exists. The factory will
+      NOT autonomously re-add a gate the owner explicitly removed. **BLOCKED on an owner
+      decision** (PENDING_OPS `site-gate`): (A) re-instate a real gate — then the §34 gated-beta
+      becomes buildable — or (B) keep the app public and drop the gated-beta track. Original
+      intent (for option A): env-driven middleware (`SITE_GATE_PASSWORD`; gate ON whenever the
+      var is set) that password-protects the deployed web app but EXEMPTS the public marketing
+      routes (waitlist / "coming soon" landing + its API + legal pages) so people can still join
+      the waitlist (exempt allowlist: `/`, `/waitlist`, `/coming-soon`, `/privacy`, `/terms`,
+      `/legal`); mobile pre-launch gated via TestFlight / internal track. Tick only when the
+      gate mechanism is REBUILT AND applied. **BLOCKING:** pre-launch execute-mode outreach is
+      FORBIDDEN until `GROWTH_STATUS.site_gate_up: true` (see
+      docs/growth/ANALYSIS_PLAYBOOK.md marketing maturity gate).
 - [x] Waitlist landing page + capture — `POST /api/waitlist/join` (server-side email
       validation, per-IP rate limit 5/hr, enumeration defense, idempotent on the unique-email
       race, persists to a NEW `waitlist` table + Alembic migration) + a premium on-brand
@@ -455,7 +459,7 @@ FIRST; voice/delivery is a later, owner-gated increment.
 
 - [ ] **§34 pre-launch funnel — public demo of the core aha + gated beta.** Replace the blank waitlist with: a public, no-account, bounded + HARDENED (Track H) demo of the core aha that goes live only after it clears the quality bar, driving the waitlist; then a gated-beta invite mechanism (waitlist → codes → real app, site gate up for others) yielding the first real PMF cohort. Full product stays gated; demo/beta build is autonomous + quality-gated, traffic/invites post-§13-Gate-1, public launch = Gate 2. Build epic: #286.
   - [x] **PUBLIC DEMO shipped (run 33, #315 backend + #316 web).** `/demo` — a public, no-account, KEY-FREE skill-match of the core fit read (paste a JD + optional résumé → real matching/missing skills + coverage %), hardened like a live surface (bounded input + burst/daily per-IP rate limits + captcha seam). DECISION COROLLARY (§6): built as the LOCAL skills half (not the Gemini-gated tailored résumé) so it needs no owner secret and can never 503 on a missing key. Drives the waitlist (demo ↔ waitlist links). Validated end-to-end in a browser (`web/e2e/demo-journey.spec.ts`, 5 journeys incl. no-résumé / no-skills / backend-500 honest degrades) + visually verified.
-  - [ ] **GATED BETA invite mechanism** (waitlist → codes → real app while the site gate holds for others) — the remaining §34 half; gated on the SITE GATE (owner: `SITE_GATE_PASSWORD`, PENDING_OPS) + §13-Gate-1, so it stays unchecked until those land.
+  - [ ] **GATED BETA invite mechanism** (waitlist → codes → real app while the site gate holds for others) — the remaining §34 half. **⚠️ BLOCKED (run 34): this depends on the SITE GATE, which was REMOVED at owner request 2026-07-02 (the app is PUBLIC — see the SITE GATE item above + PENDING_OPS `site-gate`). This cannot be built until the owner decides to re-instate a gate; if they keep the app public, this whole gated-beta half should be DROPPED. Not just a missing password.**
 
 ### H — Growth-execution engine
 - [x] Waitlist capture + double-opt-in — capture shipped earlier (PR #68); double-opt-in

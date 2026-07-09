@@ -13,11 +13,11 @@ OWNER_ACTIONS:
   as_of: 2026-07-04
   items:
     - id: site-gate
-      title: "Pre-launch SITE GATE: set SITE_GATE_PASSWORD=deepster now; unset at launch"
+      title: "DECISION NEEDED: the pre-launch SITE GATE was REMOVED at owner request 2026-07-02 — the app is PUBLIC. Re-instate it, or drop the gated-beta track?"
       priority: high
       status: open
-      why: "Don't expose the half-baked app pre-launch. The gate (web/middleware.ts) password-protects the web app but exempts the public marketing/legal routes so waitlist still works. ALSO required to flip GROWTH_STATUS.site_gate_up: true, which is the HARD precondition for the Growth Agent to do any pre-launch outreach."
-      how: "In Vercel env set SITE_GATE_PASSWORD=deepster (never commit it); then set GROWTH_STATUS.site_gate_up: true. At launch (every ship-critical QUALITY_SCORECARD dim A/A+ + readiness), UNSET SITE_GATE_PASSWORD to open the app. Mobile pre-launch: distribute via TestFlight / internal track only."
+      why: "CORRECTION (run 34, 2026-07-09): the earlier version of this item was STALE and would silently no-op. web/middleware.ts is now an INTENTIONAL pass-through — the SITE GATE was deleted 2026-07-02 at owner request ('the app is PUBLIC') and the middleware NO LONGER honors SITE_GATE_PASSWORD. So setting that env var today does NOTHING. Meanwhile ROADMAP:421 (SITE GATE) + ROADMAP:458 (§34 gated-beta invite mechanism, which DEPENDS on the gate) + GROWTH_STATUS.site_gate_up still assume a gate exists. The factory will NOT autonomously re-add a gate the owner explicitly removed — this needs an owner decision."
+      how: "Choose one: (A) RE-INSTATE a pre-launch gate — restore the HTTP Basic Auth / cookie check against process.env.SITE_GATE_PASSWORD in web/middleware.ts (exempt /, /waitlist, /coming-soon, /privacy, /terms, /legal; see git history pre-2026-07-02), THEN the factory can build the §34 gated-beta invite mechanism on top and flip GROWTH_STATUS.site_gate_up: true after setting the password in Vercel env. (B) KEEP the app PUBLIC — then the §34 gated-beta track (waitlist→codes→gated app) is moot and should be dropped from the roadmap; pre-launch outreach discipline then rests on the demo/waitlist funnel, not a gate. Tell the factory which, and it will reconcile ROADMAP + GROWTH_STATUS accordingly."
     - id: spend-caps
       title: "Set HARD provider spend caps + alerts (Gemini/Google AI, Vercel, Stripe) NOW"
       priority: urgent
