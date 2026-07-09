@@ -84,7 +84,7 @@ test('import happy path: preview -> pick a role -> pre-filled form -> REAL job i
   await signIn(page, email);
 
   await openImportTab(page);
-  await page.getByLabel(/careers URL/i).fill('https://boards.greenhouse.io/acme');
+  await page.getByLabel(/Careers page URL/i).fill('https://boards.greenhouse.io/acme');
   await page.getByRole('button', { name: /Preview roles/i }).click();
 
   // Both previewed roles render with their real title + location/department.
@@ -102,7 +102,7 @@ test('import happy path: preview -> pick a role -> pre-filled form -> REAL job i
   const title = page.getByLabel(/Job title/i);
   await expect(title).toHaveValue('Senior Backend Engineer');
   // The ATS board token ("acme") is prettified into a best-guess company the user confirms.
-  // (Exact label — the import panel's "Company careers URL" field also contains "Company".)
+  // (Exact label — the import panel's "Careers page URL" field also renders a URL input.)
   await expect(page.getByLabel('Company *')).toHaveValue('Acme');
   await expect(page.getByText(/Imported from the careers page/i)).toBeVisible();
 
@@ -131,7 +131,7 @@ test('import escape hatch: "Track without a score" adds the role with no JD (exp
   await signIn(page, email);
 
   await openImportTab(page);
-  await page.getByLabel(/careers URL/i).fill('https://boards.greenhouse.io/acme');
+  await page.getByLabel(/Careers page URL/i).fill('https://boards.greenhouse.io/acme');
   await page.getByRole('button', { name: /Preview roles/i }).click();
   await page
     .getByRole('listitem')
@@ -158,7 +158,7 @@ test('switching tabs never discards half-typed input (both panels stay mounted)'
   await page.getByRole('button', { name: /\+ Add a job/i }).click();
   await page.getByLabel(/Job title/i).fill('My hand-typed role');
   await page.getByRole('tab', { name: /Import from a careers page/i }).click();
-  await page.getByLabel(/careers URL/i).fill('https://boards.greenhouse.io/acme');
+  await page.getByLabel(/Careers page URL/i).fill('https://boards.greenhouse.io/acme');
   await page.getByRole('button', { name: /Preview roles/i }).click();
   await expect(page.getByText('Senior Backend Engineer')).toBeVisible();
   await page.getByRole('tab', { name: /Add manually/i }).click();
@@ -187,7 +187,7 @@ test('import honest state: an unsupported board shows the server message, no lis
   await signIn(page, email);
 
   await openImportTab(page);
-  await page.getByLabel(/careers URL/i).fill('https://acme.wd1.myworkdayjobs.com');
+  await page.getByLabel(/Careers page URL/i).fill('https://acme.wd1.myworkdayjobs.com');
   await page.getByRole('button', { name: /Preview roles/i }).click();
 
   await expect(page.getByText(/only Greenhouse and Lever are supported/i)).toBeVisible();
@@ -212,7 +212,7 @@ test('import honest state: an unreachable board shows the retry message, no dead
   await signIn(page, email);
 
   await openImportTab(page);
-  await page.getByLabel(/careers URL/i).fill('https://boards.greenhouse.io/acme');
+  await page.getByLabel(/Careers page URL/i).fill('https://boards.greenhouse.io/acme');
   await page.getByRole('button', { name: /Preview roles/i }).click();
 
   await expect(page.getByText(/temporarily unreachable/i)).toBeVisible();
@@ -229,7 +229,7 @@ test('import degrades honestly when the preview API fails (configured-but-failin
   await signIn(page, email);
 
   await openImportTab(page);
-  await page.getByLabel(/careers URL/i).fill('https://boards.greenhouse.io/acme');
+  await page.getByLabel(/Careers page URL/i).fill('https://boards.greenhouse.io/acme');
   await page.getByRole('button', { name: /Preview roles/i }).click();
 
   // An honest, announced error — never a stuck "Previewing…" spinner or a blank panel.

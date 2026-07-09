@@ -385,7 +385,7 @@ function ImportPanel({ onPick }: { onPick: (listing: ImportListing) => void }) {
     <div className="space-y-4">
       <form onSubmit={preview} className="space-y-3">
         <Field
-          label="Company careers URL (Greenhouse or Lever)"
+          label="Careers page URL (Greenhouse or Lever)"
           type="url"
           inputMode="url"
           placeholder="https://boards.greenhouse.io/acme"
