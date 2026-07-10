@@ -46,7 +46,18 @@ These are *named, buildable* items (the only valid weak-case loop-back triggers)
 
 1. **Annual-first paywall + founder/launch pricing** — raise annual mix and ARPA.
 2. **Team/coach/career-services B2B2C tier** — bootcamps & outplacement firms reselling
-   seats (higher ARPA, lower CAC per seat). **Packaging recommendation (GTM research,
+   seats (higher ARPA, lower CAC per seat). **BACKEND BUILT (run 39, PR #348) — no longer
+   "entirely unbuilt":** `Organization`/`OrganizationMember` models + a REAL quantity-based
+   Stripe seat checkout + signature-verified org webhook + seat-entitlement reconciliation
+   (`billing.recompute_user_tier` ORs an org seat alongside the individual + mobile sources) +
+   owner-only seat management, all gate-verified (`tests/test_org_billing.py`, 21). The
+   web/mobile admin surface + live per-seat pricing remain (ROADMAP Track C). **No ARR is
+   credited and `floor_met_year1` stays false** (anti-gaming, FACTORY_STANDARD §9): there is no
+   product live and B2B adoption is un-validated (see `demand_signal.disconfirming`), so
+   crediting a pre-launch adoption number would be gaming. Building the lever REMOVES the
+   "named buildable lever not yet built" weak-case-loop-back trigger for this dimension; the
+   residual floor gap is now a real-market-validation question (needs live cohort data), not a
+   build gap. **Packaging recommendation (GTM research,
    2026-07-05, real cited comps — no product built yet, no ARR credited):** several
    consumer-facing job-tool competitors with an org/institutional offering — Huntr, Careerflow,
    and Big Interview — publish ZERO public seat pricing on their own sites; all gate it behind
@@ -107,10 +118,14 @@ These are *named, buildable* items (the only valid weak-case loop-back triggers)
    (0 users) we do **not** inflate the projection with a Career+-mix assumption (anti-gaming),
    and on any defensible mix it is a modest diversifier, **not** a floor-flip.
 
-**Floor still not met.** With Career+ + referral now built, the **team/B2B2C tier** remains
-the primary named floor-lever (highest ARPA, lowest CAC/seat), plus annual-first/founder
-pricing. Career+'s real revenue lift will be reconciled from live free→paid + tier-mix data
-once it exists (metrics win over the model, §9).
+**Floor still not met.** With Career+ + referral + now the **team/B2B2C seat-tier BACKEND**
+built (run 39, PR #348), the last remaining *build* work on the primary floor-lever is its
+web/mobile admin surface + live per-seat pricing (owner). The floor stays honestly unmet
+(`floor_met_year1=false`) because no ARR can be credited pre-launch (0 users; B2B adoption
+un-validated) — crossing $100K now depends on REAL adoption data, not more building
+(annual-first/founder pricing is the one remaining unbuilt pricing lever). Revenue lift from
+Career+ and the seat tier will be reconciled from live free→paid + tier-mix data once it
+exists (metrics win over the model, §9).
 
 When any lever is built and the honest median crosses $100K, re-run the readiness gate.
 Until then, readiness is **rejected** on business-case grounds (per ROADMAP standards),

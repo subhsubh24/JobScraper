@@ -272,6 +272,26 @@ FIRST; voice/delivery is a later, owner-gated increment.
       grant-nothing) — no client-trusted unlock (PR #87, 2 Sonnet reviewers). Live RevenueCat
       keys are Human-Core (PENDING_OPS).
 
+#### Team / organization seat tier (B2B2C floor-lever — docs/BUSINESS_CASE.md lever 2)
+The named business-case floor-lever (QUALITY_SCORECARD `business-case-strength` C top_gap):
+bootcamps / outplacement firms / employers buy a POOL of seats and assign them to members
+(higher ARPA, lower CAC/seat). Build-code is loop work; live pricing + go-live are owner-only.
+- [x] **Seat tier — BACKEND** — SHIPPED (run 39, PR #348, 2 Sonnet reviewers + 3 fresh
+      re-reviewers; maker≠checker caught + fixed THREE distinct real bugs before merge: a Career+
+      paywall bypass, a seat-cap over-provision race, and a mobile-entitlement reconciliation gap).
+      `Organization` + `OrganizationMember` models + migration `b3d9e1f27a04`; the single authority
+      `billing.recompute_user_tier` reconciles `users.tier` from ALL THREE verified sources (active
+      individual Stripe sub OR active org seat OR active mobile/RevenueCat flag) — ZERO changes to
+      the ~10 existing paid gates. A REAL quantity-based Stripe seat checkout (`POST /api/org/checkout`,
+      refuses honestly 503) + org webhook (signature-verified; forged grants nothing); the paid-seat
+      invariant enforced on assign + on a webhook seat reduction (`.with_for_update()` lock, newest
+      freed); owner-only authz + tenant isolation + account-deletion purge. Team seat grants Pro
+      (Career+ stays individual-only). `tests/test_org_billing.py` (21). Live Stripe team Price ID
+      (`STRIPE_PRICE_TEAM_ANNUAL`) is owner-only (PENDING_OPS `stripe-account`).
+- [ ] **Seat tier — WEB/MOBILE MANAGEMENT SURFACE** — the org-admin UI (create org, buy seats,
+      invite/remove members, seat-usage view) on web + mobile. Backend-first like the Career+ tier
+      (#152); this is the surfacing follow-up so the tier is user-reachable end-to-end.
+
 ### D — Store readiness & compliance (Apple App Store + Google Play)
 - [x] Privacy policy (hosted + in-repo) and ToS — `/privacy` + `/terms` render real,
       code-accurate content (embeddings + Gemini disclosed; Stripe marked not-yet-active);
