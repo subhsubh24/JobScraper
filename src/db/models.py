@@ -61,6 +61,17 @@ class User(Base):
     referral_code = Column(String(16), unique=True, index=True, nullable=True)
     bonus_prep_packs = Column(Integer, nullable=False, server_default="0", default=0)
 
+    # Durable MOBILE (RevenueCat/StoreKit/Play) entitlement flag. Mobile billing has no
+    # per-provider row (renewals map by app_user_id alone), so without a durable flag the
+    # tier-reconciler (`billing.recompute_user_tier`) couldn't tell an active mobile subscriber
+    # from a lapsed one and would wrongly strip a mobile-only payer whenever ANOTHER source (an
+    # org seat) is removed. This column is that durable source-of-record: a verified RevenueCat
+    # grant sets it True, a verified revoke sets it False, and the reconciler ORs it with the
+    # Stripe sub + org seat into `users.tier`. Only a signature-verified webhook writes it.
+    mobile_entitlement_active = Column(
+        Boolean, nullable=False, server_default="0", default=False
+    )
+
     # Third-party-AI consent (Apple App Review 5.1.2(i) / privacy). NULL = never consented
     # (the default): the app must NOT send this user's personal data (resume / job text /
     # coach messages) to the third-party AI provider (Gemini) until they grant explicit,

@@ -18,6 +18,15 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
+    # Durable mobile-entitlement flag so the tier reconciler can OR mobile in alongside the
+    # Stripe sub + org seat (NOT NULL + server_default backfills existing rows to False cleanly).
+    op.add_column(
+        'users',
+        sa.Column(
+            'mobile_entitlement_active', sa.Boolean(), server_default='0', nullable=False
+        ),
+    )
+
     op.create_table(
         'organizations',
         sa.Column('id', sa.String(length=36), nullable=False),
@@ -76,3 +85,4 @@ def downgrade() -> None:
     op.drop_index(op.f('ix_organizations_stripe_customer_id'), table_name='organizations')
     op.drop_index(op.f('ix_organizations_owner_id'), table_name='organizations')
     op.drop_table('organizations')
+    op.drop_column('users', 'mobile_entitlement_active')

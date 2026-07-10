@@ -100,17 +100,24 @@ def _has_active_org_seat(db: Session, user: User) -> bool:
 
 
 def recompute_user_tier(db: Session, user: User) -> None:
-    """The SINGLE authority that writes ``users.tier`` from all verified entitlement sources.
+    """The SINGLE authority that writes ``users.tier`` from ALL THREE verified entitlement sources.
 
-    A user is PREMIUM iff they have an active individual subscription OR an active organization
-    seat — so neither source can wrongly downgrade the other (canceling an individual sub must
-    not strip a user who still holds a team seat, and revoking a seat must not strip a user who
-    also pays individually). Every path that can change either source (the individual webhook,
-    the org webhook, seat assign/remove, org-owner account deletion) routes through here. It
-    reads ONLY verified state (never a client flag). Behaviour is identical to the old direct
-    ``user.tier`` flip for any user with no org membership, so existing billing guarantees hold.
+    A user is PREMIUM iff ANY of: an active individual Stripe subscription, an active organization
+    seat, or an active mobile (RevenueCat) entitlement (``users.mobile_entitlement_active``). ORing
+    all three means no source can wrongly downgrade another — canceling a Stripe sub must not strip
+    a user who still holds a team seat or a mobile subscription; revoking a seat must not strip a
+    user who pays individually or on mobile; and vice versa. Every path that can change ANY source
+    routes through here: the Stripe webhook (``apply_event``), the org webhook + seat assign/remove
+    + org-owner account deletion (``src/org_billing.py``), and the RevenueCat webhook
+    (``src/mobile_billing.py``). It reads ONLY verified state (never a client flag). Behaviour is
+    identical to the old direct ``user.tier`` flip for any user whose only source is the one being
+    changed, so existing single-source billing guarantees hold.
     """
-    premium = _has_active_individual_sub(db, user) or _has_active_org_seat(db, user)
+    premium = (
+        _has_active_individual_sub(db, user)
+        or _has_active_org_seat(db, user)
+        or bool(user.mobile_entitlement_active)
+    )
     user.tier = UserTier.PREMIUM if premium else UserTier.FREE
 
 

@@ -320,6 +320,43 @@ def test_canceling_org_does_not_strip_individual_premium(client, monkeypatch, db
     assert db_session.query(User).filter(User.id == member_id).first().tier == UserTier.PREMIUM
 
 
+def test_org_seat_removal_does_not_strip_mobile_subscriber(client, monkeypatch, db_session):
+    """Regression (3rd reviewer finding): a MOBILE (RevenueCat) subscriber who also holds an org
+    seat must KEEP Premium when the seat is removed — mobile is a first-class entitlement source
+    reconciled by recompute_user_tier, not clobbered by an org-seat change."""
+    _, otoken = _register(client, "owner18@example.com")
+    member_id, mtoken = _register(client, "member18@example.com")
+
+    # 1) The member has an active mobile subscription (verified RevenueCat webhook).
+    monkeypatch.setenv("REVENUECAT_WEBHOOK_AUTH", "rc_secret")
+    grant = {"event": {"type": "INITIAL_PURCHASE", "app_user_id": member_id}}
+    r = client.post(
+        "/api/billing/revenuecat-webhook", json=grant, headers={"Authorization": "rc_secret"}
+    )
+    assert r.status_code == 200, r.text
+    db_session.expire_all()
+    assert db_session.query(User).filter(User.id == member_id).first().tier == UserTier.PREMIUM
+
+    # 2) They also join an org seat, then the owner removes it.
+    org = client.post("/api/org", json={"name": "Team R"}, headers=_auth(otoken)).json()
+    _activate_org(client, monkeypatch, org["id"], seats=2)
+    client.post("/api/org/members", json={"email": "member18@example.com"}, headers=_auth(otoken))
+    assert client.delete(f"/api/org/members/{member_id}", headers=_auth(otoken)).status_code == 200
+
+    # 3) The seat is gone but the MOBILE subscription still grants Premium (not stripped to FREE).
+    db_session.expire_all()
+    assert db_session.query(User).filter(User.id == member_id).first().tier == UserTier.PREMIUM
+
+    # And a verified mobile EXPIRATION now correctly drops them (no other source).
+    monkeypatch.setenv("REVENUECAT_WEBHOOK_AUTH", "rc_secret")
+    expire = {"event": {"type": "EXPIRATION", "app_user_id": member_id}}
+    assert client.post(
+        "/api/billing/revenuecat-webhook", json=expire, headers={"Authorization": "rc_secret"}
+    ).status_code == 200
+    db_session.expire_all()
+    assert db_session.query(User).filter(User.id == member_id).first().tier == UserTier.FREE
+
+
 def test_webhook_seat_reduction_frees_newest_members(client, monkeypatch, db_session):
     """A seat DOWNGRADE re-enforces the cap: oldest members keep seats, newest lose them."""
     _, otoken = _register(client, "owner14@example.com")

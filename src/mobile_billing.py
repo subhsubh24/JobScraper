@@ -12,8 +12,10 @@ Design rules mirror the Stripe webhook (``src/billing.py``) — SIDE-EFFECT INTE
   grants NOTHING.
 - **Honest when unconfigured.** Until the owner sets ``REVENUECAT_WEBHOOK_AUTH`` (Human-Core,
   PENDING_OPS) the endpoint refuses honestly (503) and grants nothing — never a fake unlock.
-- **``users.tier`` is the single source of truth** for gating (same column the Stripe path
-  flips), so web and mobile entitlement converge on one switch the API already reads.
+- **``users.tier`` is the single source of truth** for gating. A verified event records the
+  durable ``users.mobile_entitlement_active`` flag and then defers to ``billing.recompute_user_tier``,
+  which ORs mobile with the Stripe sub + any org seat — so web, mobile, and team entitlement
+  converge on one switch the API already reads, and no source clobbers another.
 
 We resolve the user from the event's ``app_user_id`` — the mobile app configures RevenueCat
 with our ``User.id`` as the app user id, so every event (including renewals that omit
@@ -25,7 +27,8 @@ from typing import Optional
 
 from sqlalchemy.orm import Session
 
-from src.db.models import User, UserTier
+from src import billing
+from src.db.models import User
 
 # RevenueCat event types that should GRANT the Premium entitlement (an active subscription).
 _GRANT_EVENTS = {
@@ -112,5 +115,11 @@ def apply_event(payload: dict, db: Session) -> Optional[str]:
     if not user:
         return None
 
-    user.tier = UserTier.PREMIUM if etype in _GRANT_EVENTS else UserTier.FREE
+    # Record the durable mobile-entitlement state, then let the single tier authority reconcile
+    # ``users.tier`` across ALL sources (Stripe sub + org seat + this mobile flag). Flipping tier
+    # directly here would strip a user who ALSO holds a Stripe sub or an org seat when their mobile
+    # sub lapses — and, conversely, an org-seat removal would strip THIS mobile subscriber. Routing
+    # through ``recompute_user_tier`` keeps mobile a first-class, non-clobbering source.
+    user.mobile_entitlement_active = etype in _GRANT_EVENTS
+    billing.recompute_user_tier(db, user)
     return user.id
