@@ -41,3 +41,14 @@ Format: `[id] PATTERN — CONTEXT — WHY IT WORKS — EVIDENCE`
   a local `git checkout main` / `git pull` can land on a stale or divergent local main and hide the just-
   merged work. — `git fetch origin main && git reset --hard origin/main` before branching the next PR. —
   EVIDENCE: run 32 recovery note; used cleanly throughout run 33.
+
+- **[sp-6] Add a NEW paid entitlement source by reconciling through ONE gating column — never touch the N gates.** —
+  A new billing source (team/org seats) must grant/revoke access without rewriting the ~10 endpoint gates that
+  read `users.tier`, and without wrongly downgrading a user who ALSO pays another way. — Route EVERY source
+  (Stripe sub, org seat, mobile/RevenueCat) through ONE `recompute_user_tier(db, user)` that ORs each verified
+  source into `users.tier`; give each source a durable readable state (a Subscription row, an org-seat row, a
+  `mobile_entitlement_active` flag) so the reconciler can see it. This dissolves the "touch 10 gates = trust
+  hole" objection that stalled the seat tier 23× — 0 gate changes, dual/triple-grant safe. Make it the ONLY
+  writer of the gating column (grep to prove it) so the "single authority" claim is literally true. — EVIDENCE:
+  #348 (seat tier landed clean; maker≠checker caught the 3 reconciliation edges — stale-plan level, seat-cap
+  race, mobile clobber — because the design localized entitlement to one function).
