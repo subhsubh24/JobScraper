@@ -55,14 +55,19 @@ def plan_level_for_plan(plan: Optional[str]) -> str:
 def current_plan_level(user: User, subscription: Optional[Subscription]) -> str:
     """A user's effective entitlement level: ``free`` | ``pro`` | ``career_plus``.
 
-    ``users.tier`` is the source of truth for paid-vs-free (a lapsed/canceled webhook flips it
-    back to FREE, which drops the level to ``free`` regardless of any stale plan string); the
-    verified ``Subscription.plan`` distinguishes Career+ from Pro among PREMIUM users. Pure
-    function — pass the user's ``Subscription`` row (or ``None``) so it never does implicit DB IO.
+    ``users.tier`` is the source of truth for paid-vs-free; the verified ``Subscription.plan``
+    distinguishes Career+ from Pro among PREMIUM users. Career+ is derived ONLY from a subscription
+    that is CURRENTLY ACTIVE — never merely non-None. This matters now that ``users.tier`` can be
+    PREMIUM from a source OTHER than the user's own individual subscription (a team/org Pro seat,
+    ``recompute_user_tier``): a former individual Career+ subscriber keeps a CANCELED
+    ``Subscription`` row with a stale ``plan="careerplus_*"`` forever, and if they later occupy an
+    org Pro seat their ``tier`` flips back to PREMIUM — deriving Career+ from that stale plan would
+    silently unlock the higher tier for free. Gating on the active status closes that bypass; a team
+    seat grants the base Pro level only. Pure function — pass the ``Subscription`` row (or ``None``).
     """
     if user.tier != UserTier.PREMIUM:
         return "free"
-    if subscription is None:
+    if subscription is None or subscription.status not in _ACTIVE_STATUSES:
         return "pro"
     return plan_level_for_plan(subscription.plan)
 

@@ -168,9 +168,12 @@ class Organization(Base):
 
 
 class OrganizationMember(Base):
-    """One row per seat occupant in an organization (the owner is a member too, role=owner).
+    """One row per seat occupant in an organization.
 
-    ``active`` members within an active org receive the org's paid entitlement. The invariant
+    Owner privilege is NOT stored here — it is derived from ``Organization.owner_id``; every seat
+    row is written with ``role="member"`` (the administrator claims a seat like anyone else, and
+    the API synthesizes an ``"owner"`` display role from ``owner_id``). ``active`` members within
+    an active org receive the org's paid entitlement. The invariant
     ``count(active members) <= organizations.seats_purchased`` is enforced at assignment time
     (you cannot add a member with no paid seat) and re-enforced on a webhook seat REDUCTION
     (oldest members keep their seats; the newest are deactivated) so an org never grants more

@@ -100,10 +100,22 @@ def test_current_plan_level_covers_every_state():
     assert billing.current_plan_level(free, None) == "free"
     # A FREE user with a stale careerplus sub row is still free — tier is the source of truth
     # (a canceled/expired webhook flips tier to FREE; the plan string may lag).
-    assert billing.current_plan_level(free, SimpleNamespace(plan="careerplus_monthly")) == "free"
+    assert billing.current_plan_level(
+        free, SimpleNamespace(plan="careerplus_monthly", status="canceled")
+    ) == "free"
     assert billing.current_plan_level(prem, None) == "pro"
-    assert billing.current_plan_level(prem, SimpleNamespace(plan="pro_monthly")) == "pro"
-    assert billing.current_plan_level(prem, SimpleNamespace(plan="careerplus_annual")) == "career_plus"
+    assert billing.current_plan_level(
+        prem, SimpleNamespace(plan="pro_monthly", status="active")
+    ) == "pro"
+    assert billing.current_plan_level(
+        prem, SimpleNamespace(plan="careerplus_annual", status="active")
+    ) == "career_plus"
+    # Career+ is derived ONLY from an ACTIVE subscription. A PREMIUM user whose careerplus sub is
+    # CANCELED (a stale plan string) — possible now that tier can be PREMIUM from a team/org Pro
+    # seat (billing.recompute_user_tier) — gets Pro, never a free Career+ unlock via the stale plan.
+    assert billing.current_plan_level(
+        prem, SimpleNamespace(plan="careerplus_annual", status="canceled")
+    ) == "pro"
 
 
 # --------------------------------------------------------------------------- /me plan_level

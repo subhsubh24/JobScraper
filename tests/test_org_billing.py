@@ -369,6 +369,51 @@ def test_deleting_owner_purges_org_and_drops_members(client, monkeypatch, db_ses
     assert db_session.query(User).filter(User.id == member_id).first().tier == UserTier.FREE
 
 
+def test_org_pro_seat_does_not_unlock_careerplus_via_stale_plan(client, monkeypatch, db_session):
+    """Regression: a former individual Career+ subscriber (canceled -> stale plan row) who later
+    occupies a TEAM Pro seat must get Pro, NOT Career+. Before the fix, ``current_plan_level``
+    derived Career+ from the stale non-None ``Subscription.plan`` once the org seat re-flipped
+    ``tier`` to PREMIUM — a paywall bypass. A team seat grants Pro only."""
+    monkeypatch.setenv("STRIPE_WEBHOOK_SECRET", WHSEC)
+    _, otoken = _register(client, "owner17@example.com")
+    member_id, mtoken = _register(client, "member17@example.com")
+
+    # 1) Member buys individual Career+ then cancels -> canceled row with stale careerplus plan.
+    buy = _event(
+        "checkout.session.completed",
+        {"id": "cs_m17", "client_reference_id": member_id, "customer": "cus_m17",
+         "subscription": "sub_m17", "payment_status": "paid",
+         "metadata": {"user_id": member_id, "plan": "careerplus_monthly"}},
+    )
+    assert _post_event(client, buy).status_code == 200
+    cancel = _event(
+        "customer.subscription.deleted",
+        {"id": "sub_m17", "customer": "cus_m17", "metadata": {"user_id": member_id}},
+    )
+    assert _post_event(client, cancel).status_code == 200
+    db_session.expire_all()
+    assert db_session.query(User).filter(User.id == member_id).first().tier == UserTier.FREE
+
+    # 2) They join an org on a PRO seat -> PREMIUM again, but only Pro-level entitlement.
+    org = client.post("/api/org", json={"name": "Team Q"}, headers=_auth(otoken)).json()
+    _activate_org(client, monkeypatch, org["id"], seats=2)
+    client.post("/api/org/members", json={"email": "member17@example.com"}, headers=_auth(otoken))
+    db_session.expire_all()
+    assert db_session.query(User).filter(User.id == member_id).first().tier == UserTier.PREMIUM
+
+    # The Career+-exclusive salary-negotiation tool stays gated (403), never unlocked for free.
+    r = client.post(
+        "/api/prep/salary-negotiation",
+        json={"job_id": "nonexistent", "target_salary": 100000},
+        headers=_auth(mtoken),
+    )
+    assert r.status_code == 403, r.text  # Career+ gate blocks BEFORE any job/consent/LLM step
+    # /api/auth/me reports the honest level = pro, not career_plus.
+    me = client.get("/api/auth/me", headers=_auth(mtoken)).json()["user"]
+    assert me["plan_level"] == "pro"
+    assert me["career_plus"] is False
+
+
 def test_deleting_member_frees_their_seat(client, monkeypatch, db_session):
     _, otoken = _register(client, "owner16@example.com")
     member_id, mtoken = _register(client, "member16@example.com")

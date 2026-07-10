@@ -152,6 +152,18 @@ def add_member(db: Session, org: Organization, email: str) -> OrganizationMember
     if not is_org_active(org):
         raise OrgNotActive("Purchase seats before assigning them.")
 
+    # Serialize concurrent seat assignments for THIS org by locking its row for the transaction
+    # (mirrors the ``.with_for_update()`` idiom the spend-ceiling / rate-counter paths already use
+    # in asgi.py). Without it, two parallel POST /api/org/members could both read
+    # ``seats_used == cap - 1`` under READ COMMITTED, both pass the check, and both commit —
+    # over-provisioning PAID entitlement for a seat that was never bought. On SQLite (tests) the
+    # single connection already serializes, so this is a Postgres-only correctness lock.
+    locked = db.query(Organization).filter(Organization.id == org.id).with_for_update().first()
+    if locked is not None:
+        org = locked
+        if not is_org_active(org):
+            raise OrgNotActive("Purchase seats before assigning them.")
+
     target = db.query(User).filter(User.email == email.strip().lower()).first()
     if target is None:
         raise MemberNotFound("No account exists for that email.")
