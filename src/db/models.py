@@ -122,6 +122,81 @@ class Subscription(Base):
     user = relationship("User", back_populates="subscription")
 
 
+# ============ ORGANIZATIONS / TEAM SEATS (B2B2C tier — Track C / business-case lever 2) ============
+
+class Organization(Base):
+    """A team/organization that buys a POOL of seats and assigns them to member users.
+
+    The B2B2C floor-lever (docs/BUSINESS_CASE.md lever 2): bootcamps, outplacement firms, and
+    employers resell/allocate seats to their members (higher ARPA, lower CAC per seat than
+    individual acquisition). Billing mirrors the individual Stripe path exactly (SIDE-EFFECT
+    INTEGRITY): a signature-verified, QUANTITY-based Stripe subscription is the ONLY thing that
+    sets ``status``/``seats_purchased`` — never a client-supplied flag. Entitlement is granted
+    to a member ONLY while the org is active AND the member occupies a seat; ``users.tier``
+    stays the single gating source of truth (``src.billing.recompute_user_tier`` reconciles an
+    individual sub OR an active org seat into it), so EVERY existing paid-endpoint gate applies
+    to seat members with ZERO gate changes. A team seat grants the base paid (Pro) level;
+    Career+ remains an individual-only upsell (no seat plan grants it), so seats never silently
+    unlock the higher tier. A NEW table (AUTO_CREATE_TABLES-safe) + the Alembic migration.
+    """
+    __tablename__ = "organizations"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    name = Column(String(255), nullable=False)
+    # The user who created + administers the org (buys seats, adds/removes members). FK without
+    # an ORM cascade — account deletion purges owned orgs explicitly (see auth_service), same
+    # posture as referrals, so a Postgres FK constraint never blocks a user delete.
+    owner_id = Column(String(36), ForeignKey("users.id"), nullable=False, index=True)
+
+    # Our plan id (e.g. ``team_annual``) — DERIVED entitlement level maps via billing, never
+    # trusted from the client. NULL until a verified checkout completes.
+    plan = Column(String(50))
+    status = Column(String(50))  # Stripe subscription status: active, trialing, canceled, ...
+    # Seat pool size = the verified Stripe subscription QUANTITY. Only a signed webhook writes
+    # this; the seat-assignment endpoint refuses to exceed it (no unpaid entitlement).
+    seats_purchased = Column(Integer, nullable=False, server_default="0", default=0)
+
+    stripe_customer_id = Column(String(255), index=True)
+    stripe_subscription_id = Column(String(255), index=True)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    members = relationship(
+        "OrganizationMember", back_populates="organization", cascade="all, delete-orphan"
+    )
+
+
+class OrganizationMember(Base):
+    """One row per seat occupant in an organization (the owner is a member too, role=owner).
+
+    ``active`` members within an active org receive the org's paid entitlement. The invariant
+    ``count(active members) <= organizations.seats_purchased`` is enforced at assignment time
+    (you cannot add a member with no paid seat) and re-enforced on a webhook seat REDUCTION
+    (oldest members keep their seats; the newest are deactivated) so an org never grants more
+    entitlement than it pays for. ``user_id`` is globally UNIQUE — a user belongs to at most one
+    org — which keeps entitlement reconciliation unambiguous. FK to users without an ORM cascade;
+    account deletion purges these rows explicitly.
+    """
+    __tablename__ = "organization_members"
+    __table_args__ = (
+        UniqueConstraint("user_id", name="uq_org_member_user"),
+        Index("ix_org_member_org_active", "org_id", "active"),
+    )
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    org_id = Column(String(36), ForeignKey("organizations.id"), nullable=False, index=True)
+    user_id = Column(String(36), ForeignKey("users.id"), nullable=False, index=True)
+    role = Column(String(20), nullable=False, default="member")  # owner | member
+    # Soft seat-occupancy flag: a removed/deactivated member keeps the row (audit) but frees the
+    # seat and loses entitlement. Only ``active`` rows count against the seat pool + grant tier.
+    active = Column(Boolean, nullable=False, server_default="1", default=True)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    organization = relationship("Organization", back_populates="members")
+
+
 # ============ REFERRALS (invite loop — growth) ============
 
 class Referral(Base):
