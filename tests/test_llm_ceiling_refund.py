@@ -124,6 +124,50 @@ def test_provider_502s_do_not_burn_the_daily_quota(client, db_session, monkeypat
     assert ok.json()["message"] == "Here is some concrete advice."
 
 
+def test_moderation_decline_still_consumes_the_ceiling(client, db_session, monkeypatch):
+    """A moderation refusal is NOT refunded — the generation really ran and returned a policy
+    decline, so it must still cost a slot. Pin the deliberate asymmetry (refund a provider 502,
+    but NEVER a 422 moderation) so a future accidental refund-on-moderation can't silently hand a
+    user a free slot on every declined request (a real ceiling-bypass)."""
+    from src.db.models import Subscription, User, UserTier
+    from src.enrichment.llm_workflows import ModeratedContentError
+
+    r = client.post("/api/auth/register", json={"email": "moderation@example.com", "password": OK_PW})
+    assert r.status_code == 200, r.text
+    uid, token = r.json()["user"]["id"], r.json()["token"]
+    auth = {"Authorization": f"Bearer {token}"}
+    db_session.query(User).filter(User.id == uid).update({User.tier: UserTier.PREMIUM})
+    db_session.add(Subscription(user_id=uid, plan="pro_monthly", status="active"))
+    db_session.commit()
+    assert client.post("/api/ai-consent", headers=auth).status_code == 200
+    job_id = client.post(
+        "/api/jobs",
+        headers=auth,
+        json={"title": "Engineer", "company_name": "Acme", "description": "python"},
+    ).json()["job"]["id"]
+
+    class _ModeratedWorkflows:
+        def __init__(self, db):
+            pass
+
+        def generate_cover_letter(self, job, user):
+            raise ModeratedContentError("declined by policy")
+
+    monkeypatch.setattr(asgi, "llm_available", lambda: True)
+    monkeypatch.setattr(asgi, "LLMWorkflows", _ModeratedWorkflows)
+    monkeypatch.setattr(asgi, "LLM_DAILY_CEILING", 2)
+
+    # Two moderated declines (422) — each really invoked the model, so each CONSUMES a slot and is
+    # NOT refunded...
+    for _ in range(2):
+        r = client.post("/api/prep/cover-letter", headers=auth, json={"job_id": job_id})
+        assert r.status_code == 422, r.text
+    # ...so the 3rd request is over the ceiling → 429. A regression that wrongly refunded moderation
+    # would leave the slot available and this would come back 422, reddening the test.
+    blocked = client.post("/api/prep/cover-letter", headers=auth, json={"job_id": job_id})
+    assert blocked.status_code == 429, blocked.text
+
+
 def test_success_still_consumes_the_ceiling(client, db_session, monkeypatch):
     """The refund must not neuter the wallet-drain defense: genuine successes still count, so the
     ceiling still blocks a runaway once real generations exhaust it."""
