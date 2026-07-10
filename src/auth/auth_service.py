@@ -166,6 +166,10 @@ class AuthService:
         # ZERO rows owned by or referencing the user).
         from src import referrals
         referrals.purge_user_referrals(self.db, user)
+        # Organization rows (owned orgs + seat memberships) also FK users without an ORM
+        # cascade — purge them (and reconcile affected members' tiers) before the delete.
+        from src import org_billing
+        org_billing.purge_user_orgs(self.db, user)
         self.db.delete(user)
         self.db.flush()
 

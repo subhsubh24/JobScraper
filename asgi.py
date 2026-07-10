@@ -63,6 +63,7 @@ from src.ranking.scorer import JobScorer
 from src import analytics
 from src import billing
 from src import mobile_billing
+from src import org_billing
 from src import referrals
 from src.email import EmailMessage, email_enabled, send_email
 from src.email.tokens import make_confirm_token, verify_confirm_token
@@ -642,6 +643,19 @@ class CheckoutRequest(BaseModel):
     plan: str = Field(min_length=2, max_length=50)
 
 
+class OrgCreateRequest(BaseModel):
+    name: str = Field(min_length=2, max_length=120)
+
+
+class OrgCheckoutRequest(BaseModel):
+    plan: str = Field(min_length=2, max_length=50)
+    seats: int = Field(ge=org_billing.MIN_SEATS, le=org_billing.MAX_SEATS)
+
+
+class OrgMemberRequest(BaseModel):
+    email: str = Field(min_length=3, max_length=255)
+
+
 class SalaryNegotiationRequest(BaseModel):
     job_id: str = Field(min_length=1, max_length=64)
     # gt=0 (not ge=0): a target of 0 is not a real negotiation goal — it would burn a paid
@@ -1183,7 +1197,11 @@ async def billing_webhook(request: Request, db: Session = Depends(get_db)):
     except Exception:
         # Invalid signature / malformed payload — grant NOTHING.
         raise HTTPException(status_code=400, detail="Invalid signature.")
-    billing.apply_event(event, db)
+    # Route ORG (team-seat) events first — they carry an ``org_id`` and map to a known
+    # Organization; anything else falls back to individual-subscription handling. Both run only
+    # on a signature-VERIFIED event, so neither entitlement path can be forged.
+    if org_billing.apply_event(event, db) is None:
+        billing.apply_event(event, db)
     db.commit()
     return {"received": True}
 
@@ -1213,6 +1231,149 @@ async def revenuecat_webhook(request: Request, db: Session = Depends(get_db)):
     mobile_billing.apply_event(payload, db)
     db.commit()
     return {"received": True}
+
+
+# ---------------------------------------------------------------------------
+# Organizations / team seats (B2B2C tier — Track C, business-case lever 2)
+# ---------------------------------------------------------------------------
+def _org_payload(db: Session, org, *, viewer: User) -> dict:
+    """Serialize an org for its owner or a member. Members see only summary state (no roster);
+    the owner sees the member roster. Never leaks another org's data (tenant-scoped by caller)."""
+    is_owner = org.owner_id == viewer.id
+    payload = {
+        "id": org.id,
+        "name": org.name,
+        "plan": org.plan,
+        "active": org_billing.is_org_active(org),
+        "seats_purchased": org.seats_purchased or 0,
+        "seats_used": org_billing.seats_used(db, org),
+        "is_owner": is_owner,
+        "role": "owner" if is_owner else "member",
+    }
+    if is_owner:
+        members = org_billing.list_members(db, org)
+        id_to_email = {
+            u.id: u.email
+            for u in db.query(User).filter(
+                User.id.in_([m.user_id for m in members] or [""])
+            ).all()
+        }
+        payload["members"] = [
+            {"user_id": m.user_id, "email": id_to_email.get(m.user_id), "role": m.role}
+            for m in members
+        ]
+    return payload
+
+
+@app.post("/api/org", dependencies=[Depends(rate_limit_user("write", 20))])
+def create_organization(
+    data: OrgCreateRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Create an organization the signed-in user administers (one owned org per user)."""
+    try:
+        org = org_billing.create_org(db, user, data.name)
+    except org_billing.OrgAlreadyExists:
+        raise HTTPException(status_code=409, detail="You already own an organization.")
+    db.commit()
+    return _org_payload(db, org, viewer=user)
+
+
+@app.get("/api/org", dependencies=[Depends(rate_limit_user("user_read", 120))])
+def get_organization(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Return the org the user owns or holds a seat in, or ``{organization: null}`` if none."""
+    org = org_billing.org_for_user(db, user)
+    if org is None:
+        return {"organization": None}
+    return {"organization": _org_payload(db, org, viewer=user)}
+
+
+@app.post("/api/org/checkout", dependencies=[Depends(rate_limit_user("billing", 10))])
+def org_checkout(
+    data: OrgCheckoutRequest,
+    request: Request,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Create a REAL quantity-based Stripe Checkout session to buy ``seats`` team seats.
+
+    SIDE-EFFECT INTEGRITY: makes a REAL stripe call; refuses with an honest 503 (no charge)
+    when Stripe isn't configured. Only the org OWNER may buy seats. Entitlement for members is
+    granted later, solely by the signed webhook.
+    """
+    org = org_billing.owned_org(db, user)
+    if org is None:
+        raise HTTPException(status_code=404, detail="Create an organization first.")
+    base = _web_base_url(request)
+    try:
+        url = org_billing.create_seat_checkout_session(
+            user,
+            org,
+            data.plan,
+            data.seats,
+            success_url=f"{base}/app/team?checkout=success",
+            cancel_url=f"{base}/app/team?checkout=cancel",
+        )
+    except org_billing.UnknownPlan:
+        raise HTTPException(status_code=400, detail="Unknown plan.")
+    except org_billing.OrgError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    except org_billing.BillingNotConfigured:
+        raise HTTPException(
+            status_code=503,
+            detail="Team plans aren't available yet. No charge was made.",
+        )
+    return {"url": url}
+
+
+@app.post("/api/org/members", dependencies=[Depends(rate_limit_user("write", 30))])
+def add_org_member(
+    data: OrgMemberRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Assign a purchased seat to a member by email (org OWNER only)."""
+    org = org_billing.owned_org(db, user)
+    if org is None:
+        raise HTTPException(status_code=404, detail="Create an organization first.")
+    try:
+        org_billing.add_member(db, org, data.email)
+    except org_billing.OrgNotActive:
+        raise HTTPException(status_code=400, detail="Purchase seats before assigning them.")
+    except org_billing.NoSeatsAvailable:
+        raise HTTPException(status_code=400, detail="All purchased seats are in use.")
+    except org_billing.MemberNotFound:
+        raise HTTPException(status_code=404, detail="No account exists for that email.")
+    except org_billing.AlreadyInAnotherOrg:
+        raise HTTPException(
+            status_code=409, detail="That user already belongs to another organization."
+        )
+    db.commit()
+    return _org_payload(db, org, viewer=user)
+
+
+@app.delete(
+    "/api/org/members/{member_user_id}",
+    dependencies=[Depends(rate_limit_user("write", 30))],
+)
+def remove_org_member(
+    member_user_id: str,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Free the seat held by ``member_user_id`` (org OWNER only)."""
+    org = org_billing.owned_org(db, user)
+    if org is None:
+        raise HTTPException(status_code=404, detail="You don't administer an organization.")
+    removed = org_billing.remove_member(db, org, member_user_id)
+    db.commit()
+    if not removed:
+        raise HTTPException(status_code=404, detail="That user isn't an active member.")
+    return _org_payload(db, org, viewer=user)
 
 
 # ---------------------------------------------------------------------------

@@ -55,16 +55,70 @@ def plan_level_for_plan(plan: Optional[str]) -> str:
 def current_plan_level(user: User, subscription: Optional[Subscription]) -> str:
     """A user's effective entitlement level: ``free`` | ``pro`` | ``career_plus``.
 
-    ``users.tier`` is the source of truth for paid-vs-free (a lapsed/canceled webhook flips it
-    back to FREE, which drops the level to ``free`` regardless of any stale plan string); the
-    verified ``Subscription.plan`` distinguishes Career+ from Pro among PREMIUM users. Pure
-    function — pass the user's ``Subscription`` row (or ``None``) so it never does implicit DB IO.
+    ``users.tier`` is the source of truth for paid-vs-free; the verified ``Subscription.plan``
+    distinguishes Career+ from Pro among PREMIUM users. Career+ is derived ONLY from a subscription
+    that is CURRENTLY ACTIVE — never merely non-None. This matters now that ``users.tier`` can be
+    PREMIUM from a source OTHER than the user's own individual subscription (a team/org Pro seat,
+    ``recompute_user_tier``): a former individual Career+ subscriber keeps a CANCELED
+    ``Subscription`` row with a stale ``plan="careerplus_*"`` forever, and if they later occupy an
+    org Pro seat their ``tier`` flips back to PREMIUM — deriving Career+ from that stale plan would
+    silently unlock the higher tier for free. Gating on the active status closes that bypass; a team
+    seat grants the base Pro level only. Pure function — pass the ``Subscription`` row (or ``None``).
     """
     if user.tier != UserTier.PREMIUM:
         return "free"
-    if subscription is None:
+    if subscription is None or subscription.status not in _ACTIVE_STATUSES:
         return "pro"
     return plan_level_for_plan(subscription.plan)
+
+
+def _has_active_individual_sub(db: Session, user: User) -> bool:
+    """True iff the user has their OWN active/trialing individual Stripe subscription."""
+    sub = db.query(Subscription).filter(Subscription.user_id == user.id).first()
+    return bool(sub and sub.status in _ACTIVE_STATUSES)
+
+
+def _has_active_org_seat(db: Session, user: User) -> bool:
+    """True iff the user occupies an ACTIVE seat in an ACTIVE organization (B2B2C tier).
+
+    Imported lazily to avoid a hard import cycle and to keep this module usable if the org
+    tables aren't present in an old schema (the query simply returns no rows).
+    """
+    from src.db.models import Organization, OrganizationMember
+
+    row = (
+        db.query(OrganizationMember.id)
+        .join(Organization, OrganizationMember.org_id == Organization.id)
+        .filter(
+            OrganizationMember.user_id == user.id,
+            OrganizationMember.active.is_(True),
+            Organization.status.in_(_ACTIVE_STATUSES),
+        )
+        .first()
+    )
+    return row is not None
+
+
+def recompute_user_tier(db: Session, user: User) -> None:
+    """The SINGLE authority that writes ``users.tier`` from ALL THREE verified entitlement sources.
+
+    A user is PREMIUM iff ANY of: an active individual Stripe subscription, an active organization
+    seat, or an active mobile (RevenueCat) entitlement (``users.mobile_entitlement_active``). ORing
+    all three means no source can wrongly downgrade another — canceling a Stripe sub must not strip
+    a user who still holds a team seat or a mobile subscription; revoking a seat must not strip a
+    user who pays individually or on mobile; and vice versa. Every path that can change ANY source
+    routes through here: the Stripe webhook (``apply_event``), the org webhook + seat assign/remove
+    + org-owner account deletion (``src/org_billing.py``), and the RevenueCat webhook
+    (``src/mobile_billing.py``). It reads ONLY verified state (never a client flag). Behaviour is
+    identical to the old direct ``user.tier`` flip for any user whose only source is the one being
+    changed, so existing single-source billing guarantees hold.
+    """
+    premium = (
+        _has_active_individual_sub(db, user)
+        or _has_active_org_seat(db, user)
+        or bool(user.mobile_entitlement_active)
+    )
+    user.tier = UserTier.PREMIUM if premium else UserTier.FREE
 
 
 class BillingNotConfigured(Exception):
@@ -235,7 +289,7 @@ def apply_event(event, db: Session) -> Optional[str]:
             plan=meta.get("plan"),
             status="active",
         )
-        user.tier = UserTier.PREMIUM
+        recompute_user_tier(db, user)
         return user.id
 
     if etype in ("customer.subscription.created", "customer.subscription.updated"):
@@ -253,7 +307,7 @@ def apply_event(event, db: Session) -> Optional[str]:
             status=status,
             current_period_end=_period_end(obj),
         )
-        user.tier = UserTier.PREMIUM if status in _ACTIVE_STATUSES else UserTier.FREE
+        recompute_user_tier(db, user)
         return user.id
 
     if etype == "customer.subscription.deleted":
@@ -261,7 +315,7 @@ def apply_event(event, db: Session) -> Optional[str]:
         if not user:
             return None
         _upsert_subscription(db, user, stripe_subscription_id=obj.get("id"), status="canceled")
-        user.tier = UserTier.FREE
+        recompute_user_tier(db, user)
         return user.id
 
     return None

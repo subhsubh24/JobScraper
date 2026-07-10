@@ -74,6 +74,21 @@ Keep this current as routes are added. A new route with no journey coverage is a
   (20/min) + daily (200/day) per-IP rate limit, captcha seam (no-op until owner connects). Honest
   no-résumé state (has_resume=false, no fake 0%). The §34 pre-launch "aha" funnel driver.
 
+- **team / organization seats (B2B2C tier)** — `POST /api/org` (create), `GET /api/org` (mine),
+  `POST /api/org/checkout` (buy N seats — a REAL quantity-based Stripe call), `POST /api/org/members`
+  (assign a seat by email), `DELETE /api/org/members/{user_id}` (free a seat)
+  (`tests/test_org_billing.py`, 21): the named business-case floor-lever. Entitlement is reconciled
+  into `users.tier` by `billing.recompute_user_tier` (active individual Stripe sub OR active org
+  seat OR active mobile/RevenueCat entitlement — the single authority over all three sources), so
+  every existing paid gate applies to seat members unchanged; a team seat grants the base Pro level
+  (Career+ stays an individual upsell). SIDE-EFFECT INTEGRITY: `status`/`seats_purchased` move ONLY
+  on a signature-verified webhook (a forged event grants nothing); the paid-seat invariant
+  (`active members <= seats_purchased`) is enforced on assignment AND on a webhook seat reduction
+  (newest freed first); checkout refuses honestly (503) when Stripe isn't configured. Authz +
+  tenant isolation (owner-only management; a member never sees the roster) + account-deletion purge
+  (no orphaned org rows) are all tested. Web/mobile management surface is a follow-up (backend-first,
+  like the Career+ tier PR #152). Live Stripe team Price ID is owner-only (PENDING_OPS).
+
 ## Mobile screens (`mobile/src/app/**`, jest-expo component/integration tests)
 | Screen / unit | Covered by | Outcome asserted |
 |---|---|---|
