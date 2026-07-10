@@ -77,8 +77,9 @@ Keep this current as routes are added. A new route with no journey coverage is a
 - **team / organization seats (B2B2C tier)** — `POST /api/org` (create), `GET /api/org` (mine),
   `POST /api/org/checkout` (buy N seats — a REAL quantity-based Stripe call), `POST /api/org/members`
   (assign a seat by email), `DELETE /api/org/members/{user_id}` (free a seat)
-  (`tests/test_org_billing.py`, 19): the named business-case floor-lever. Entitlement is reconciled
-  into `users.tier` by `billing.recompute_user_tier` (active individual sub OR active org seat), so
+  (`tests/test_org_billing.py`, 21): the named business-case floor-lever. Entitlement is reconciled
+  into `users.tier` by `billing.recompute_user_tier` (active individual Stripe sub OR active org
+  seat OR active mobile/RevenueCat entitlement — the single authority over all three sources), so
   every existing paid gate applies to seat members unchanged; a team seat grants the base Pro level
   (Career+ stays an individual upsell). SIDE-EFFECT INTEGRITY: `status`/`seats_purchased` move ONLY
   on a signature-verified webhook (a forged event grants nothing); the paid-seat invariant
