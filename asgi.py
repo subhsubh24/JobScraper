@@ -340,6 +340,35 @@ def _peek_counter(db: Session, subject: str, bucket: str, window_seconds: int) -
     return row.count if row else 0
 
 
+def _refund_counter(db: Session, subject: str, bucket: str, window_seconds: int) -> None:
+    """Give back one previously-consumed hit in the CURRENT window (floor 0), cross-instance.
+
+    The inverse of ``_consume_counter``, for the narrow case where a slot was consumed up-front
+    but the metered work then failed through NO fault of the user AND incurred no real spend —
+    specifically an upstream provider OUTAGE (a 502 from a dead/erroring LLM provider). Refunding
+    keeps the daily ceiling honest (it should count generations that actually ran/cost money, not
+    provider outages) WITHOUT weakening the wallet-drain defense: a 502 means the billable call did
+    not succeed, so there is no spend to give back. ``SELECT ... FOR UPDATE`` serializes the
+    decrement (mirroring ``_consume_counter``). Never drives the count below 0 — a refund with no
+    matching prior consume (e.g. the window rolled over between consume and failure) is a harmless
+    no-op.
+    """
+    window_key = int(time.time() // window_seconds)
+    row = (
+        db.query(RateCounter)
+        .filter(
+            RateCounter.subject == subject,
+            RateCounter.bucket == bucket,
+            RateCounter.window_key == window_key,
+        )
+        .with_for_update()
+        .first()
+    )
+    if row is not None and row.count > 0:
+        row.count -= 1
+    db.commit()  # persist the decrement (or just release the row lock when there is nothing to refund)
+
+
 # Per-ACCOUNT login lockout — DB-backed so it holds ACROSS serverless instances. The old design
 # was an in-memory per-instance dict: on Vercel a distributed password brute-force that spreads
 # across IPs hits a DIFFERENT instance each time, so no single instance ever accumulated enough
@@ -456,6 +485,25 @@ def check_llm_ceiling(user: User, db: Session) -> None:
             status_code=429,
             detail="Daily AI usage limit reached. Try again tomorrow.",
         )
+
+
+def refund_llm_ceiling(user: User, db: Session) -> None:
+    """Refund the daily-AI slot ``check_llm_ceiling`` consumed up-front, for the case where the
+    LLM provider itself failed (a 502) — the outage is not the user's fault and cost nothing, so
+    it must not burn their daily quota. Deliberately NOT called on success or on a moderation
+    refusal (there the call really ran and — for moderation — a real generation was attempted).
+
+    Best-effort and self-contained: it first rolls back any half-open transaction left by the
+    failed provider call (nothing legitimate is pending on the 502 path — the artifact commit
+    lives in the success path), then decrements the counter. A refund failure is swallowed so it
+    can never mask the provider 502 the caller is about to raise.
+    """
+    try:
+        db.rollback()
+        _refund_counter(db, user.id, "llm_daily", 86400)
+    except Exception:  # noqa: BLE001 — a refund is best-effort; never mask the real provider error
+        logger.warning("Failed to refund the daily AI slot after a provider error", exc_info=True)
+        db.rollback()
 
 
 def ai_consent_ok(user: User) -> bool:
@@ -1555,6 +1603,7 @@ def generate_prep_pack(
         raise HTTPException(status_code=422, detail=_MODERATED_DECLINE_DETAIL)
     except Exception:
         logger.exception("Prep pack generation failed")
+        refund_llm_ceiling(user, db)  # provider outage, not the user's fault — don't burn a daily slot
         raise HTTPException(status_code=502, detail="AI provider error generating prep pack")
 
     auth.increment_prep_usage(user)
@@ -1624,6 +1673,7 @@ def generate_salary_negotiation_guide(
         raise HTTPException(status_code=422, detail=_MODERATED_DECLINE_DETAIL)
     except Exception:
         logger.exception("Salary negotiation generation failed")
+        refund_llm_ceiling(user, db)  # provider outage, not the user's fault — don't burn a daily slot
         raise HTTPException(status_code=502, detail="AI provider error generating negotiation guide")
 
     db.commit()
@@ -1688,6 +1738,7 @@ def generate_cover_letter_endpoint(
         raise HTTPException(status_code=422, detail=_MODERATED_DECLINE_DETAIL)
     except Exception:
         logger.exception("Cover letter generation failed")
+        refund_llm_ceiling(user, db)  # provider outage, not the user's fault — don't burn a daily slot
         raise HTTPException(status_code=502, detail="AI provider error generating cover letter")
 
     db.commit()
@@ -1749,6 +1800,7 @@ def generate_study_plan_endpoint(
         raise HTTPException(status_code=422, detail=_MODERATED_DECLINE_DETAIL)
     except Exception:
         logger.exception("Study plan generation failed")
+        refund_llm_ceiling(user, db)  # provider outage, not the user's fault — don't burn a daily slot
         raise HTTPException(status_code=502, detail="AI provider error generating study plan")
 
     db.commit()
@@ -1821,6 +1873,7 @@ def generate_tailored_resume_endpoint(
         raise HTTPException(status_code=422, detail=_MODERATED_DECLINE_DETAIL)
     except Exception:
         logger.exception("Tailored résumé generation failed")
+        refund_llm_ceiling(user, db)  # provider outage, not the user's fault — don't burn a daily slot
         raise HTTPException(status_code=502, detail="AI provider error generating tailored résumé")
 
     db.commit()
@@ -1901,6 +1954,7 @@ def start_mock_interview(
         raise HTTPException(status_code=422, detail=_MODERATED_DECLINE_DETAIL)
     except Exception:
         logger.exception("Mock-interview question generation failed")
+        refund_llm_ceiling(user, db)  # provider outage, not the user's fault — don't burn a daily slot
         raise HTTPException(status_code=502, detail="AI provider error starting the mock interview")
 
     interview = MockInterview(
@@ -1979,6 +2033,7 @@ def answer_mock_interview(
         raise HTTPException(status_code=422, detail=_MODERATED_DECLINE_DETAIL)
     except Exception:
         logger.exception("Mock-interview answer scoring failed")
+        refund_llm_ceiling(user, db)  # provider outage, not the user's fault — don't burn a daily slot
         raise HTTPException(status_code=502, detail="AI provider error scoring your answer")
 
     entry = {"question_index": data.question_index, "answer": data.answer, **result}
@@ -2093,6 +2148,7 @@ def coach_chat(
         )
     except Exception:
         logger.exception("Coach chat failed")
+        refund_llm_ceiling(user, db)  # provider outage, not the user's fault — don't burn a daily slot
         raise HTTPException(status_code=502, detail="AI provider error in coach chat")
     db.commit()
     analytics.record_event(db, "coach_message")  # aggregate metric (best-effort, no PII)
@@ -2236,6 +2292,7 @@ def generate_learning_plan_endpoint(
         raise HTTPException(status_code=422, detail=_MODERATED_DECLINE_DETAIL)
     except Exception:
         logger.exception("Learning plan generation failed")
+        refund_llm_ceiling(user, db)  # provider outage, not the user's fault — don't burn a daily slot
         raise HTTPException(status_code=502, detail="AI provider error generating learning plan")
 
     analytics.record_event(db, "learning_plan_generated")  # aggregate metric (best-effort, no PII)
