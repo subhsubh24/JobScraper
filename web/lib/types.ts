@@ -51,6 +51,29 @@ export interface User {
   ai_consent_at?: string | null;
 }
 
+// A seat held by a member of an organization (owner-visible roster row). `email` may be null
+// only in the unlikely event the member's account was deleted between listing and lookup.
+export interface OrgMember {
+  user_id: string;
+  email: string | null;
+  role: string;
+}
+
+// The signed-in user's organization (team seat tier). `members` is present ONLY when the
+// viewer is the owner — members see summary state only, never the roster (tenant privacy,
+// mirrors the server's _org_payload). `active` is true once seats are purchased + paid.
+export interface Organization {
+  id: string;
+  name: string;
+  plan: string;
+  active: boolean;
+  seats_purchased: number;
+  seats_used: number;
+  is_owner: boolean;
+  role: string;
+  members?: OrgMember[];
+}
+
 export interface Job {
   id: string;
   title: string;

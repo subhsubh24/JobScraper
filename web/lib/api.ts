@@ -1,6 +1,15 @@
 // Typed client for the Career Operator FastAPI backend.
 // Base URL: NEXT_PUBLIC_API_URL (set in Vercel) -> the live API default.
-import type { ImportPreviewResult, Job, PipelineStats, Readiness, User } from '@/lib/types';
+import type {
+  ImportPreviewResult,
+  Job,
+  Organization,
+  PipelineStats,
+  Readiness,
+  User,
+} from '@/lib/types';
+
+export type { Organization, OrgMember } from '@/lib/types';
 
 // Single Vercel deployment (Vercel Services): the FastAPI backend is mounted at /api on
 // the SAME origin as this web app, so the default base URL is empty (relative). Each
@@ -485,5 +494,47 @@ export const api = {
         `/api/prep/mock-interviews?job_id=${encodeURIComponent(jobId)}`,
       )
     ).interviews;
+  },
+
+  // --- Team / organization seat tier -------------------------------------------------------
+  // The org the signed-in user owns or holds a seat in, or null when they belong to none.
+  async getOrg(): Promise<Organization | null> {
+    return (await request<{ organization: Organization | null }>('/api/org')).organization;
+  },
+
+  // Create the org the user administers (one owned org per user). Returns the fresh org
+  // (with an empty roster and no seats yet). Throws ApiError(409) if they already own one.
+  async createOrg(name: string): Promise<Organization> {
+    return request<Organization>('/api/org', { method: 'POST', body: { name } });
+  },
+
+  // Start a REAL quantity-based Stripe Checkout to buy `seats` team seats (owner only) and
+  // return its hosted URL. Throws ApiError(503) when team billing isn't configured yet — the
+  // caller surfaces it honestly rather than pretending a purchase happened. `plan` defaults to
+  // the only shipped org plan; seats is bounded 1–200 server-side.
+  async orgCheckout(seats: number, plan = 'team_annual'): Promise<string> {
+    return (
+      await request<{ url: string }>('/api/org/checkout', {
+        method: 'POST',
+        body: { plan, seats },
+      })
+    ).url;
+  },
+
+  // Assign a purchased seat to a member by email (owner only). Awaits the real POST and returns
+  // the updated org (roster + seat usage) — never an optimistic success. Throws ApiError(400)
+  // when no seats are free / unpurchased, (404) when no account has that email, (409) when the
+  // user already belongs to another org — the caller surfaces each honestly.
+  async addOrgMember(email: string): Promise<Organization> {
+    return request<Organization>('/api/org/members', { method: 'POST', body: { email } });
+  },
+
+  // Free the seat held by `userId` (owner only). Awaits the real DELETE and returns the updated
+  // org so the roster + seat count reflect the server truth. Throws ApiError(404) if that user
+  // isn't an active member.
+  async removeOrgMember(userId: string): Promise<Organization> {
+    return request<Organization>(`/api/org/members/${encodeURIComponent(userId)}`, {
+      method: 'DELETE',
+    });
   },
 };
