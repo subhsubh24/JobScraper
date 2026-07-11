@@ -357,6 +357,61 @@ def test_org_seat_removal_does_not_strip_mobile_subscriber(client, monkeypatch, 
     assert db_session.query(User).filter(User.id == member_id).first().tier == UserTier.FREE
 
 
+def test_canceling_individual_sub_does_not_strip_mobile_subscriber(client, monkeypatch, db_session):
+    """Regression: the {individual Stripe sub + mobile RevenueCat} pair, NO org.
+
+    Completes the entitlement-reconciliation matrix — the other two pairs, {org, individual} and
+    {org, mobile}, are covered by the two tests above. A user who pays BOTH individually (Stripe)
+    AND on mobile (RevenueCat) must KEEP Premium when EITHER source ends, because
+    ``recompute_user_tier`` ORs all three verified sources. Critically this uses the Stripe
+    ``customer.subscription.deleted`` webhook (``billing.apply_event`` -> ``recompute_user_tier``)
+    as the trigger with the MOBILE entitlement as the SURVIVING source — a path neither sibling
+    test hits, so a regression that made the Stripe-cancel branch flip ``tier -> FREE`` directly
+    (instead of reconciling through all sources) would silently strip a paying mobile subscriber.
+    """
+    user_id, _ = _register(client, "dualpay@example.com")
+
+    # 1) Active mobile subscription (verified RevenueCat webhook) -> PREMIUM.
+    monkeypatch.setenv("REVENUECAT_WEBHOOK_AUTH", "rc_secret")
+    grant = {"event": {"type": "INITIAL_PURCHASE", "app_user_id": user_id}}
+    assert client.post(
+        "/api/billing/revenuecat-webhook", json=grant, headers={"Authorization": "rc_secret"}
+    ).status_code == 200
+    db_session.expire_all()
+    assert db_session.query(User).filter(User.id == user_id).first().tier == UserTier.PREMIUM
+
+    # 2) They ALSO buy an individual Stripe subscription -> still PREMIUM (two live sources).
+    monkeypatch.setenv("STRIPE_WEBHOOK_SECRET", WHSEC)
+    buy = _event(
+        "checkout.session.completed",
+        {"id": "cs_dual", "client_reference_id": user_id, "customer": "cus_dual",
+         "subscription": "sub_dual", "payment_status": "paid",
+         "metadata": {"user_id": user_id, "plan": "pro_annual"}},
+    )
+    assert _post_event(client, buy).status_code == 200
+    db_session.expire_all()
+    assert db_session.query(User).filter(User.id == user_id).first().tier == UserTier.PREMIUM
+
+    # 3) Cancel the INDIVIDUAL Stripe sub -> STAY PREMIUM: the mobile entitlement still grants it.
+    #    This is the reconciliation path neither sibling test exercises.
+    cancel = _event(
+        "customer.subscription.deleted",
+        {"id": "sub_dual", "customer": "cus_dual", "metadata": {"user_id": user_id}},
+    )
+    assert _post_event(client, cancel).status_code == 200
+    db_session.expire_all()
+    assert db_session.query(User).filter(User.id == user_id).first().tier == UserTier.PREMIUM
+
+    # 4) The mobile entitlement now EXPIRES too -> FREE (no verified source remains).
+    monkeypatch.setenv("REVENUECAT_WEBHOOK_AUTH", "rc_secret")
+    expire = {"event": {"type": "EXPIRATION", "app_user_id": user_id}}
+    assert client.post(
+        "/api/billing/revenuecat-webhook", json=expire, headers={"Authorization": "rc_secret"}
+    ).status_code == 200
+    db_session.expire_all()
+    assert db_session.query(User).filter(User.id == user_id).first().tier == UserTier.FREE
+
+
 def test_webhook_seat_reduction_frees_newest_members(client, monkeypatch, db_session):
     """A seat DOWNGRADE re-enforces the cap: oldest members keep seats, newest lose them."""
     _, otoken = _register(client, "owner14@example.com")
