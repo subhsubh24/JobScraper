@@ -20,7 +20,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload, selectinload
@@ -645,6 +645,16 @@ class CheckoutRequest(BaseModel):
 
 class OrgCreateRequest(BaseModel):
     name: str = Field(min_length=2, max_length=120)
+
+    @field_validator("name")
+    @classmethod
+    def _strip_name(cls, v: str) -> str:
+        # min_length runs BEFORE stripping, so "   " passes the length check then collapses to
+        # an empty org name. Enforce the bound on the STRIPPED value and store it stripped.
+        v = v.strip()
+        if len(v) < 2:
+            raise ValueError("Organization name must be at least 2 non-whitespace characters.")
+        return v
 
 
 class OrgCheckoutRequest(BaseModel):

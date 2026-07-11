@@ -151,6 +151,12 @@ class Organization(Base):
     unlock the higher tier. A NEW table (AUTO_CREATE_TABLES-safe) + the Alembic migration.
     """
     __tablename__ = "organizations"
+    # One owned org per user is enforced at the DB layer (not just the app-level check in
+    # ``org_billing.create_org``): two concurrent ``POST /api/org`` requests could both read
+    # ``owned_org() -> None`` under READ COMMITTED and both insert, leaving a user owning two
+    # orgs and making entitlement reconciliation ambiguous. A UNIQUE(owner_id) makes the second
+    # insert fail loud (caught -> 409), mirroring ``uq_org_member_user`` on the member table.
+    __table_args__ = (UniqueConstraint("owner_id", name="uq_org_owner"),)
 
     id = Column(String(36), primary_key=True, default=generate_uuid)
     name = Column(String(255), nullable=False)

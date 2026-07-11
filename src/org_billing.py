@@ -21,6 +21,7 @@ Live Stripe keys + the team Price ID (``STRIPE_PRICE_TEAM_ANNUAL``) are owner-on
 import os
 from typing import List, Optional
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from src import billing
@@ -137,7 +138,14 @@ def create_org(db: Session, owner: User, name: str) -> Organization:
         raise OrgAlreadyExists("You already own an organization.")
     org = Organization(name=name.strip(), owner_id=owner.id, status=None, seats_purchased=0)
     db.add(org)
-    db.flush()
+    try:
+        db.flush()
+    except IntegrityError:
+        # A concurrent create raced past the app-level ``owned_org`` check above; the
+        # UNIQUE(owner_id) constraint (uq_org_owner) rejected this second insert. Surface it as
+        # the same clean 409 the check would have, never a 500 (§6c: fix the cause, fail loud).
+        db.rollback()
+        raise OrgAlreadyExists("You already own an organization.")
     return org
 
 
