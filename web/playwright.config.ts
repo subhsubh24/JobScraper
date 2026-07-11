@@ -49,6 +49,13 @@ export default defineConfig({
         AUTO_CREATE_TABLES: '1',
         E2E_DISABLE_RATE_LIMIT: '1',
         GEMINI_API_KEY: '',
+        // A test webhook secret so the team-journey suite can ACTIVATE an org via a
+        // signature-verified synthetic Stripe event (the recipe tests/test_org_billing.py uses)
+        // and drive the real member-management UI — that path is otherwise unreachable in E2E
+        // (no live Stripe here). This enables signature VERIFICATION only; it does NOT enable
+        // checkout (that needs STRIPE_SECRET_KEY, still unset), so the honest-refusal paths that
+        // the paywall + buy-seats tests assert stay exactly as they were.
+        STRIPE_WEBHOOK_SECRET: 'whsec_test_secret',
       },
     },
     {
