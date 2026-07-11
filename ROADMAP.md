@@ -291,6 +291,13 @@ bootcamps / outplacement firms / employers buy a POOL of seats and assign them t
 - [ ] **Seat tier — WEB/MOBILE MANAGEMENT SURFACE** — the org-admin UI (create org, buy seats,
       invite/remove members, seat-usage view) on web + mobile. Backend-first like the Career+ tier
       (#152); this is the surfacing follow-up so the tier is user-reachable end-to-end.
+      **WEB HALF LANDED (run 42, #356):** `/app/team` — create-team → buy-seats (real Stripe
+      Checkout, honest 503 refusal, no fake activation) → member roster (add/remove by email,
+      seat-usage view), with the owner/member split mirroring the server's `_org_payload`. 5 web-E2E
+      journeys against the REAL backend incl. the member-management critical path (org activated via
+      the signed synthetic webhook), + a "Team" nav link. Box stays `[ ]` until the MOBILE surface
+      also lands (mobile can't be validated on Linux; `/pricing` Team discoverability for net-new
+      buyers is a named follow-up).
 
 ### D — Store readiness & compliance (Apple App Store + Google Play)
 - [x] Privacy policy (hosted + in-repo) and ToS — `/privacy` + `/terms` render real,
