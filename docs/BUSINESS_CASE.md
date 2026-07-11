@@ -50,8 +50,10 @@ These are *named, buildable* items (the only valid weak-case loop-back triggers)
    "entirely unbuilt":** `Organization`/`OrganizationMember` models + a REAL quantity-based
    Stripe seat checkout + signature-verified org webhook + seat-entitlement reconciliation
    (`billing.recompute_user_tier` ORs an org seat alongside the individual + mobile sources) +
-   owner-only seat management, all gate-verified (`tests/test_org_billing.py`, 21). The
-   web/mobile admin surface + live per-seat pricing remain (ROADMAP Track C). **No ARR is
+   owner-only seat management, all gate-verified (`tests/test_org_billing.py`, 21). **Web
+   management surface also BUILT (run 42, PR #356):** `/app/team` create-team → buy-seats →
+   member-roster flow against the real backend. The mobile half of the surface + live
+   per-seat pricing remain (ROADMAP Track C). **No ARR is
    credited and `floor_met_year1` stays false** (anti-gaming, FACTORY_STANDARD §9): there is no
    product live and B2B adoption is un-validated (see `demand_signal.disconfirming`), so
    crediting a pre-launch adoption number would be gaming. Building the lever REMOVES the
@@ -119,8 +121,9 @@ These are *named, buildable* items (the only valid weak-case loop-back triggers)
    and on any defensible mix it is a modest diversifier, **not** a floor-flip.
 
 **Floor still not met.** With Career+ + referral + now the **team/B2B2C seat-tier BACKEND**
-built (run 39, PR #348), the last remaining *build* work on the primary floor-lever is its
-web/mobile admin surface + live per-seat pricing (owner). The floor stays honestly unmet
+(run 39, PR #348) **and its WEB management surface** (run 42, PR #356) built, the last
+remaining *build* work on the primary floor-lever is the MOBILE half of the admin surface +
+live per-seat pricing (owner). The floor stays honestly unmet
 (`floor_met_year1=false`) because no ARR can be credited pre-launch (0 users; B2B adoption
 un-validated) — crossing $100K now depends on REAL adoption data, not more building
 (annual-first/founder pricing is the one remaining unbuilt pricing lever). Revenue lift from

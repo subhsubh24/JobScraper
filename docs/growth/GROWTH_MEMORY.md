@@ -91,6 +91,44 @@ pre-launch.
 
 ---
 
+### 2026-07-11 — Daily GTM review (quiet run; scorecards unmoved despite real product progress)
+- **Observed:** Phase still `pre_launch`. Re-verified `ListConnectors` (only Gmail/Drive/
+  Calendar, no analytics/billing/ESP MCP) and shell env (no `PROD_URL`/`ANALYTICS_READ_TOKEN`) —
+  `channels_connected: []` stays honest. Re-ran `analysis/gtm_engine_pct.py` — unchanged at 50.
+  Both independent scorecards read fresh this run: **neither has re-graded since 2026-07-09**
+  (same `as_of` on both files) — despite real product-factory movement in between (runs 39-42,
+  2026-07-10/11): the team/B2B2C seat-tier **backend** (PR #348) and its **web management
+  surface** (PR #356) both shipped, gate-verified (`tests/test_org_billing.py` 21 cases +
+  5 web-E2E journeys), and PR #336 closed the correctness A→A+ gap the 5th QUALITY_SCORECARD
+  audit named (AI-slot refund on a provider 502). None of that is self-certifiable by this loop
+  per GTM_STANDARD §4/FACTORY_STANDARD §28 — QUALITY_SCORECARD stays consumed **as-is** (C,
+  `ship_gate_met: false`; functional-reality D, store-readiness C, business-case-strength C all
+  still open on the auditor's own last grade) until its own next independent audit; outreach
+  stays hard-blocked regardless. GTM_SCORECARD stays A/`ship_gate_met: true` (unchanged, GTM
+  work-quality gate).
+- **Concluded:** No real funnel/PMF data justifies a ROADMAP/BUSINESS_CASE ARR/VISION steer this
+  run (same reasoning as every prior pre-launch read). The business-case floor-lever build work
+  (team tier) is real and load-bearing, but crediting it in `floor_met_year1` before the next
+  audit + before real adoption data would be self-certification — correctly left untouched.
+- **Did (real, in-repo, no channel needed):** One small, genuine artifact-freshness fix in
+  `docs/BUSINESS_CASE.md` lever 2: the prose said "the web/mobile admin surface... remain",
+  which understated PR #356 (the web half is now shipped) — corrected to name the web half as
+  built and only the mobile half + live per-seat pricing as remaining, matching
+  `ROADMAP.md:291-300`'s own precise framing. No ARR number or `floor_met_year1` changed.
+  Refreshed `GROWTH_STATUS.md` (`as_of`, validation block, a new learnings entry, an explicit
+  new owner_blocker/next_action calling out `STRIPE_PRICE_TEAM_ANNUAL` as the seat tier's
+  remaining sellability gap now that both build halves exist). Independent reviewer
+  (maker≠checker, fresh subagent) reviewed the BUSINESS_CASE fix + GROWTH_STATUS update
+  together: APPROVED.
+- **Recommended (to factory):** Unchanged priority order on the 3 named ship-critical gaps
+  (functional-reality fix confirmation, store-readiness assets/IAP, business-case floor) — all
+  product-factory or owner work, not something this loop builds. Zero outreach drafts this run
+  (correct): `QUALITY_SCORECARD.ship_gate_met` is still false. Site-gate owner decision still
+  open — 2nd consecutive quiet GTM read since the 07-09 reframe; not yet a circuit-breaker
+  pattern, but flagged to escalate on a 3rd.
+
+---
+
 ### 2026-07-09 — Daily GTM review (site-gate reframe + engine_pct honesty fix + GTM_SCORECARD gap closed)
 - **Observed:** Phase still `pre_launch`. `ListConnectors` confirms only Gmail (connected,
   enabled) + Google Drive (connected, not enabled-in-chat) + Google Calendar (unknown/not
