@@ -19,7 +19,7 @@ state. Nothing is fabricated.
 ```yaml
 GROWTH_STATUS:
   project: jobscraper
-  as_of: 2026-07-09
+  as_of: 2026-07-11
   phase: pre_launch
   engine_built: false      # engine_built iff engine_pct==100 (scripts/check_blocks.py invariant)
   engine_pct: 50           # COMPUTED (FACTORY_STANDARD s22): analysis/gtm_engine_pct.py parses
@@ -183,7 +183,7 @@ GROWTH_STATUS:
     published: 0
     last_published: null
   validation:               # GTM_STANDARD s4 self-validation -- fail closed, never claim an unverified source
-    checked_as_of: 2026-07-09
+    checked_as_of: 2026-07-11
     sources:
       - name: product_analytics
         status: unavailable   # no PROD_URL/ANALYTICS_READ_TOKEN present in this run's env; no
@@ -193,15 +193,17 @@ GROWTH_STATUS:
       - name: email_esp
         status: unavailable   # no email-provider MCP/tool connected this run
       - name: gtm_scorecard
-        status: available     # docs/growth/GTM_SCORECARD.md (independent auditor, RE-GRADED
-                               # this run's date, as_of 2026-07-09: overall A, ship_gate_met
-                               # true, unchanged from the last read) -- read as a DATA signal,
-                               # consumed not authored
+        status: available     # docs/growth/GTM_SCORECARD.md (independent auditor, UNCHANGED
+                               # since the last read: as_of still 2026-07-09, overall A,
+                               # ship_gate_met true) -- no new grade has landed; read as a DATA
+                               # signal, consumed not authored
       - name: quality_scorecard
         status: available     # docs/quality/QUALITY_SCORECARD.md (independent Quality Auditor,
-                               # 5th audit, as_of 2026-07-09: overall C, down from B,
-                               # ship_gate_met false) -- read as a DATA signal, consumed not
-                               # authored; NOT the GTM scorecard (distinct gate, see learnings)
+                               # UNCHANGED since the last read: as_of still 2026-07-09, 5th
+                               # audit, overall C, ship_gate_met false) -- no new independent
+                               # grade has landed despite real product movement since (see
+                               # learnings); read as a DATA signal, consumed not authored; NOT
+                               # the GTM scorecard (distinct gate)
     note: "All funnel/acquisition/pmf/channels metrics above are 0/null because no analytics/
            billing/email source is connected -- this satisfies scripts/validate_gtm.py's honesty
            gate (a non-zero metric requires a connected source). Re-checked this run: (1)
@@ -213,19 +215,45 @@ GROWTH_STATUS:
            analytics/billing/ESP source -- not claimed as one), so the GET /api/analytics/summary
            read path (ANALYSIS_PLAYBOOK.md, wired by PR #146/#245) cannot be called this run
            either. Both checks confirm channels_connected=[] honestly (fail-closed, no invented
-           metric). Both independent scorecards RE-GRADED the SAME DAY as this run (2026-07-09,
-           first movement in 2 GTM reads): QUALITY_SCORECARD's 5th audit found a NEW
-           ship-critical regression (functional-reality A+->D: the shipped default LLM model
-           was decommissioned upstream by Google, 502ing every paid AI feature) -- overall
-           C, ship_gate_met still false. Per commit history (fbb61ca, 51020ad, same day, AFTER
-           the audit) the product factory already shipped a fix (resilient model fallback +
-           cross-instance login-lockout) -- but per GTM_STANDARD s4 / FACTORY_STANDARD s28 the
-           loop does NOT self-certify progress from adjacent commits: the scorecard is consumed
-           AS-IS (C, ship_gate_met:false) until its OWN independent auditor re-grades, so
-           outreach stays hard-blocked this run regardless. GTM_SCORECARD also re-graded
-           (overall A, ship_gate_met:true, unchanged) with one named top_gap
-           (roadmap_steer_justification A, not A+) addressed this run -- see learnings."
+           metric). Neither independent scorecard has re-graded since 2026-07-09 (same as_of
+           date as the last GTM read, confirmed by reading both files fresh this run) -- both
+           consumed AS-IS, no self-certification from the real product-factory movement in
+           between (runs 39-42, 2026-07-10/11: team/B2B2C seat-tier BACKEND (#348) AND its WEB
+           management surface (#356) shipped -- the named business-case-strength lever; plus
+           #336 fixed the correctness A->A+ gap the 5th audit named, the AI-slot-refund-on-502
+           item). None of that is self-certifiable per GTM_STANDARD s4/FACTORY_STANDARD s28 --
+           QUALITY_SCORECARD stays read as C/ship_gate_met:false (functional-reality D,
+           store-readiness C, business-case-strength C all still open on the auditor's OWN last
+           grade) until its next independent audit; outreach stays hard-blocked regardless.
+           GTM_SCORECARD stays A/ship_gate_met:true (GTM work-quality gate, unchanged)."
   learnings:
+    - "2026-07-11 (GTM run): Quiet run, no steer -- still 0 users/0 funnel, phase=pre_launch.
+       Re-verified ListConnectors (only Gmail/Drive/Calendar, no analytics/billing/ESP MCP) and
+       shell env (no PROD_URL/ANALYTICS_READ_TOKEN) -- channels_connected=[] / engine_pct=50
+       (re-ran analysis/gtm_engine_pct.py, unchanged) confirmed honestly. Real product movement
+       happened since the last GTM read (2026-07-09): runs 39-42 shipped the team/B2B2C
+       seat-tier BACKEND (PR #348, the named business-case-strength floor-lever) AND its WEB
+       management surface (PR #356, `/app/team` create-team -> buy-seats -> member-roster
+       against the real backend) -- plus PR #336 closed the correctness A->A+ gap the 5th
+       QUALITY_SCORECARD audit named (AI-slot refund on a provider 502). Checked both
+       independent scorecards fresh: NEITHER has re-graded since 2026-07-09 (same as_of on
+       both files) -- so QUALITY_SCORECARD stays consumed AS-IS (C, ship_gate_met:false;
+       functional-reality D / store-readiness C / business-case-strength C still open on the
+       auditor's own last grade) and outreach stays hard-blocked, per GTM_STANDARD s4 (no
+       self-certification from adjacent product-factory commits, same discipline as the
+       07-09 LLM-fallback fix). Made one small, real BUSINESS_CASE.md freshness fix (own
+       artifact, not a steer): lever 2's prose said 'web/mobile admin surface... remain',
+       which understated PR #356 -- corrected to name the web half as shipped and only the
+       mobile half + live per-seat pricing as remaining (ROADMAP.md:291-300 already tracked
+       this precisely; BUSINESS_CASE's prose had lagged it by one run). No ARR number or
+       floor_met_year1 changed (still false, still anti-gamed -- 0 users, B2B adoption
+       un-validated). Independent reviewer (maker!=checker, fresh subagent) reviewed both the
+       BUSINESS_CASE freshness fix and this GROWTH_STATUS update together: APPROVED (see PR).
+       Demand_signal cadence checked: last run 2026-07-03 (8 days), ~quarterly refresh not due
+       until ~October. Site-gate owner decision (PENDING_OPS `site-gate`) still open, unchanged
+       since the 07-09 reframe -- only the second GTM read since that reframe, not yet a
+       repeat-ask pattern worth a circuit-breaker escalation. Zero outreach drafts (correct,
+       same reason): QUALITY_SCORECARD.ship_gate_met is false."
     - "2026-07-09 (GTM run): Two real corrections + one honesty fix, no ROADMAP/VISION/
        BUSINESS_CASE ARR steer. (1) SITE-GATE REFRAME (the big one): PENDING_OPS.md and
        ROADMAP.md:421-435 were updated by the product factory (run 34, same day) to disclose
@@ -399,15 +427,15 @@ GROWTH_STATUS:
        changed -- pure computation-integrity hardening, independently reviewed
        (maker!=checker, APPROVE)."
   next_actions:
-    - "Factory: functional-reality D (ship-critical, URGENT per QUALITY_SCORECARD 5th audit) is
-       the current top gap -- the shipped default LLM model was decommissioned upstream; a
-       same-day fix (fbb61ca/51020ad) already appears in the commit log, watch for the NEXT
-       independent audit to confirm it actually closes the D before treating it as resolved.
-       business-case-strength and store-readiness remain the 2 STANDING ship-critical C's --
-       team/coach/B2B2C seat tier + annual-first/founder pricing for the floor; rendered store
-       assets + mobile IAP for store-readiness. BUSINESS_CASE.md lever 2 now carries both the
-       cited real-comp packaging recommendation AND an explicit non-demand-validated caveat
-       (this run) -- input only, nothing new to add until the tier is actually built."
+    - "Factory: functional-reality D (ship-critical, URGENT per QUALITY_SCORECARD 5th audit,
+       still the auditor's last word as of this GTM run) remains the top named gap -- watch for
+       the NEXT independent audit to confirm the same-day fix (fbb61ca/51020ad) actually closed
+       it. business-case-strength (C) has real NEW build progress since the 5th audit -- the
+       team/B2B2C seat tier now has both a backend (#348) and a web management surface (#356) --
+       but per s4 this loop does not self-certify; watch for the next audit to credit it.
+       store-readiness (C) is unchanged: rendered store assets + mobile IAP for store-readiness,
+       and the seat tier's MOBILE admin surface + live STRIPE_PRICE_TEAM_ANNUAL pricing for the
+       floor, remain the standing build gaps."
     - "Owner DECISION NEEDED (site-gate, PENDING_OPS `site-gate`, ROADMAP.md:421-435) --
        REPLACES the prior 'apply SITE_GATE_PASSWORD' ask, which is now CONFIRMED STALE (the
        gate code was deleted 2026-07-02; the env var does nothing against the current
@@ -420,6 +448,11 @@ GROWTH_STATUS:
     - "Owner: connect an email provider + analytics (see CONNECT.md) -- engine_pct is honestly
        50% built (Track G+H infra exists) but 0 channels are CONNECTED, which is the actual
        remaining gap, distinct from build completeness."
+    - "Owner: the team/B2B2C seat-tier backend + web surface are now both built and gate-
+       verified (#348, #356) but API-refuse honestly (503, no charge) until
+       STRIPE_PRICE_TEAM_ANNUAL is set (PENDING_OPS `stripe-account`) -- this is now the single
+       highest-leverage owner step to make the primary business-case floor-lever actually
+       sellable, distinct from the already-open Career+ test-price gap on the same item."
     - "No outreach drafts this run: GTM_STANDARD §6's readiness gate is a HARD block on both
        outbound lanes (incl. the bespoke 1:1 draft lane) until QUALITY_SCORECARD.ship_gate_met
        is true -- it is still false (C, 5th audit), so zero drafts is the only compliant
@@ -428,10 +461,12 @@ GROWTH_STATUS:
        2026-07-03, not due until ~Oct), watch for a connected analytics/billing/email MCP
        source or a PROD_URL/ANALYTICS_READ_TOKEN appearing in env, watch for the owner's
        site-gate decision (A/B) landing in PENDING_OPS + reconcile ROADMAP/GROWTH_STATUS
-       accordingly, watch for the NEXT independent QUALITY_SCORECARD grade to confirm whether
-       the LLM-fallback fix actually closed the functional-reality D (would also newly need
-       the model-liveness-in-CI + AI-slot-refund gaps it named), and re-run
-       analysis/gtm_engine_pct.py if Track G/H items tick."
+       accordingly (now 2 consecutive quiet reads on this blocker -- escalate to a circuit-
+       breaker callout if a 3rd read still finds no owner movement), watch for the NEXT
+       independent QUALITY_SCORECARD grade -- it has not moved since 2026-07-09 despite real
+       runs 39-42 product work (team/B2B2C seat tier backend+web, correctness AI-slot-refund
+       fix) that plausibly closes 2 of the 3 named ship-critical gaps once the auditor re-grades,
+       and re-run analysis/gtm_engine_pct.py if Track G/H items tick."
   owner_blockers:
     - "QUALITY_SCORECARD C (5th audit, as_of 2026-07-09, DOWN from B), ship gate NOT met: a NEW
        ship-critical functional-reality regression (A+->D) -- the shipped default Gemini model
@@ -448,6 +483,11 @@ GROWTH_STATUS:
     - "No marketing channels connected -- Growth Agent stays in prepare-mode. engine_pct is
        honestly 50% (build completeness, computed) -- the gap is channel CONNECTION, not
        missing infra."
+    - "Team/B2B2C seat tier (backend #348 + web surface #356, both gate-verified) is fully
+       built but not sellable: STRIPE_PRICE_TEAM_ANNUAL is unset (PENDING_OPS `stripe-account`),
+       so POST /api/org/checkout refuses honestly (503, no charge). This is now the single
+       highest-leverage owner step on the business-case floor-lever, alongside the existing
+       Career+ test-price gap on the same PENDING_OPS item."
   links:
     connect_runbook: docs/growth/CONNECT.md
     playbook: docs/growth/ANALYSIS_PLAYBOOK.md
