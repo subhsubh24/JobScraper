@@ -7,7 +7,7 @@ import base64
 from datetime import datetime, timedelta
 from typing import Optional
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from src.db.models import User, UserTier
 
@@ -117,7 +117,17 @@ class AuthService:
         if not payload:
             return None
 
-        user = self.db.query(User).filter(User.id == payload["user_id"]).first()
+        # Eager-load the one-to-one subscription: every authenticated request resolves the
+        # bearer token through here and then serializes the user via ``user_public`` (asgi.py),
+        # which reads ``user.subscription`` to derive the plan level. Without this, that access
+        # is a lazy +1 query on the hot auth path hit on every app launch / session restore.
+        # ``uselist=False`` makes joinedload a single LEFT JOIN with no row multiplication.
+        user = (
+            self.db.query(User)
+            .options(joinedload(User.subscription))
+            .filter(User.id == payload["user_id"])
+            .first()
+        )
         return user
 
     # ============ USER MANAGEMENT ============
