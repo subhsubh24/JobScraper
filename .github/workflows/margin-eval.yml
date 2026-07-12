@@ -57,6 +57,11 @@ jobs:
       - name: Run cost-per-outcome eval (embeddings, cost-capped)
         if: steps.guard.outputs.enabled == 'true'
         env:
+          # GitHub Actions sets CI=true, which the meter/SDK treats as the HERMETIC keyless gate
+          # and so refuses to emit — a green-but-decorative run. This is a DELIBERATE,
+          # secrets-backed emit, so neutralize CI for THIS step ONLY (behind the secrets guard).
+          # CI stays true everywhere else, keeping the keyless `preflight ci` gate hermetic.
+          CI: ""
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           MARGIN_INGEST_URL: ${{ secrets.MARGIN_INGEST_URL }}
           MARGIN_INGEST_KEY: ${{ secrets.MARGIN_INGEST_KEY }}
