@@ -316,6 +316,15 @@ bootcamps / outplacement firms / employers buy a POOL of seats and assign them t
       needs no runtime prompt), so there are no `NS*UsageDescription`/dangerous Android perms to
       justify; standing rule for future additions (PR #43).
 - [ ] Rendered store assets: real icon, screenshots, feature graphic (committed image files)
+      **FEATURE-GRAPHIC HALF LANDED (run 45, #370):** `docs/store/assets/feature-graphic.png` —
+      a real committed 1024×500 RGB no-alpha PNG (meets the Play spec; required to publish),
+      rendered from reviewable HTML (`scripts/store/feature_graphic.html` + a reproducible render
+      script) on the real brand tokens, guarded per-PR by `tests/test_store_assets.py`, with a
+      committed alt-text/a11y description. Clears THE DESIGNER QUESTION (2 Sonnet reviewers incl.
+      a pixel-level design pass). STILL OPEN before this box ticks: **store screenshots** (need a
+      signed native build — not producible on Linux; web captures are NOT substituted) and a
+      **bespoke app icon** (`mobile/assets/images/icon.png` is the Expo template; an illustrative
+      brand mark is owner/designer work — auto-gen fails the DESIGNER QUESTION). Box stays `[ ]`.
 - [x] ASO / store copy (title, subtitle, keywords, descriptions) — `docs/store/ASO_COPY.md`
       (title/subtitle/keywords within char limits, descriptions honest to shipped features,
       auto-renew + restore-purchases disclosure) (PR #43).

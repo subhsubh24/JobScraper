@@ -52,3 +52,18 @@ Format: `[id] PATTERN — CONTEXT — WHY IT WORKS — EVIDENCE`
   writer of the gating column (grep to prove it) so the "single authority" claim is literally true. — EVIDENCE:
   #348 (seat tier landed clean; maker≠checker caught the 3 reconciliation edges — stale-plan level, seat-cap
   race, mobile clobber — because the design localized entitlement to one function).
+
+- **[sp-7] A TYPOGRAPHIC store/marketing asset IS loop-buildable to the DESIGNER QUESTION — split it from the
+  bespoke-mark defer.** — A "store assets" gap gets deferred as design-core, but it usually LUMPS two different
+  artifact classes: a bespoke ILLUSTRATIVE mark (app icon — genuinely owner/designer; auto-gen = slop) vs a
+  TYPOGRAPHIC COMPOSITION (feature graphic / OG image / banner — wordmark + tagline + brand treatment), which is
+  a layout/type problem the factory already does well on its A-grade landing surfaces. — Build the typographic one
+  as REVIEWABLE HTML/CSS on the real brand tokens, render it to the committed PNG via headless Chromium
+  (`chrome --headless --screenshot --window-size=W,H --force-device-scale-factor=1`), and make the PNG the
+  DETERMINISTIC output of a committed script (byte-identical re-render — not a hand-edited blob). ITERATE against
+  your OWN vision review until it clears THE DESIGNER QUESTION (watch for content clipped by a fixed canvas), and
+  add a per-PR guard asserting the exact store spec (dimensions + no-alpha + non-zero). Give the value reviewer the
+  actual pixels to judge on both axes (design + honest). — EVIDENCE: #370 (Google Play 1024×500 feature graphic;
+  broke a ~5× "store assets are design-core" defer; both Sonnet reviewers incl. a pixel-level pass APPROVE;
+  `tests/test_store_assets.py` guards the spec). Honest bound: screenshots (native app) + the bespoke icon stay
+  owner/native-blocked — this pattern is for the typographic class only.
