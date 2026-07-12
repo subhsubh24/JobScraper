@@ -159,6 +159,28 @@ VALIDATION_CAPABILITIES:
     blocking: false            # non-critical: any failure degrades to found=0 with an honest
                                # message; the core product is unchanged without it.
     owner_action: null
+  - id: margin
+    service: "Margin — cost-per-outcome telemetry SDK (margin-meter; outbound observability)"
+    env: [MARGIN_INGEST_URL, MARGIN_INGEST_KEY]
+                               # Read by the margin-meter SDK (NOT our src/), so the DECLARATION
+                               # scan won't flag them — declared here anyway for the full env
+                               # contract + so a NEW service is never silently undeclared.
+    used_for: "emitting measured LLM-call economics + fit-score outcomes to Margin (§24/§25 unit-economics observability)"
+    validation: mock           # The emit LOGIC is exercised without any live secret: with the
+                               # SDK/meter mocked, tests assert (a) INERT when no key/meter (no
+                               # call), (b) FAIL-SAFE — a raising meter is swallowed and never
+                               # propagates into scoring/LLM calls, (c) the emit is invoked with
+                               # the right args when a meter exists. The real outbound POST to
+                               # Margin is not made in CI (no keys) — analogous to captcha's mocked
+                               # siteverify. Pure observability: NO product/user-facing behavior
+                               # depends on it, so there is no degrade path to gate.
+    covered_by: tests/test_margin_telemetry.py
+    key_in_ci: false
+    blocking: false            # non-critical: unset ⇒ the meter is None ⇒ every emit short-circuits
+                               # to a no-op. Zero product impact; owner sets MARGIN_INGEST_URL +
+                               # MARGIN_INGEST_KEY to enable telemetry (non-blocking connect step,
+                               # same pattern as email/captcha — owner_action stays null).
+    owner_action: null
 ```
 
 When `GEMINI_API_KEY` is present in CI, `tests/test_llm_live.py` automatically exercises a real
