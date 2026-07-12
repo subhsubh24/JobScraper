@@ -117,11 +117,15 @@ class AuthService:
         if not payload:
             return None
 
-        # Eager-load the one-to-one subscription: every authenticated request resolves the
-        # bearer token through here and then serializes the user via ``user_public`` (asgi.py),
-        # which reads ``user.subscription`` to derive the plan level. Without this, that access
-        # is a lazy +1 query on the hot auth path hit on every app launch / session restore.
-        # ``uselist=False`` makes joinedload a single LEFT JOIN with no row multiplication.
+        # Eager-load the one-to-one subscription here, the single choke-point every
+        # authenticated request resolves its token through. The endpoints that read
+        # ``user.subscription`` (via ``current_plan_level`` in ``user_public``/the paywall) —
+        # ``GET /api/auth/me`` (hit on every app launch / session restore), the AI-consent
+        # grant/revoke pair, and the Career+ ``salary-negotiation`` path — otherwise each pay a
+        # lazy +1 query; loading it once at token resolution removes that round-trip for them.
+        # The other authed endpoints never touch ``subscription``, so for them this adds only a
+        # single LEFT JOIN to a UNIQUE-indexed FK returning 0–1 rows (``uselist=False`` → no row
+        # multiplication) — negligible, and worth the simplicity of one shared load site.
         user = (
             self.db.query(User)
             .options(joinedload(User.subscription))
