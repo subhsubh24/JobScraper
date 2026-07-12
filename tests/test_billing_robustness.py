@@ -39,6 +39,12 @@ def test_individual_checkout_routes_through_bounded_client(monkeypatch):
     monkeypatch.setenv("STRIPE_PRICE_PRO_ANNUAL", "price_pro_annual_x")
     import stripe
 
+    # ``stripe.default_http_client`` is a process-global singleton, so an earlier test that
+    # already bounded it would mask a regression here. Reset it first, so this test proves
+    # THIS checkout call configured the client — if configure_stripe() were dropped, the
+    # client stays None and the capture below AttributeErrors (red), order-independently.
+    monkeypatch.setattr(stripe, "default_http_client", None)
+
     seen = {}
 
     def _fake_create(**kwargs):
@@ -57,6 +63,10 @@ def test_org_seat_checkout_routes_through_bounded_client(monkeypatch):
     monkeypatch.setenv("STRIPE_SECRET_KEY", "sk_test_x")
     monkeypatch.setenv("STRIPE_PRICE_TEAM_ANNUAL", "price_team_annual_x")
     import stripe
+
+    # Reset the process-global client (see the individual-checkout test) so this test is
+    # order-independent and reddens if create_seat_checkout_session skips configure_stripe().
+    monkeypatch.setattr(stripe, "default_http_client", None)
 
     seen = {}
 

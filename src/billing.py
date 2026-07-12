@@ -38,9 +38,11 @@ def configure_stripe():
 
     Centralizes both so every network-making call (individual + org seat checkout) is bounded
     identically. ``new_default_http_client`` selects the best available backend (requests/…),
-    all of which honor ``timeout``; reassigning the default client is idempotent and cheap on a
-    cold serverless invocation. Webhook signature verification (``construct_event``) is pure
-    crypto with no HTTP, so it is unaffected.
+    all of which honor ``timeout``. This runs on EVERY checkout call (not just cold start) and
+    builds a fresh client each time — always assigning the SAME bounded value, so it is safe and
+    idempotent; the discarded per-call HTTP session is negligible on this low-QPS, non-hot path.
+    Webhook signature verification (``construct_event``) is pure crypto with no HTTP, so it is
+    unaffected.
     """
     import stripe
 
