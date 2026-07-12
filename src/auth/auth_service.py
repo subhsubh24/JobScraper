@@ -7,7 +7,7 @@ import base64
 from datetime import datetime, timedelta
 from typing import Optional
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from src.db.models import User, UserTier
 
@@ -117,7 +117,21 @@ class AuthService:
         if not payload:
             return None
 
-        user = self.db.query(User).filter(User.id == payload["user_id"]).first()
+        # Eager-load the one-to-one subscription here, the single choke-point every
+        # authenticated request resolves its token through. The endpoints that read
+        # ``user.subscription`` (via ``current_plan_level`` in ``user_public``/the paywall) —
+        # ``GET /api/auth/me`` (hit on every app launch / session restore), the AI-consent
+        # grant/revoke pair, and the Career+ ``salary-negotiation`` path — otherwise each pay a
+        # lazy +1 query; loading it once at token resolution removes that round-trip for them.
+        # The other authed endpoints never touch ``subscription``, so for them this adds only a
+        # single LEFT JOIN to a UNIQUE-indexed FK returning 0–1 rows (``uselist=False`` → no row
+        # multiplication) — negligible, and worth the simplicity of one shared load site.
+        user = (
+            self.db.query(User)
+            .options(joinedload(User.subscription))
+            .filter(User.id == payload["user_id"])
+            .first()
+        )
         return user
 
     # ============ USER MANAGEMENT ============
