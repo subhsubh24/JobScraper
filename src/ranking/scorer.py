@@ -1,7 +1,6 @@
 """Job scoring algorithm using embeddings and heuristics."""
 import json
 import logging
-import threading
 from typing import List
 import numpy as np
 from sqlalchemy.orm import Session
@@ -12,20 +11,22 @@ from src.llm import get_llm_client, embedding_model, _meter
 logger = logging.getLogger("career_operator.scorer")
 
 
-def _record_fit_outcome(score):  # pragma: no cover - non-blocking outcome telemetry; never affects scoring
-    """Emit the finalized job-fit score to Margin as an outcome, NON-BLOCKING + fail-safe."""
+def _record_fit_outcome(score):  # pragma: no cover - outcome telemetry; never affects scoring
+    """Emit the finalized job-fit score to Margin as an outcome. Fail-safe: errors swallowed.
+
+    BLOCKING by design: on Vercel serverless the function is frozen once the handler returns,
+    which would kill a fire-and-forget thread before its POST lands. The meter's 2.0s timeout
+    bounds the worst case.
+    """
     if not _meter:
         return
     try:
-        threading.Thread(
-            target=lambda: _meter.record_outcome(
-                workflow_id="jobscraper-fit-scoring",
-                passed=(score is not None),
-                quality_score=round(score / 100, 4),
-                quality_method="heuristic",
-            ),
-            daemon=True,
-        ).start()
+        _meter.record_outcome(
+            workflow_id="jobscraper-fit-scoring",
+            passed=(score is not None),
+            quality_score=round(score / 100, 4),
+            quality_method="heuristic",
+        )
     except Exception:
         pass
 

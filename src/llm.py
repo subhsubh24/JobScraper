@@ -11,7 +11,6 @@ configuration" response instead of crashing. This module is the single place tha
 decides whether the LLM is available and which models to use.
 """
 import os
-import threading
 import time
 from typing import Optional
 
@@ -26,7 +25,12 @@ _meter = MarginMeter(timeout=2.0) if MarginMeter else None  # pragma: no cover
 
 
 def _emit_call_metrics(resp, model, elapsed, status):  # pragma: no cover - telemetry, must never affect the call
-    """Emit one measured LLM call to Margin, NON-BLOCKING. Fail-safe: any error is swallowed."""
+    """Emit one measured LLM call to Margin. Fail-safe: any error is swallowed.
+
+    BLOCKING by design: on Vercel serverless the function is frozen the instant the handler
+    returns, which would kill a fire-and-forget thread before its POST lands. The meter's own
+    2.0s timeout bounds the worst case, negligible next to the multi-second LLM call.
+    """
     if not _meter:
         return
     try:
@@ -35,19 +39,16 @@ def _emit_call_metrics(resp, model, elapsed, status):  # pragma: no cover - tele
         output_tokens = int(getattr(usage, "completion_tokens", 0) or 0)
         cache_read = int(getattr(getattr(usage, "prompt_tokens_details", None), "cached_tokens", 0) or 0)
         actual_model = getattr(resp, "model", model) if resp is not None else model
-        threading.Thread(
-            target=lambda: _meter.record_call(
-                workflow_id="jobscraper-fit-scoring",
-                provider="google",
-                model=actual_model,
-                input_tokens=input_tokens,
-                output_tokens=output_tokens,
-                cache_read_tokens=cache_read,
-                latency_ms=int(elapsed * 1000),
-                status=status,
-            ),
-            daemon=True,
-        ).start()
+        _meter.record_call(
+            workflow_id="jobscraper-fit-scoring",
+            provider="google",
+            model=actual_model,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            cache_read_tokens=cache_read,
+            latency_ms=int(elapsed * 1000),
+            status=status,
+        )
     except Exception:
         pass
 
