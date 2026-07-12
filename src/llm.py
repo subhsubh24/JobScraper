@@ -11,7 +11,46 @@ configuration" response instead of crashing. This module is the single place tha
 decides whether the LLM is available and which models to use.
 """
 import os
+import threading
+import time
 from typing import Optional
+
+# Margin meter — cost-per-outcome telemetry. GUARDED so a missing/broken SDK can never break
+# the host app on import. The module singleton is fail-safe: record_* short-circuits (no
+# network) unless MARGIN_INGEST_URL + MARGIN_INGEST_KEY are set in the env (both unset in CI).
+try:
+    from margin_meter import MarginMeter
+except Exception:  # pragma: no cover - SDK optional; import must never break the host
+    MarginMeter = None
+_meter = MarginMeter(timeout=2.0) if MarginMeter else None  # pragma: no cover
+
+
+def _emit_call_metrics(resp, model, elapsed, status):  # pragma: no cover - telemetry, must never affect the call
+    """Emit one measured LLM call to Margin, NON-BLOCKING. Fail-safe: any error is swallowed."""
+    if not _meter:
+        return
+    try:
+        usage = getattr(resp, "usage", None)
+        input_tokens = int(getattr(usage, "prompt_tokens", 0) or 0)
+        output_tokens = int(getattr(usage, "completion_tokens", 0) or 0)
+        cache_read = int(getattr(getattr(usage, "prompt_tokens_details", None), "cached_tokens", 0) or 0)
+        actual_model = getattr(resp, "model", model) if resp is not None else model
+        threading.Thread(
+            target=lambda: _meter.record_call(
+                workflow_id="jobscraper-fit-scoring",
+                provider="google",
+                model=actual_model,
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+                cache_read_tokens=cache_read,
+                latency_ms=int(elapsed * 1000),
+                status=status,
+            ),
+            daemon=True,
+        ).start()
+    except Exception:
+        pass
+
 
 # Gemini's OpenAI-compatibility base URL.
 GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
@@ -93,9 +132,13 @@ def resilient_chat_completion(client: "object", **kwargs):
     tried = []
     last_exc: Optional[Exception] = None
     for model in candidates:
+        _t0 = time.perf_counter()
         try:
-            return client.chat.completions.create(model=model, **kwargs)
+            resp = client.chat.completions.create(model=model, **kwargs)
+            _emit_call_metrics(resp, model, time.perf_counter() - _t0, "ok")  # pragma: no cover
+            return resp
         except Exception as exc:  # noqa: BLE001 - classify then re-raise or fall back
+            _emit_call_metrics(None, model, time.perf_counter() - _t0, "error")  # pragma: no cover
             if not _is_model_unavailable(exc):
                 raise
             tried.append(model)

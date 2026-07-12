@@ -1,14 +1,33 @@
 """Job scoring algorithm using embeddings and heuristics."""
 import json
 import logging
+import threading
 from typing import List
 import numpy as np
 from sqlalchemy.orm import Session
 
 from src.db.models import JobPosting, JobScore, User
-from src.llm import get_llm_client, embedding_model
+from src.llm import get_llm_client, embedding_model, _meter
 
 logger = logging.getLogger("career_operator.scorer")
+
+
+def _record_fit_outcome(score):  # pragma: no cover - non-blocking outcome telemetry; never affects scoring
+    """Emit the finalized job-fit score to Margin as an outcome, NON-BLOCKING + fail-safe."""
+    if not _meter:
+        return
+    try:
+        threading.Thread(
+            target=lambda: _meter.record_outcome(
+                workflow_id="jobscraper-fit-scoring",
+                passed=(score is not None),
+                quality_score=round(score / 100, 4),
+                quality_method="heuristic",
+            ),
+            daemon=True,
+        ).start()
+    except Exception:
+        pass
 
 
 class JobScorer:
@@ -194,6 +213,7 @@ class JobScorer:
         # Weights: 60% semantic, 40% skills match
         overall_score = (semantic_score * 0.6 + skills_score * 0.4) * 100
         overall_score = min(100, max(0, overall_score))
+        _record_fit_outcome(overall_score)  # pragma: no cover
 
         # Generate explanation
         explanation = self._generate_explanation(
