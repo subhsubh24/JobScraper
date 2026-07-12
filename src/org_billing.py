@@ -202,7 +202,16 @@ def add_member(db: Session, org: Organization, email: str) -> OrganizationMember
         raise NoSeatsAvailable("All purchased seats are in use.")
     member = OrganizationMember(org_id=org.id, user_id=target.id, role="member", active=True)
     db.add(member)
-    db.flush()
+    try:
+        db.flush()
+    except IntegrityError:
+        # A concurrent add raced past the app-level ``existing`` check above; the
+        # UNIQUE(user_id) constraint (uq_org_member_user — a user belongs to at most one org)
+        # rejected this second insert. Surface it as the same clean 409 the check would have,
+        # never a 500 — mirroring ``create_org`` on its owner_id race (§6c: fix the cause,
+        # fail loud). The user is now in the org that won the race.
+        db.rollback()
+        raise AlreadyInAnotherOrg("That user already belongs to another organization.")
     billing.recompute_user_tier(db, target)
     return member
 
@@ -300,9 +309,7 @@ def create_seat_checkout_session(
         raise OrgError(f"Seats must be between {MIN_SEATS} and {MAX_SEATS}.")
     price_id = price_id_for_org_plan(plan)  # raises before any network call if misconfigured
 
-    import stripe
-
-    stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
+    stripe = billing.configure_stripe()  # sub-budget HTTP timeout (see billing.configure_stripe)
     meta = {"org_id": org.id, "plan": plan, "seats": str(seats)}
     session = stripe.checkout.Session.create(
         mode="subscription",
