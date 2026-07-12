@@ -9,6 +9,8 @@ on:
     paths:
       - 'src/llm.py'
       - 'src/ranking/**'
+      - 'src/enrichment/**'
+      - 'src/ai_coach/**'
       - 'asgi.py'
       - 'evals/margin/**'
       - 'scripts/margin_eval.py'
@@ -67,8 +69,8 @@ jobs:
           MARGIN_INGEST_KEY: ${{ secrets.MARGIN_INGEST_KEY }}
         run: |
           RUN_ID="ci-${GITHUB_SHA::12}"
-          echo "::group::margin_eval ($RUN_ID) — new cost-per-outcome distribution"
-          python scripts/margin_eval.py --embeddings --max-embed-cases 30 --run-id "$RUN_ID"
+          echo "::group::margin_eval ($RUN_ID) — refresh cost-per-outcome across all AI workflows"
+          python scripts/margin_eval.py --workflow all --embeddings --max-llm-cases 30 --run-id "$RUN_ID"
           echo "::endgroup::"
           echo "Emitted a fresh graded outcome distribution for jobscraper-fit-scoring under"
           echo "session_id=eval:$RUN_ID — compare new-vs-prior cost-per-outcome in the Margin dashboard."
