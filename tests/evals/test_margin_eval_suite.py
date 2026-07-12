@@ -108,3 +108,61 @@ def test_band_for_score_maps_correctly():
     assert margin_eval.band_for_score(50.0, BANDS) == "partial"
     assert margin_eval.band_for_score(40.0, BANDS) == "weak"
     assert margin_eval.band_for_score(30.0, BANDS) == "mismatch"
+
+
+# --- 4. new LLM-only suites: matrix + grader logic (synthetic, NO network) ------------ #
+# These workflows have no deterministic key-free path, so CI validates the matrix + the GRADER
+# (not a live call). The runner SKIPS them without GEMINI_API_KEY (asserted via a dry heuristic run).
+MOCK_CASES = margin_eval.load_cases(margin_eval.MOCK_CASES_PATH)
+COVER_CASES = margin_eval.load_cases(margin_eval.COVER_CASES_PATH)
+
+
+def test_mock_matrix_wellformed_and_bimodal():
+    assert len(MOCK_CASES) >= 12
+    bands = {c["expected_band"] for c in MOCK_CASES}
+    assert bands == {"strong", "weak"}, "mock scoring is graded bimodally (strong vs weak answers)"
+    for c in MOCK_CASES:
+        assert {"question", "answer", "role"} <= set(c)
+    # A real weak set: blank / vague / off-topic answers must be present.
+    assert any(not c["answer"].strip() for c in MOCK_CASES), "want a blank-answer edge case"
+
+
+def test_mock_band_grader_is_genuine():
+    mb = margin_eval.MOCK_BANDS
+    assert margin_eval.grade("strong", 80.0, mb)[0]      # strong answer scores high -> pass
+    assert not margin_eval.grade("strong", 30.0, mb)[0]  # strong case scoring low -> fail
+    assert margin_eval.grade("weak", 13.3, mb)[0]        # weak/blank answer scores low -> pass
+    assert not margin_eval.grade("weak", 80.0, mb)[0]    # weak case scoring high -> fail
+    # A degenerate constant-50 scorer fails BOTH cohorts (the 42-58 gap) — not always-pass.
+    assert not margin_eval.grade("strong", 50.0, mb)[0]
+    assert not margin_eval.grade("weak", 50.0, mb)[0]
+
+
+def test_cover_matrix_wellformed():
+    assert len(COVER_CASES) >= 6
+    for c in COVER_CASES:
+        assert {"company", "jd_skills", "resume_text"} <= set(c)
+        assert c["jd_skills"], "each cover case needs JD skills to check grounding"
+
+
+def test_cover_structural_grader_is_genuine():
+    case = {"company": "Acme Robotics", "jd_skills": ["python", "fastapi"]}
+    good = ("Dear Acme Robotics team, I'm excited to apply. Over six years I've built high-throughput "
+            "services in python with fastapi, shipping measurable reliability wins. I'd bring that "
+            "same rigor to your platform and would welcome the chance to discuss how I can help.")
+    passed, quality, reasons = margin_eval.grade_cover_letter(good, case)
+    assert passed and quality == 1.0, reasons
+    # Genuine failures a degraded generator would produce:
+    assert not margin_eval.grade_cover_letter("", case)[0]                      # empty
+    assert not margin_eval.grade_cover_letter(good.replace("Acme Robotics", "the company"), case)[0]
+    assert not margin_eval.grade_cover_letter("Dear [Company], I love python and fastapi. " * 3, case)[0]
+    # off-topic (no JD skill, no company) fails
+    assert not margin_eval.grade_cover_letter("I enjoy long walks and cooking pasta on weekends.", case)[0]
+
+
+def test_registry_exposes_all_workflows():
+    assert set(margin_eval.WORKFLOWS) == {"fit-scoring", "mock-interview-scoring", "cover-letter"}
+    # LLM-only workflows are flagged so the runner skips them without a key.
+    assert margin_eval.WORKFLOWS["mock-interview-scoring"].requires_llm
+    assert margin_eval.WORKFLOWS["cover-letter"].requires_llm
+    assert not margin_eval.WORKFLOWS["fit-scoring"].requires_llm
