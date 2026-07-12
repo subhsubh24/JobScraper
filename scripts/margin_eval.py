@@ -162,25 +162,33 @@ def score_case(db, case, scorer, use_embeddings, meter, run_id):
                      latency_ms=latency_ms)
 
     if meter is not None:
+        session = f"eval:{run_id}"
         # Emit the real AI COST (embeddings mode only — heuristic mode has no LLM call).
+        # record_call carries the batch on session_id (supported on calls).
         if input_tokens > 0:  # pragma: no cover - live-only
             try:
                 r = meter.record_call(workflow_id=WORKFLOW_ID, provider="google",
                                       model=scorer.EMBEDDING_MODEL, input_tokens=input_tokens,
                                       output_tokens=0, cache_read_tokens=0, latency_ms=latency_ms,
-                                      status="ok", session_id=f"eval:{run_id}")
+                                      status="ok", session_id=session)
                 res.call_emitted = bool(getattr(r, "ok", False))
-            except Exception:
-                pass
+                if not res.call_emitted:
+                    print(f"  [warn] call emit not ok for {case['id']}: {getattr(r, 'error', r)}",
+                          file=sys.stderr)
+            except Exception as exc:
+                print(f"  [warn] call emit raised for {case['id']}: {exc}", file=sys.stderr)
         # Emit the GRADED outcome (both modes): quality = the real fit score, passed = in-band.
+        # The batch id rides on `link` — record_outcome has no session_id in the SDK surface.
         try:
             r = meter.record_outcome(workflow_id=WORKFLOW_ID, passed=passed,
                                      quality_score=round(score / 100.0, 4),
-                                     quality_method="eval-band-grader",
-                                     session_id=f"eval:{run_id}")
+                                     quality_method="eval-band-grader", link=session)
             res.outcome_emitted = bool(getattr(r, "ok", False))
-        except Exception:
-            pass
+            if not res.outcome_emitted:
+                print(f"  [warn] outcome emit not ok for {case['id']}: {getattr(r, 'error', r)}",
+                      file=sys.stderr)
+        except Exception as exc:
+            print(f"  [warn] outcome emit raised for {case['id']}: {exc}", file=sys.stderr)
     return res
 
 
