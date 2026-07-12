@@ -254,3 +254,60 @@ liveness or real-output smoke.
 **Issues:** filed a NEW ship-critical issue for functional-reality D (decommissioned model). #92
 (business-case) + #93 (store-readiness) remain the correct open ship-critical issues (both still C,
 unchanged) — updated with this audit's fresh evidence, not duplicated.
+
+## 2026-07-11 — 6th independent audit
+
+**Overall: B (↑ from C) · ship_gate_met: false.** A **recovery audit**: the ship-critical
+functional-reality regression that drove the 2026-07-09 D is **resolved (D → A)**, and two more
+ship-critical dims moved up on real evidence (correctness A→A+, business-case C→B). Ship gate stays
+NO on the two standing pre-launch gaps (store-readiness C, business-case B).
+
+Per-dimension (Δ vs 2026-07-09): functional-reality **A** (▲ D→A), correctness **A+** (▲ A→A+),
+security **A** (= improved basis), design-taste **A** (=), store-readiness **C** (=), artifact-integrity
+**A** (=), business-case-strength **B** (▲ C→B), tests-evals **A** (=), performance **A+** (=).
+
+Method: 9 fresh independent adversarial grader subagents (maker ≠ checker), each ran its own signal +
+cited file/line. Auditor pre-ran the gate at HEAD `9f119e5`: flake8 clean, `import asgi` ok, **609
+backend pass @ 91.09% cov** (floor ratcheted 85→**88**), 15 journeys pass, 62 evals pass, `check_quality
+parse` OK / `readiness` FAIL, `check_blocks` OK (`floor_met_year1=false`, **`engine_pct=50`** was 0),
+`arr_base.py`→57500, no tracked secrets, CORS `[]` in prod. web/mobile `tsc`/`lint`/`jest`/Playwright
+not re-runnable locally (node_modules absent) — relied on committed specs + required CI.
+
+**The recovery (functional-reality D→A):** auditor re-probed the REAL Gemini endpoint with the live
+key — `gemini-2.5-flash` now returns **200 "OK"** (a hard 404 two days ago), `gemini-flash-latest` +
+`gemini-2.5-flash-lite` also 200, embedding `gemini-embedding-001`→200 (dim 3072). Live eval suite
+`test_ai_output_evals.py` → **10 passed** (was 9 failed / 1 passed). Crucially the factory did NOT just
+wait for Google: `src/llm.py:78 resilient_chat_completion` falls back on a 404 model-death ONLY through a
+verified-live chain and fails LOUD if all-dead; a per-PR source-scan guard
+(`tests/test_llm_nobypass_integration.py`) enforces every AI workflow routes through it (sole raw
+`.create` is the wrapper, `src/llm.py:97`). `.env.example:11` corrected to the floating alias. Off A+
+only by the code default still being pinned `gemini-2.5-flash` (trivial — fallback covers it).
+
+**correctness A→A+:** the persistent "provider 502 burns a legit user's daily AI slot with no refund"
+finding is FIXED — symmetric `refund_llm_ceiling` (`asgi.py:491`) in all 9 LLM endpoints' failure
+branches (9/9), excluded from success + moderation, `SELECT…FOR UPDATE` floored at 0. Zero findings.
+
+**business-case C→B:** the highest-ARPA lever (team/B2B2C seat tier) is now genuinely BUILT — real
+`Organization`/`OrganizationMember` models + migration (`models.py:138,187`), quantity-based Stripe seat
+checkout + signature-verified webhook + seat-cap enforcement (`org_billing.py`), owner-scoped endpoints
+(`asgi.py:1278-1386`), 22 tests. Last cycle's C trigger (top lever ENTIRELY unbuilt) is removed. Held at
+B: floor still honestly unmet (57500 < $100K, `floor_met_year1=false`, zero ARR credited) — the backend
+is built but not yet MONETIZED (no admin UI, no live per-seat pricing, no validated B2B adoption).
+
+**security A (improved basis):** the in-memory per-instance login-lockout finding is FIXED — lockout is
+now DB-backed cross-instance (`asgi.py:373-431`). The new org/seat attack surface is authz-clean
+(`seats_purchased` webhook-only, seat mutations owner-scoped, cap lock-enforced, entitlement via
+`recompute_user_tier` Pro-only) — zero entitlement bypass. Off A+ by the SAME CAPTCHA no-op.
+
+**artifact-integrity A:** both prior doc-lags FIXED (ROADMAP coverage box now `fail_under=88`;
+`/api/jobs/import-preview` added to ROUTE_INVENTORY). Every spot-checked ticked box maps to real tested
+code; #353 entitlement-reconciliation test asserts real DB tier lifecycle. Held off A+ by an
+honest-direction self-lag: the PRIOR scorecard understated the now-built org tier (corrected here).
+
+**Standing ship-critical gaps (both block the gate, unchanged this cycle):** store-readiness C (same 4
+open ACCEPTANCE FAILs A3/A4/G4/G7 — no rendered assets, mobile IAP still a "coming soon" stub) and
+business-case below floor. These are the two top gaps to drive next.
+
+**Issues:** functional-reality issue #329 (the decommissioned-model D) is RESOLVED — commented with the
+recovery evidence and closed. #93 (store-readiness, still C) + #92 (business-case, C→B) updated with this
+audit's fresh evidence, not duplicated. No new issue filed (no ship-critical dim newly below A).
