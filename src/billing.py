@@ -23,6 +23,34 @@ from src.db.models import Subscription, User, UserTier
 # Stripe subscription statuses that should grant the Premium entitlement.
 _ACTIVE_STATUSES = {"active", "trialing"}
 
+# Bound EVERY Stripe HTTP call BELOW the serverless function budget (Vercel maxDuration=60s,
+# vercel.json). stripe-python's default HTTP timeout is 80s — LONGER than the budget — so a
+# slow/hung Stripe API would let the platform kill the function mid-request (possibly after a
+# charge) with NO response the caller can act on. A sub-budget timeout makes the call fail LOUD
+# in-request instead, so the endpoint returns an honest error. (DEEP_DIAGNOSIS rule (a): every
+# external call needs a timeout shorter than the serverless budget — the same rule src/llm.py
+# already honors for the Gemini calls.)
+STRIPE_HTTP_TIMEOUT_SECONDS = 25
+
+
+def configure_stripe():
+    """Set the Stripe api key AND a sub-budget HTTP timeout; return the ``stripe`` module.
+
+    Centralizes both so every network-making call (individual + org seat checkout) is bounded
+    identically. ``new_default_http_client`` selects the best available backend (requests/…),
+    all of which honor ``timeout``; reassigning the default client is idempotent and cheap on a
+    cold serverless invocation. Webhook signature verification (``construct_event``) is pure
+    crypto with no HTTP, so it is unaffected.
+    """
+    import stripe
+
+    stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
+    stripe.default_http_client = stripe.new_default_http_client(
+        timeout=STRIPE_HTTP_TIMEOUT_SECONDS
+    )
+    return stripe
+
+
 # Public plan id -> the env var holding that plan's Stripe Price ID. The owner creates the
 # products/prices in Stripe and sets these in the deploy env; they are never committed.
 _PLAN_PRICE_ENV = {
@@ -161,9 +189,7 @@ def create_checkout_session(
         raise BillingNotConfigured("STRIPE_SECRET_KEY is not set.")
     price_id = price_id_for_plan(plan)  # raises before any network call if misconfigured
 
-    import stripe
-
-    stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
+    stripe = configure_stripe()
     session = stripe.checkout.Session.create(
         mode="subscription",
         line_items=[{"price": price_id, "quantity": 1}],
