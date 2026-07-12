@@ -73,6 +73,13 @@ export default function PricingPage() {
     }
   }
 
+  function goToTeam() {
+    setNotice(null);
+    // The seat tier is self-serve inside the app (create org -> buy seats -> assign members).
+    // No account yet -> sign up first, then land on the team dashboard (register honors ?next).
+    router.push(getToken() ? '/app/team' : '/register?next=/app/team');
+  }
+
   return (
     <main className="mx-auto w-full max-w-4xl px-6 py-16">
       <h1 className="text-center text-4xl font-extrabold">Pricing</h1>
@@ -152,6 +159,29 @@ export default function PricingPage() {
           </div>
         </div>
       </div>
+
+      {/* Team & Organizations — the B2B2C seat tier, set apart from the individual plans so
+          the two audiences (job seekers vs. orgs buying for their people) read distinctly. */}
+      <section className="mt-6 rounded-2xl border border-slate-800 bg-slate-900/40 p-6 md:flex md:items-center md:justify-between md:gap-8">
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="text-base font-semibold text-slate-100">Team &amp; Organizations</h2>
+            <span className="rounded-full bg-slate-700/40 px-2 py-0.5 text-xs font-semibold text-slate-300">
+              For bootcamps, employers &amp; outplacement
+            </span>
+          </div>
+          <p className="mt-2 max-w-xl text-sm text-slate-400">
+            Buy a pool of seats and assign them to your members — everyone gets Pro. One
+            subscription, centralized billing, and an admin dashboard to add or remove people as
+            your cohort changes. Per-seat annual pricing that scales with your team.
+          </p>
+        </div>
+        <div className="mt-4 shrink-0 md:mt-0">
+          <Button className="w-full md:w-auto" onClick={goToTeam}>
+            Set up your team
+          </Button>
+        </div>
+      </section>
 
       {notice && (
         <p role="alert" className="mt-6 text-center text-sm text-amber-400">
