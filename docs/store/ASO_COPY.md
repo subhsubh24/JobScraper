@@ -3,8 +3,9 @@
 > Text assets for the App Store + Play Console listings. Honest to what the app does today
 > (no fabricated features). Voice per VISION.md: operator-grade, calm, outcome-focused — not
 > hypey. Character limits noted are the current store maxima; trim at submission if they
-> change. Rendered screenshots/feature graphics are a separate, NOT-yet-buildable artifact
-> (need a running signed build) — tracked as FAIL in ACCEPTANCE_AUDIT.
+> change. The **feature graphic is now rendered + committed** (`docs/store/assets/feature-graphic.png`,
+> from a reviewable HTML source + `scripts/store/render_feature_graphic.sh`); store **screenshots**
+> still need a signed native build (tracked as FAIL in ACCEPTANCE_AUDIT A3/G7).
 
 ## App name / title
 - **App Store name** (≤ 30 chars): `Career Operator`
@@ -117,5 +118,6 @@ shown score is always AI-computed.
 
 ## Owner notes (Human-Core)
 - Final character-limit trim happens in the console at submission (limits drift).
-- Rendered screenshots + feature graphic require a signed build — not buildable in-repo yet.
+- Feature graphic: DONE (`docs/store/assets/feature-graphic.png`, 1024×500, no alpha; alt text in
+  `docs/store/assets/README.md`). Rendered **screenshots** still require a signed native build.
 - Localize beyond en-US later (ASO roadmap item).
