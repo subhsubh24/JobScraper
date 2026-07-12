@@ -1,0 +1,69 @@
+name: Margin eval (cost-per-outcome refresh)
+
+# Change-triggered: refresh JobScraper's cost-per-outcome in Margin whenever a REAL change to
+# the AI / scoring / eval surface SHIPS to main — not on docs/bookkeeping. The paths filter keeps
+# this off unrelated commits (store assets, READMEs, config churn).
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/llm.py'
+      - 'src/ranking/**'
+      - 'asgi.py'
+      - 'evals/margin/**'
+      - 'scripts/margin_eval.py'
+      - '.github/workflows/margin-eval.yml'
+
+# Never pile up overlapping refreshes; the newest ship wins.
+concurrency:
+  group: margin-eval-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  margin-eval:
+    name: refresh cost-per-outcome (real metered path)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # GUARD: stay INERT until the owner sets the secrets. The `secrets` context is not reliably
+      # available in a job-level `if:`, so we guard in a step (maps secrets -> env, checks, and
+      # gates the rest of the job on an output). Missing secrets => clean skip, exit 0, CI green.
+      - name: Guard — require the Margin + Gemini secrets, else skip cleanly
+        id: guard
+        env:
+          MARGIN_INGEST_KEY: ${{ secrets.MARGIN_INGEST_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          if [ -z "$MARGIN_INGEST_KEY" ] || [ -z "$GEMINI_API_KEY" ]; then
+            echo "Margin eval SKIPPED: set the MARGIN_INGEST_KEY and GEMINI_API_KEY repo secrets"
+            echo "(also MARGIN_INGEST_URL) to enable the real metered cost-per-outcome refresh."
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "secrets present — running the metered eval."
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up Python
+        if: steps.guard.outputs.enabled == 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install deps (incl. margin-meter from PyPI)
+        if: steps.guard.outputs.enabled == 'true'
+        run: pip install -r requirements-dev.txt
+
+      - name: Run cost-per-outcome eval (embeddings, cost-capped)
+        if: steps.guard.outputs.enabled == 'true'
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          MARGIN_INGEST_URL: ${{ secrets.MARGIN_INGEST_URL }}
+          MARGIN_INGEST_KEY: ${{ secrets.MARGIN_INGEST_KEY }}
+        run: |
+          RUN_ID="ci-${GITHUB_SHA::12}"
+          echo "::group::margin_eval ($RUN_ID) — new cost-per-outcome distribution"
+          python scripts/margin_eval.py --embeddings --max-embed-cases 30 --run-id "$RUN_ID"
+          echo "::endgroup::"
+          echo "Emitted a fresh graded outcome distribution for jobscraper-fit-scoring under"
+          echo "session_id=eval:$RUN_ID — compare new-vs-prior cost-per-outcome in the Margin dashboard."
