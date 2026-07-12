@@ -15,6 +15,11 @@ psycopg2-binary==2.9.9
 # LLM (optional at runtime — degrades gracefully without OPENAI_API_KEY)
 openai==1.59.6  # >=1.55 required: 1.10 breaks with httpx>=0.28 ("proxies" TypeError) on Vercel
 
+# Margin meter — cost-per-outcome telemetry SDK (stdlib-only, tiny bundle). Imported by
+# src/llm.py behind a guarded try/except and only emits when MARGIN_INGEST_URL +
+# MARGIN_INGEST_KEY are set, so it is inert (no network) in CI and on Vercel unless configured.
+margin-meter>=0.1.0
+
 # Billing — Stripe Checkout + webhook signature verification (Track C). Pure-Python,
 # small bundle. Live keys/price IDs are owner-only (PENDING_OPS); the SDK is imported by
 # src/billing.py + the /api/billing/* endpoints, so it must ship in the runtime bundle.
