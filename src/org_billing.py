@@ -25,7 +25,12 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from src import billing
-from src.billing import BillingNotConfigured, UnknownPlan, _ACTIVE_STATUSES
+from src.billing import (
+    BillingNotConfigured,
+    BillingProviderUnavailable,
+    UnknownPlan,
+    _ACTIVE_STATUSES,
+)
 from src.db.models import Organization, OrganizationMember, User
 
 # Public org plan id -> env var holding that plan's Stripe Price ID (a PER-SEAT recurring price;
@@ -311,17 +316,22 @@ def create_seat_checkout_session(
 
     stripe = billing.configure_stripe()  # sub-budget HTTP timeout (see billing.configure_stripe)
     meta = {"org_id": org.id, "plan": plan, "seats": str(seats)}
-    session = stripe.checkout.Session.create(
-        mode="subscription",
-        line_items=[{"price": price_id, "quantity": seats}],
-        success_url=success_url,
-        cancel_url=cancel_url,
-        client_reference_id=owner.id,
-        customer_email=owner.email,
-        metadata=meta,
-        subscription_data={"metadata": meta},
-        allow_promotion_codes=True,
-    )
+    try:
+        session = stripe.checkout.Session.create(
+            mode="subscription",
+            line_items=[{"price": price_id, "quantity": seats}],
+            success_url=success_url,
+            cancel_url=cancel_url,
+            client_reference_id=owner.id,
+            customer_email=owner.email,
+            metadata=meta,
+            subscription_data={"metadata": meta},
+            allow_promotion_codes=True,
+        )
+    except stripe.error.APIConnectionError as exc:
+        # Sub-budget timeout / connection failure — same honest-503 contract as individual
+        # checkout (see billing.create_checkout_session). No seat charge was created.
+        raise BillingProviderUnavailable(str(exc)) from exc
     return session.url
 
 
