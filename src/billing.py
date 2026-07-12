@@ -159,6 +159,17 @@ class UnknownPlan(Exception):
     """Raised when an unrecognized plan id is requested."""
 
 
+class BillingProviderUnavailable(Exception):
+    """Raised when Stripe IS configured but was transiently unreachable while creating a
+    Checkout session — a timeout (the sub-budget ``STRIPE_HTTP_TIMEOUT_SECONDS`` firing) or a
+    connection failure, both surfaced by stripe-python as ``stripe.error.APIConnectionError``.
+
+    The caller maps this to a retryable 503, NOT a 500: a bounded timeout is only useful if the
+    resulting failure is caught and surfaced honestly (that is the whole point of bounding the
+    call below the serverless budget — see ``configure_stripe``). No charge exists yet — this is
+    the pre-checkout step, before the customer completes the hosted Checkout page."""
+
+
 def billing_enabled() -> bool:
     """True only when a Stripe secret key is configured (owner-provided, server-side)."""
     return bool(os.getenv("STRIPE_SECRET_KEY"))
@@ -192,17 +203,23 @@ def create_checkout_session(
     price_id = price_id_for_plan(plan)  # raises before any network call if misconfigured
 
     stripe = configure_stripe()
-    session = stripe.checkout.Session.create(
-        mode="subscription",
-        line_items=[{"price": price_id, "quantity": 1}],
-        success_url=success_url,
-        cancel_url=cancel_url,
-        client_reference_id=user.id,
-        customer_email=user.email,
-        metadata={"user_id": user.id, "plan": plan},
-        subscription_data={"metadata": {"user_id": user.id, "plan": plan}},
-        allow_promotion_codes=True,
-    )
+    try:
+        session = stripe.checkout.Session.create(
+            mode="subscription",
+            line_items=[{"price": price_id, "quantity": 1}],
+            success_url=success_url,
+            cancel_url=cancel_url,
+            client_reference_id=user.id,
+            customer_email=user.email,
+            metadata={"user_id": user.id, "plan": plan},
+            subscription_data={"metadata": {"user_id": user.id, "plan": plan}},
+            allow_promotion_codes=True,
+        )
+    except stripe.error.APIConnectionError as exc:
+        # The sub-budget timeout (or a connection failure) fired before Stripe responded. Surface
+        # an HONEST, retryable error instead of letting it escape as an uncaught 500 — no charge
+        # was created (this is the pre-checkout step).
+        raise BillingProviderUnavailable(str(exc)) from exc
     return session.url
 
 

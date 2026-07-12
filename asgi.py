@@ -1188,6 +1188,13 @@ def billing_checkout(
             status_code=503,
             detail="Subscriptions aren't available yet. No charge was made.",
         )
+    except billing.BillingProviderUnavailable:
+        # Stripe was configured but transiently unreachable (the sub-budget timeout fired).
+        # Retryable, and no charge was created — surface an honest 503, never an uncaught 500.
+        raise HTTPException(
+            status_code=503,
+            detail="The payment service is temporarily unavailable. No charge was made — please try again in a moment.",
+        )
     return {"url": url}
 
 
@@ -1336,6 +1343,13 @@ def org_checkout(
         raise HTTPException(
             status_code=503,
             detail="Team plans aren't available yet. No charge was made.",
+        )
+    except org_billing.BillingProviderUnavailable:
+        # Stripe configured but transiently unreachable (sub-budget timeout) — honest retryable
+        # 503, no seat charge created, never an uncaught 500. Mirrors individual checkout.
+        raise HTTPException(
+            status_code=503,
+            detail="The payment service is temporarily unavailable. No charge was made — please try again in a moment.",
         )
     return {"url": url}
 
