@@ -167,7 +167,7 @@ export default function PricingPage() {
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-base font-semibold text-slate-100">Team &amp; Organizations</h2>
             <span className="rounded-full bg-slate-700/40 px-2 py-0.5 text-xs font-semibold text-slate-300">
-              For bootcamps, employers &amp; outplacement
+              For bootcamps, employers &amp; outplacement firms
             </span>
           </div>
           <p className="mt-2 max-w-xl text-sm text-slate-400">
