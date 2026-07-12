@@ -1,0 +1,7 @@
+{
+  "_comment": "Expected-fit band -> [min_inclusive, max_exclusive) window on JobScore.overall_score (0-100). CALIBRATED against the deterministic, key-free heuristic scorer (overall = 30 + 40*skills_score, so range [30,70]). A case PASSES when its real fit score lands in its assigned band's window. Windows are non-overlapping so the grader genuinely distinguishes fit quality (a constant scorer fails strong + mismatch). Embeddings mode adds a real semantic signal that shifts absolute scores upward; see README for the calibration caveat.",
+  "strong": [62.0, 100.01],
+  "partial": [48.0, 62.0],
+  "weak": [38.0, 48.0],
+  "mismatch": [0.0, 38.0]
+}
