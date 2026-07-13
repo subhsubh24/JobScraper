@@ -5,7 +5,10 @@ outcome (BUILDS ≠ WORKS). This inventory is the checklist the journey suites a
 against: every user-reachable route/flow below should be exercised by an outcome-asserting
 test (browser for web, in-process for the API) — not merely return `<400`.
 
-Keep this current as routes are added. A new route with no journey coverage is a gap.
+Keep this current as routes are added. A new route with no journey coverage is a gap. The
+**Complete API route → coverage matrix** below is the authoritative, exhaustive list of every
+route in `asgi.py` (all 49) and the test that exercises it — so completeness is verifiable, not
+asserted. The web/mobile tables and the API-flow narrative give the richer per-flow context.
 
 ## Web app routes (`web/app/**/page.tsx`)
 | Route | Purpose | Covered by | Outcome asserted |
@@ -88,6 +91,64 @@ Keep this current as routes are added. A new route with no journey coverage is a
   tenant isolation (owner-only management; a member never sees the roster) + account-deletion purge
   (no orphaned org rows) are all tested. Web/mobile management surface is a follow-up (backend-first,
   like the Career+ tier PR #152). Live Stripe team Price ID is owner-only (PENDING_OPS).
+
+### Complete API route → coverage matrix (all 49 routes in `asgi.py`)
+Exhaustive by construction: every `@app.<verb>` route in `asgi.py` appears exactly once with the
+test that exercises it. If a new route is added to `asgi.py` without a row here (and a real test),
+the inventory is out of date — that is the gap this matrix makes visible. Auth/tier is the
+server-enforced gate; "public" means no bearer token required.
+
+| Method | Route | Auth / tier | Covered by |
+|---|---|---|---|
+| POST | `/api/auth/register` | public | `journeys/test_core_journey.py`, `test_account_and_security.py`, `test_signup_resilience.py` |
+| POST | `/api/auth/login` | public | `journeys/test_core_journey.py`, `test_account_and_security.py` (lockout/enumeration) |
+| GET | `/api/auth/me` | authed | `journeys/test_core_journey.py`, `test_auth_eager_load.py` |
+| DELETE | `/api/auth/me` | authed | `test_account_and_security.py`, `test_content_report.py` (deletion cascade) |
+| POST | `/api/ai-consent` | authed | `test_ai_consent.py` |
+| DELETE | `/api/ai-consent` | authed | `test_ai_consent.py` (revoke) |
+| GET | `/api/referrals/me` | authed | `test_referral.py` |
+| POST | `/api/waitlist/join` | public | `test_waitlist.py`, `journeys/test_waitlist_double_optin.py` |
+| GET | `/api/waitlist/confirm` | public (token) | `journeys/test_waitlist_double_optin.py` |
+| POST | `/api/demo/skill-match` | public | `test_demo_skill_match.py`, `evals/test_demo_match_evals.py` |
+| POST | `/api/auth/verify-purchase` | authed | `journeys/test_core_journey.py` (501, no fake grant), `test_api_input_hardening.py` |
+| POST | `/api/billing/checkout` | authed | `test_billing.py`, `test_billing_timeout.py` |
+| POST | `/api/billing/webhook` | public (Stripe sig) | `test_billing.py`, `test_org_billing.py` |
+| POST | `/api/billing/revenuecat-webhook` | public (RC sig) | `test_mobile_billing.py`, `test_org_billing.py` |
+| POST | `/api/org` | authed | `test_org_billing.py`, `test_org_hardening.py` |
+| GET | `/api/org` | authed | `test_org_billing.py` |
+| POST | `/api/org/checkout` | authed (owner) | `test_org_billing.py`, `test_billing_timeout.py` |
+| POST | `/api/org/members` | authed (owner) | `test_org_billing.py` |
+| DELETE | `/api/org/members/{member_user_id}` | authed (owner) | `test_org_billing.py` |
+| POST | `/api/jobs` | authed | `journeys/test_core_journey.py`, `test_jobs_endpoint.py`, `test_job_idempotency.py` |
+| GET | `/api/jobs` | authed | `journeys/test_core_journey.py`, `test_jobs_endpoint.py`, `test_read_rate_limit.py` |
+| GET | `/api/jobs/{job_id}` | authed | `journeys/test_core_journey.py`, `test_jobs_endpoint.py` |
+| GET | `/api/jobs/{job_id}/readiness` | authed (free) | `test_readiness.py`, `evals/test_readiness_evals.py` |
+| PATCH | `/api/jobs/{job_id}` | authed | `journeys/test_core_journey.py`, `test_jobs_endpoint.py` |
+| POST | `/api/jobs/import-preview` | authed | `test_ingestion_endpoint.py`, `test_greenhouse_client.py` |
+| POST | `/api/prep-packs/generate` | Pro | `test_prep_pack_endpoint.py`, `journeys/test_core_journey.py` (503) |
+| POST | `/api/prep/salary-negotiation` | Career+ | `test_career_plus.py`, `test_input_bounds.py` |
+| POST | `/api/prep/cover-letter` | Pro | `test_prep_tools.py`, `test_llm_ceiling_refund.py` |
+| POST | `/api/prep/study-plan` | Pro | `test_prep_tools.py` |
+| POST | `/api/prep/tailored-resume` | Pro | `test_tailored_resume.py`, `test_resume_profile.py` |
+| POST | `/api/prep/mock-interview` | Pro | `test_mock_interview.py` |
+| POST | `/api/prep/mock-interview/{interview_id}/answer` | Pro | `test_mock_interview.py` |
+| GET | `/api/prep/mock-interview/{interview_id}` | Pro | `test_mock_interview.py` |
+| GET | `/api/prep/mock-interviews` | Pro | `test_mock_interview.py` |
+| POST | `/api/coach/chat` | Pro | `journeys/test_core_journey.py`, `test_coach_endpoint.py`, `test_api_input_hardening.py` |
+| GET | `/api/coach/suggestions` | authed | `journeys/test_core_journey.py`, `test_api_input_hardening.py`, `test_rate_limit_peruser.py` |
+| POST | `/api/report` | authed | `test_content_report.py` |
+| GET | `/api/insights/skill-gaps` | free | `test_skill_gaps.py` |
+| POST | `/api/insights/learning-plan` | Pro | `test_skill_gaps.py` |
+| GET | `/api/profile/resume` | authed | `test_resume_profile.py` |
+| PATCH | `/api/profile/resume` | authed | `test_resume_profile.py` |
+| POST | `/api/profile/enrich/github` | Pro | `test_github_enrichment.py` |
+| GET | `/api/profile/enrichment` | authed (free) | `test_github_enrichment.py` |
+| DELETE | `/api/profile/enrichment` | authed (free) | `test_github_enrichment.py` |
+| GET | `/api/analytics/pipeline` | authed | `journeys/test_core_journey.py`, `test_perf_n1.py` |
+| GET | `/api/analytics/summary` | token-gated | `test_analytics.py` |
+| GET | `/` | public | `journeys/test_core_journey.py` (API root) |
+| GET | `/health` | public | `journeys/test_core_journey.py` |
+| GET | `/api/health` | public | `journeys/test_core_journey.py` |
 
 ## Mobile screens (`mobile/src/app/**`, jest-expo component/integration tests)
 | Screen / unit | Covered by | Outcome asserted |
