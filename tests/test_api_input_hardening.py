@@ -63,9 +63,15 @@ def test_chat_request_rejects_overlong_ids(client, db_session):
     assert r.status_code != 422, r.text
 
 
-def test_coach_suggestions_is_rate_limited(client):
+def test_coach_suggestions_is_rate_limited(client, monkeypatch):
     """The suggestions endpoint (a per-user context query) now enforces a limit, so an authed
-    client can't hammer it unbounded — it was the only coach endpoint without one."""
+    client can't hammer it unbounded — it was the only coach endpoint without one.
+
+    Determinism: freeze `time.time` so all 35 requests share ONE 60s limiter window
+    (`window_key = int(time.time() // 60)`); a burst straddling a boundary otherwise splits
+    across two windows and never trips the 30/60s limit (the CI-flake class fixed 2026-07-13).
+    """
+    monkeypatch.setattr(asgi.time, "time", lambda: 1_700_000_000.0)
     token = _register(client, "suggest-limit@example.com")
     saw_429 = False
     for _ in range(35):  # limit is 30/60s
@@ -78,9 +84,14 @@ def test_coach_suggestions_is_rate_limited(client):
     assert saw_429, "coach/suggestions should throttle within 35 rapid calls"
 
 
-def test_verify_purchase_is_rate_limited(client):
+def test_verify_purchase_is_rate_limited(client, monkeypatch):
     """The verify-purchase write endpoint now shares the auth limiter. It still refuses
-    honestly (501, no fake grant) AND throttles under a burst."""
+    honestly (501, no fake grant) AND throttles under a burst.
+
+    Determinism: freeze `time.time` so all 15 requests share ONE 60s limiter window — a burst
+    straddling a boundary otherwise splits across two windows and never trips the 10/60s limit.
+    """
+    monkeypatch.setattr(asgi.time, "time", lambda: 1_700_000_000.0)
     token = _register(client, "verify-limit@example.com")
     body = {"receipt_data": "r", "platform": "ios"}
     statuses = []
