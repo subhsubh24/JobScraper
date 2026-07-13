@@ -67,3 +67,15 @@ Format: `[id] PATTERN — CONTEXT — WHY IT WORKS — EVIDENCE`
   broke a ~5× "store assets are design-core" defer; both Sonnet reviewers incl. a pixel-level pass APPROVE;
   `tests/test_store_assets.py` guards the spec). Honest bound: screenshots (native app) + the bespoke icon stay
   owner/native-blocked — this pattern is for the typographic class only.
+
+- **[sp-8] A found flaky/broken test is a CLASS, not a one-off — scout for siblings sharing the root
+  mechanism and fix them all in ONE PR.** — CI reddens on one test (or a deep audit finds one bug); the
+  instinct is to patch that single case. — Before fixing, run a cheap read-only scout prompted with the
+  EXACT root mechanism to enumerate every OTHER test/site with the same mechanism, then fix the whole class
+  in one coherent file-disjoint PR (§6c: "fix the actual cause so the whole CLASS can't recur"). Verify
+  determinism by stress-looping (Nx) + reproducing the OLD failure, and have a reviewer prove non-vacuity
+  (break the product code → every fixed test must still fail-loud). Bound it honestly: exclude same-mechanism
+  cases whose probability is negligible (a ~5s test can't cross a 900s/3600s window) — fixing those is padding,
+  not thoroughness. — EVIDENCE: #388 (one CI-reddening 60s fixed-window rate-limit flake → scout found 7 tests
+  across 4 files → all frozen deterministic in one PR; Reviewer A revert-broke `_consume_counter` to confirm
+  all 7 still fail-loud; 900s/3600s/86400s cousins consciously deferred as negligible-probability).
