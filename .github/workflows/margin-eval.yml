@@ -4,6 +4,9 @@ name: Margin eval (cost-per-outcome refresh)
 # the AI / scoring / eval surface SHIPS to main — not on docs/bookkeeping. The paths filter keeps
 # this off unrelated commits (store assets, READMEs, config churn).
 on:
+  # Manual trigger so the owner can run a refresh on demand (e.g. to verify emission after
+  # setting the secrets) without waiting for a qualifying push.
+  workflow_dispatch:
   push:
     branches: [main]
     paths:
