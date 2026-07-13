@@ -151,6 +151,8 @@ burnout) supportively is in scope; generating harmful content is not."""
         # live one instead of 502-ing the coach (src/llm.py).
         response = resilient_chat_completion(
             self.client,
+            operation="jobscraper-career-coach",
+            session_id=session_id,  # the multi-turn conversation id links every coach turn
             model=self.MODEL,
             messages=messages,
             temperature=0.7,
@@ -272,6 +274,8 @@ burnout) supportively is in scope; generating harmful content is not."""
 
         response = resilient_chat_completion(
             self.client,
+            operation="jobscraper-career-coach-summary",
+            session_id=session_id,  # same conversation id → summary links to its coach turns
             model=self.MODEL,
             messages=[
                 {

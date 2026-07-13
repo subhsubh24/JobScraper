@@ -48,6 +48,75 @@ def test_emit_call_metrics_passes_measured_args():
     assert kwargs["model"] == "gemini-2.5-flash"
 
 
+def test_emit_call_metrics_tags_operation_session_and_retry():
+    """A descriptive operation → workflow_id (the chain NODE), plus session_id + is_retry pass through."""
+    fake = mock.Mock()
+    with mock.patch.object(llm, "_meter", fake):
+        llm._emit_call_metrics(
+            _FakeResp(), "m", 1.0, "ok",
+            operation="jobscraper-cover-letter-refine",
+            session_id="jobscraper-job-42",
+            is_retry=True,
+        )
+    kwargs = fake.record_call.call_args.kwargs
+    assert kwargs["workflow_id"] == "jobscraper-cover-letter-refine"
+    assert kwargs["session_id"] == "jobscraper-job-42"
+    assert kwargs["is_retry"] is True
+
+
+def test_emit_call_metrics_defaults_operation_when_untagged():
+    """An untagged call site stays back-compatible (default workflow_id, no session, no retry)."""
+    fake = mock.Mock()
+    with mock.patch.object(llm, "_meter", fake):
+        llm._emit_call_metrics(_FakeResp(), "m", 1.0, "ok")
+    kwargs = fake.record_call.call_args.kwargs
+    assert kwargs["workflow_id"] == "jobscraper-fit-scoring"
+    assert kwargs["session_id"] is None
+    assert kwargs["is_retry"] is False
+
+
+def test_journey_session_id_links_by_job_and_is_none_without_job():
+    """The shared session id is derived from the job so per-request steps link into one chain."""
+    assert llm.journey_session_id(7) == "jobscraper-job-7"
+    assert llm.journey_session_id(None) is None
+
+
+def test_resilient_chat_completion_threads_operation_and_session():
+    """The wrapper forwards operation + session_id onto the emitted call (the primary, non-retry)."""
+    fake = mock.Mock()
+    client = mock.Mock()
+    client.chat.completions.create.return_value = _FakeResp()
+    with mock.patch.object(llm, "_meter", fake):
+        llm.resilient_chat_completion(
+            client, operation="jobscraper-mock-interview-scoring",
+            session_id="jobscraper-job-9", messages=[],
+        )
+    kwargs = fake.record_call.call_args.kwargs
+    assert kwargs["workflow_id"] == "jobscraper-mock-interview-scoring"
+    assert kwargs["session_id"] == "jobscraper-job-9"
+    assert kwargs["is_retry"] is False
+
+
+def test_resilient_chat_completion_marks_fallback_attempt_as_retry():
+    """When the primary model is decommissioned (404), the fallback attempt emits is_retry=True."""
+    from openai import NotFoundError
+
+    fake = mock.Mock()
+    client = mock.Mock()
+    not_found = NotFoundError.__new__(NotFoundError)
+    setattr(not_found, "status_code", 404)
+    client.chat.completions.create.side_effect = [not_found, _FakeResp()]
+    with mock.patch.object(llm, "_meter", fake):
+        resp = llm.resilient_chat_completion(
+            client, model="dead-model", operation="jobscraper-fit-scoring",
+            session_id="jobscraper-job-1", messages=[],
+        )
+    assert resp is not None
+    retries = [c.kwargs["is_retry"] for c in fake.record_call.call_args_list]
+    # First attempt (dead primary) is not a retry; the successful fallback attempt IS.
+    assert retries[0] is False and any(r is True for r in retries)
+
+
 def test_emit_call_metrics_error_path_with_no_response():
     fake = mock.Mock()
     with mock.patch.object(llm, "_meter", fake):

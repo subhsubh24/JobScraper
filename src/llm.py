@@ -24,8 +24,36 @@ except Exception:  # pragma: no cover - SDK optional; import must never break th
 _meter = MarginMeter(timeout=2.0) if MarginMeter else None  # pragma: no cover
 
 
-def _emit_call_metrics(resp, model, elapsed, status):  # pragma: no cover - telemetry, must never affect the call
+# Default Margin operation label (workflow_id) for a call site that does not name one, so
+# telemetry stays back-compatible if a new call site forgets to tag itself.
+_DEFAULT_OPERATION = "jobscraper-fit-scoring"
+
+
+def journey_session_id(job_id) -> Optional[str]:
+    """Stable session id linking every AI operation performed for ONE job application.
+
+    A user's journey — fit-score → cover-letter (draft + reviewer) → mock-interview scoring,
+    plus prep pack / résumé / negotiation / study plan — all target the SAME job, across
+    SEPARATE HTTP requests. Deriving the ``session_id`` from the job id makes Margin stitch
+    those per-request calls into one supply-chain run (a multi-node chain) instead of isolated
+    single-node calls. Returns None when there is no job to key on (e.g. a cross-pipeline
+    learning plan) so the call is simply left unlinked rather than mis-attributed.
+    """
+    if job_id is None:
+        return None
+    return f"jobscraper-job-{job_id}"
+
+
+def _emit_call_metrics(  # pragma: no cover - telemetry, must never affect the call
+    resp, model, elapsed, status, operation=None, session_id=None, is_retry=False
+):
     """Emit one measured LLM call to Margin. Fail-safe: any error is swallowed.
+
+    ``operation`` is the descriptive node label (Margin ``workflow_id``) for THIS call — e.g.
+    ``jobscraper-cover-letter`` vs its reviewer pass ``jobscraper-cover-letter-refine`` — so a
+    workflow that makes >1 LLM call decomposes into a multi-node chain instead of one node.
+    ``session_id`` links every operation of one journey run; ``is_retry`` flags a fallback-model
+    re-attempt so a retry is its own honest node, not a phantom extra success.
 
     BLOCKING by design: on Vercel serverless the function is frozen the instant the handler
     returns, which would kill a fire-and-forget thread before its POST lands. The meter's own
@@ -40,7 +68,7 @@ def _emit_call_metrics(resp, model, elapsed, status):  # pragma: no cover - tele
         cache_read = int(getattr(getattr(usage, "prompt_tokens_details", None), "cached_tokens", 0) or 0)
         actual_model = getattr(resp, "model", model) if resp is not None else model
         _meter.record_call(
-            workflow_id="jobscraper-fit-scoring",
+            workflow_id=operation or _DEFAULT_OPERATION,
             provider="google",
             model=actual_model,
             input_tokens=input_tokens,
@@ -48,6 +76,8 @@ def _emit_call_metrics(resp, model, elapsed, status):  # pragma: no cover - tele
             cache_read_tokens=cache_read,
             latency_ms=int(elapsed * 1000),
             status=status,
+            session_id=session_id,
+            is_retry=is_retry,
         )
     except Exception:
         pass
@@ -120,7 +150,7 @@ def _is_model_unavailable(exc: Exception) -> bool:
     return status == 404
 
 
-def resilient_chat_completion(client: "object", **kwargs):
+def resilient_chat_completion(client: "object", *, operation=None, session_id=None, **kwargs):
     """``client.chat.completions.create(**kwargs)`` with automatic fallback on model death.
 
     Tries the configured model first, and ONLY on a model-not-found (404) error retries through
@@ -137,14 +167,19 @@ def resilient_chat_completion(client: "object", **kwargs):
     candidates = [primary] + [m for m in _fallback_chat_models() if m != primary]
     tried = []
     last_exc: Optional[Exception] = None
-    for model in candidates:
+    for _idx, model in enumerate(candidates):
+        # Every attempt past the first is a fallback-model RETRY — tag it so Margin sees the
+        # retry as its own honest node in the chain (a decommissioned primary is real cost).
+        _is_retry = _idx > 0
         _t0 = time.perf_counter()
         try:
             resp = client.chat.completions.create(model=model, **kwargs)
-            _emit_call_metrics(resp, model, time.perf_counter() - _t0, "ok")  # pragma: no cover
+            _emit_call_metrics(resp, model, time.perf_counter() - _t0, "ok",
+                               operation=operation, session_id=session_id, is_retry=_is_retry)  # pragma: no cover
             return resp
         except Exception as exc:  # noqa: BLE001 - classify then re-raise or fall back
-            _emit_call_metrics(None, model, time.perf_counter() - _t0, "error")  # pragma: no cover
+            _emit_call_metrics(None, model, time.perf_counter() - _t0, "error",
+                               operation=operation, session_id=session_id, is_retry=_is_retry)  # pragma: no cover
             if not _is_model_unavailable(exc):
                 raise
             tried.append(model)

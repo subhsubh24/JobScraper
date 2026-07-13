@@ -240,10 +240,12 @@ def test_refinement_falls_back_to_draft_when_review_call_fails(db_session, monke
     original_call = wf._call_llm
     calls = {"n": 0}
 
-    def flaky(system_prompt, user_prompt, json_mode=False):
+    def flaky(system_prompt, user_prompt, json_mode=False, **kwargs):
+        # **kwargs absorbs the additive Margin telemetry args (operation/session_id) the
+        # generators now pass through _call_llm — pure observability, no behaviour change.
         calls["n"] += 1
         if calls["n"] == 1:
-            return original_call(system_prompt, user_prompt, json_mode=json_mode)  # draft OK
+            return original_call(system_prompt, user_prompt, json_mode=json_mode, **kwargs)  # draft OK
         raise RuntimeError("provider 503 on the review pass")
 
     monkeypatch.setattr(wf, "_call_llm", flaky)

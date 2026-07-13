@@ -6,7 +6,9 @@ import numpy as np
 from sqlalchemy.orm import Session
 
 from src.db.models import JobPosting, JobScore, User
-from src.llm import get_llm_client, embedding_model, _meter
+import time
+
+from src.llm import get_llm_client, embedding_model, _meter, _emit_call_metrics, journey_session_id
 
 logger = logging.getLogger("career_operator.scorer")
 
@@ -60,14 +62,27 @@ class JobScorer:
         self._enriched_cache[user.id] = result
         return result
 
-    def get_embedding(self, text: str) -> List[float]:
-        """Get embedding vector for text."""
+    def get_embedding(self, text: str, operation: str = None, session_id: str = None) -> List[float]:
+        """Get embedding vector for text.
+
+        ``operation``/``session_id`` are pure Margin telemetry: the embedding IS the fit-score
+        step's real AI call, so we meter it (fail-safe, never affects scoring) as its own node so
+        the fit-score step shows up in the journey chain, not just its outcome.
+        """
         if self.client is None:
             raise RuntimeError("GEMINI_API_KEY not configured; using heuristic fallback")
-        response = self.client.embeddings.create(
-            model=self.EMBEDDING_MODEL,
-            input=text[:8000]  # Limit input length
-        )
+        _t0 = time.perf_counter()
+        try:
+            response = self.client.embeddings.create(
+                model=self.EMBEDDING_MODEL,
+                input=text[:8000]  # Limit input length
+            )
+        except Exception:
+            _emit_call_metrics(None, self.EMBEDDING_MODEL, time.perf_counter() - _t0, "error",
+                               operation=operation, session_id=session_id)  # pragma: no cover
+            raise
+        _emit_call_metrics(response, self.EMBEDDING_MODEL, time.perf_counter() - _t0, "ok",
+                           operation=operation, session_id=session_id)  # pragma: no cover
         return response.data[0].embedding
 
     def cosine_similarity(self, vec1: List[float], vec2: List[float]) -> float:
@@ -87,7 +102,7 @@ class JobScorer:
             return 0.5
         return float(np.dot(a, b) / denom)
 
-    def ensure_user_embedding(self, user: User) -> List[float]:
+    def ensure_user_embedding(self, user: User, session_id: str = None) -> List[float]:
         """Ensure user has a resume embedding, create if missing."""
         if user.resume_embedding:
             if isinstance(user.resume_embedding, str):
@@ -97,12 +112,16 @@ class JobScorer:
         if not user.resume_text:
             raise ValueError("User has no resume text to create embedding")
 
-        embedding = self.get_embedding(user.resume_text)
+        embedding = self.get_embedding(
+            user.resume_text,
+            operation="jobscraper-fit-score-embedding-resume",
+            session_id=session_id,
+        )
         user.resume_embedding = embedding
         self.db.flush()
         return embedding
 
-    def ensure_job_embedding(self, job: JobPosting) -> List[float]:
+    def ensure_job_embedding(self, job: JobPosting, session_id: str = None) -> List[float]:
         """Ensure job has a JD embedding, create if missing."""
         if job.jd_embedding:
             if isinstance(job.jd_embedding, str):
@@ -125,7 +144,11 @@ class JobScorer:
         {job.responsibilities or ''}
         """
 
-        embedding = self.get_embedding(jd_text)
+        embedding = self.get_embedding(
+            jd_text,
+            operation="jobscraper-fit-score-embedding-jd",
+            session_id=session_id,
+        )
         job.jd_embedding = embedding
         self.db.flush()
         return embedding
@@ -174,9 +197,12 @@ class JobScorer:
         """
         # Get embeddings (only when allowed — see ``use_embeddings``).
         if use_embeddings:
+            # Shared session id links this job's fit-score AI calls to the rest of its journey
+            # (cover letter, mock interview, …) — pure telemetry, no effect on scoring.
+            _session = journey_session_id(job.id)
             try:
-                resume_embedding = self.ensure_user_embedding(user)
-                job_embedding = self.ensure_job_embedding(job)
+                resume_embedding = self.ensure_user_embedding(user, session_id=_session)
+                job_embedding = self.ensure_job_embedding(job, session_id=_session)
 
                 # Calculate semantic similarity (0-1)
                 semantic_score = self.cosine_similarity(resume_embedding, job_embedding)
