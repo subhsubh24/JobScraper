@@ -23,8 +23,9 @@ Same factory process as the sibling products; only the product differs.
   `.gitignore` — they hid `web/lib` and broke a deploy. Anchor to root (`/lib/`).
 
 ## LLM / AI rules (cost + graceful degradation)
-- LLM only via `src/llm.py` (Gemini through its OpenAI-compatible endpoint). Pin model via
-  env (`GEMINI_MODEL`, default `gemini-2.5-flash`) — never inline a model string elsewhere.
+- LLM only via `src/llm.py` (Gemini through its OpenAI-compatible endpoint). Override the model
+  via env (`GEMINI_MODEL`, default the floating alias `gemini-flash-latest`) — never inline a
+  model string elsewhere.
 - **Cheapest tier by default; the app DEGRADES GRACEFULLY with no key** (scoring →
   heuristics; prep/coach → truthful 503). Never let a missing key crash a flow.
 - Per-user/day spend ceiling (`LLM_DAILY_CEILING`) is load-bearing wallet-drain defense —
