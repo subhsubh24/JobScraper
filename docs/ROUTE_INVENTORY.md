@@ -44,7 +44,7 @@ Coverage kinds: **journey** = `tests/journeys/` end-to-end · **e2e** = Playwrig
 |---|---|---|---|---|
 | POST | `/api/org` | Create org (owner only) | integration `test_org_billing.py`; e2e `team-journey.spec.ts` | one org per owner; DB constraint on race |
 | GET | `/api/org` | Get org owned or seated in | integration `test_org_billing.py`; e2e `team-journey.spec.ts` | owner sees roster; member sees read-only |
-| POST | `/api/org/checkout` | Stripe seat checkout (quantity) | integration `test_org_billing.py`, `test_billing_timeout.py`; live `test_billing_live.py` | real seat session; honest 503 when unconfigured |
+| POST | `/api/org/checkout` | Stripe seat checkout (quantity) | integration `test_org_billing.py`, `test_billing_timeout.py` | real seat session; honest 503 when unconfigured |
 | POST | `/api/org/members` | Assign a seat by email (owner) | integration `test_org_billing.py`; e2e `team-journey.spec.ts` | seat-cap enforced; idempotent; reactivates soft-deleted |
 | DELETE | `/api/org/members/{member_user_id}` | Free a seat (owner) | integration `test_org_billing.py`; e2e `team-journey.spec.ts` | soft-delete; tier recomputed; tenant-isolated |
 
