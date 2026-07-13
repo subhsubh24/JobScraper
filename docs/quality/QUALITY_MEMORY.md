@@ -311,3 +311,62 @@ business-case below floor. These are the two top gaps to drive next.
 **Issues:** functional-reality issue #329 (the decommissioned-model D) is RESOLVED — commented with the
 recovery evidence and closed. #93 (store-readiness, still C) + #92 (business-case, C→B) updated with this
 audit's fresh evidence, not duplicated. No new issue filed (no ship-critical dim newly below A).
+
+## 2026-07-13 — 7th independent audit
+
+**Overall: B (=) · ship_gate_met: false.** No overall change, but real evidence-backed movement in
+BOTH directions: one ship-critical dim finished its recovery UP (functional-reality A→A+), one
+non-critical dim moved DOWN on a genuine new finding (performance A+→A), and the two standing
+pre-launch blockers (store-readiness C, business-case B) are unchanged — correctly holding overall at B.
+
+Per-dimension (Δ vs 2026-07-11): functional-reality **A+** (▲ A→A+), correctness **A+** (=), security
+**A** (=), design-taste **A** (=), store-readiness **C** (=), artifact-integrity **A** (=),
+business-case-strength **B** (=), tests-evals **A** (=), performance **A** (▼ A+→A).
+
+Method: 9 fresh independent adversarial grader subagents (maker ≠ checker), each ran its own signal +
+cited file/line. Auditor pre-ran the gate at HEAD `b221a03`: flake8 clean, `import asgi` ok, **725
+backend pass @ 91.42% cov** (floor 88, was 609 @ 91.09%), 15 journeys pass, 147 evals pass (was 62 —
+#376 enumerated more suites), **live `test_ai_output_evals.py`→10 passed**, `check_quality parse` OK /
+`readiness` FAIL, `check_blocks` OK (`floor_met_year1=false`, `engine_pct=50`), `arr_base`→57500, no
+tracked secrets, CORS `[]` in prod. Auditor independently re-probed the REAL Gemini endpoint with the
+live key: default `gemini-flash-latest`→200, fallbacks `gemini-2.5-flash`/`gemini-2.5-flash-lite`→200,
+`gemini-2.0-flash`→404 (dead, not in default chain).
+
+**functional-reality A→A+ (recovery complete):** the last A→A+ holdback — the code default
+`_DEFAULT_CHAT_MODEL` still pinned to `gemini-2.5-flash` — is RESOLVED by #379 (`4f5348a`):
+`src/llm.py:98` now reads the floating alias `gemini-flash-latest`, removing the last pinned
+single-point-of-failure. Live probe + 10/10 live evals + 15/15 journeys + entitlement round-trip all
+green; zero findings. The functional-reality arc since 2026-07-09 is now D→A→A+.
+
+**performance A+→A (real new finding):** the Margin cost-per-outcome telemetry shipped this window
+(#368/#369/#382) emits metrics SYNCHRONOUSLY/blocking on the LLM hot path — `_emit_call_metrics`
+(`src/llm.py:47-83`) + `_record_fit_outcome` (`scorer.py:16-35`), per-call `MarginMeter(timeout=2.0)`,
+blocking BY DESIGN (#369, because Vercel freezes daemon threads post-response). A slow/degraded Margin
+ingest inflates user-facing p99 up to ~2s/call, stacking per LLM call in multi-call workflows. It is
+bounded + fail-safe + gated off when unconfigured, and `score_all_jobs`'s batch loop is NOT HTTP-wired,
+so it is a named A-level finding, not a ship blocker — but it did not exist at the 2026-07-11 A+ grade,
+so A is the honest grade (anti-inflation: A+ requires ZERO findings).
+
+**Standing ship-critical blockers (both unchanged, both hold overall at B):**
+- **store-readiness C:** #370 committed a REAL, Play-spec-correct, designer-grade feature graphic
+  (`docs/store/assets/feature-graphic.png`, 1024×500 8-bit RGB no-alpha, guarded by
+  `tests/test_store_assets.py`) — but it closed ZERO of the 4 open ACCEPTANCE_AUDIT FAILs. A3/G7 still
+  need store screenshots (signed native build) + a bespoke app icon (still Expo template); A4/G4 still
+  need the mobile IAP client (`react-native-purchases` absent; `paywall.tsx:115-124` is a "coming soon"
+  Alert stub). Progress on a sub-item does not raise the grade while the FAILs stand.
+- **business-case B:** the highest-ARPA lever (team/B2B2C seat tier) is now genuinely user-reachable
+  end-to-end (web admin surface `web/app/app/team/page.tsx` #356 + `/pricing` Team band #363 + live
+  Stripe-test seat coverage #383) — but no per-seat price is published (`STRIPE_PRICE_TEAM_ANNUAL`
+  owner-unset → checkout 503), B2B demand un-validated, `arr_base`→57500 < $100K, `floor_met_year1=false`,
+  ZERO ARR credited. An honest below-floor pre-launch number cannot be graded above B.
+
+**New named nit surfaced this run (holds artifact-integrity at A, off A+):** #384 `ROUTE_INVENTORY.md`
+asserts "a COMPLETE map: every route in asgi.py" but omits ≥4 real, tested routes (`/api/ai-consent`,
+`/api/report`, `/api/referrals/me`, `/api/waitlist/confirm`). The endpoints + their proving tests all
+exist and pass, so this is a doc-completeness overclaim, not a fabricated tick — correctable in one edit.
+
+**Issues:** #93 (store-readiness, still C) + #92 (business-case, still B) updated with this audit's fresh
+evidence, not duplicated. No new ship-critical issue filed (no ship-critical dim newly below A —
+functional-reality went UP; the performance A+→A drop is a non-critical dim still ≥B). The artifact-integrity
+doc-lag and the performance finding are recorded here + in the scorecard top_gaps as A→A+ / non-critical
+drive-work for the factory, not as ship-critical issues.
