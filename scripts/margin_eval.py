@@ -191,9 +191,19 @@ class _RetagMeter:
         return None
 
 
+# Margin's ingest accepts only these provenance labels; anything else was silently
+# DROPPED (the None-outcome bug) and is now coerced to judge_proxy. Emit the HONEST
+# label per grader, and guard against drift so a bad label fails loudly HERE instead
+# of quietly downgrading at ingest.
+_ACCEPTED_QUALITY_METHODS = {"ground_truth", "llm_judge", "judge_proxy", "self_report"}
+
+
 def _emit_outcome(meter, workflow_id, run_id, passed, quality_score, method, res, case_id):
     if meter is None:
         return
+    assert method is None or method in _ACCEPTED_QUALITY_METHODS, (
+        f"quality_method {method!r} is not one of {sorted(_ACCEPTED_QUALITY_METHODS)} "
+        "— it would be dropped/coerced at Margin ingest; use an honest allowed label")
     try:
         r = meter.record_outcome(workflow_id=workflow_id, passed=passed,
                                  quality_score=round(quality_score, 4),
@@ -240,7 +250,7 @@ def run_one_fit(ctx, case, meter, run_id, use_embeddings):
     passed, landed = grade(case["expected_band"], score, bands)
     res = CaseResult(case["id"], case["expected_band"], score, passed, landed,
                      input_tokens=input_tokens, latency_ms=latency_ms)
-    _emit_outcome(meter, FIT_WORKFLOW_ID, run_id, passed, score / 100.0, "eval-band-grader",
+    _emit_outcome(meter, FIT_WORKFLOW_ID, run_id, passed, score / 100.0, "ground_truth",
                   res, case["id"])
     return res
 
@@ -279,14 +289,14 @@ def run_one_mock(ctx, case, meter, run_id, use_llm):  # pragma: no cover - live-
         res = CaseResult(case["id"], case["expected_band"], 0.0, False, errored=True)
         res.input_tokens = sum(t for t, _ in sink)
         res.call_emitted = any(ok for _, ok in sink)
-        _emit_outcome(meter, MOCK_WORKFLOW_ID, run_id, False, 0.0, "eval-error", res, case["id"])
+        _emit_outcome(meter, MOCK_WORKFLOW_ID, run_id, False, 0.0, None, res, case["id"])
         return res
     passed, landed = grade(case["expected_band"], overall, MOCK_BANDS)
     res = CaseResult(case["id"], case["expected_band"], overall, passed, landed)
     res.input_tokens = sum(t for t, _ in sink)
     res.call_emitted = any(ok for _, ok in sink)
     _emit_outcome(meter, MOCK_WORKFLOW_ID, run_id, passed, overall / 100.0,
-                  "eval-answer-score", res, case["id"])
+                  "ground_truth", res, case["id"])
     return res
 
 
@@ -320,7 +330,7 @@ def run_one_cover(ctx, case, meter, run_id, use_llm):  # pragma: no cover - live
         res = CaseResult(case["id"], case.get("expected_band", "valid"), 0.0, False, errored=True)
         res.input_tokens = sum(t for t, _ in sink)
         res.call_emitted = any(ok for _, ok in sink)
-        _emit_outcome(meter, COVER_WORKFLOW_ID, run_id, False, 0.0, "eval-error", res, case["id"])
+        _emit_outcome(meter, COVER_WORKFLOW_ID, run_id, False, 0.0, None, res, case["id"])
         return res
     passed, quality, reasons = grade_cover_letter(text, case)
     res = CaseResult(case["id"], case.get("expected_band", "valid"), quality * 100, passed)
@@ -328,7 +338,7 @@ def run_one_cover(ctx, case, meter, run_id, use_llm):  # pragma: no cover - live
     res.call_emitted = any(ok for _, ok in sink)
     if not passed:
         print(f"  [grade] cover {case['id']} FAILED: {reasons}", file=sys.stderr)
-    _emit_outcome(meter, COVER_WORKFLOW_ID, run_id, passed, quality, "eval-structural", res, case["id"])
+    _emit_outcome(meter, COVER_WORKFLOW_ID, run_id, passed, quality, "judge_proxy", res, case["id"])
     return res
 
 

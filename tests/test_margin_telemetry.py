@@ -87,7 +87,8 @@ def test_record_fit_outcome_passes_outcome():
     kwargs = fake.record_outcome.call_args.kwargs
     assert kwargs["passed"] is True
     assert kwargs["quality_score"] == 0.82  # score/100, rounded
-    assert kwargs["quality_method"] == "heuristic"
+    # Honest Margin provenance: a deterministic proxy score (not ground_truth/llm_judge).
+    assert kwargs["quality_method"] == "judge_proxy"
 
 
 def test_record_fit_outcome_swallows_meter_error():

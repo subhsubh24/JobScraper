@@ -25,7 +25,9 @@ def _record_fit_outcome(score):  # pragma: no cover - outcome telemetry; never a
             workflow_id="jobscraper-fit-scoring",
             passed=(score is not None),
             quality_score=round(score / 100, 4),
-            quality_method="heuristic",
+            # Deterministic embeddings+heuristics fit score (no ground truth / no LLM
+            # judge in production) → judge_proxy is the honest Margin provenance label.
+            quality_method="judge_proxy",
         )
     except Exception:
         pass
