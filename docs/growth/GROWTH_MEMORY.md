@@ -6,6 +6,64 @@ pre-launch.
 
 ---
 
+### 2026-07-13 — Daily GTM review (QUALITY_SCORECARD 7th-audit reconcile; site-gate circuit-breaker escalation; business-case as_of freshness fix)
+- **Observed:** Phase still `pre_launch`. Re-verified `ListConnectors` (only Gmail/Drive/
+  Calendar, no analytics/billing/ESP MCP) and shell env (no `PROD_URL`/`ANALYTICS_READ_TOKEN`)
+  — `channels_connected: []` stays honest. Re-ran `analysis/gtm_engine_pct.py` (unchanged, 50)
+  and `node scripts/validate-computation.mjs` (4/4 figures PASS, none changed). The independent
+  **QUALITY_SCORECARD re-graded the SAME DAY** (7th audit, commit `6d3b905`/#387): overall stays
+  **B**, `ship_gate_met` stays **false**, but real dimensional movement — **functional-reality
+  recovered A→A+** (the pinned `gemini-2.5-flash` default flagged at the 2026-07-11 GTM read is
+  confirmed resolved: #379 moved it to the floating alias `gemini-flash-latest`, and the auditor
+  independently re-probed the live Gemini endpoint), while **performance moved A+→A** on a
+  genuine NEW finding (the Margin cost-telemetry shipped this window, #368/#369/#382, emits
+  synchronously/blocking on the LLM hot path — bounded, fail-safe, non-ship-critical). Exactly
+  two ship-critical dims remain open: **store-readiness (C, unchanged** — store screenshots +
+  bespoke icon + mobile IAP client all still absent) and **business-case-strength (B, up from
+  C** — the team/B2B2C seat tier is now genuinely user-reachable end-to-end via #356 (web admin
+  surface) + #363 (`/pricing` Team band) + #383 (live Stripe-test seat coverage), but still no
+  live per-seat price (`STRIPE_PRICE_TEAM_ANNUAL` owner-unset) and no validated B2B adoption, so
+  `floor_met_year1` stays honestly false). None of this is self-certifiable by this loop — read
+  fresh, consumed as-is. **GTM_SCORECARD unchanged**, still `as_of: 2026-07-09`, A,
+  `ship_gate_met: true` — this is now the **3rd consecutive GTM read** (2026-07-09, 07-11, 07-13)
+  without a fresh grade; noted, not treated as a stall since GTM's own ship-gate is unaffected.
+- **Concluded:** No real funnel/PMF data justifies a ROADMAP/BUSINESS_CASE ARR/VISION steer this
+  run (same reasoning as every prior pre-launch read — 0 users, 0 funnel data). The
+  `BUSINESS_CASE.md` `as_of` fix is a reconciliation of this loop's own stale metadata, not a
+  new steer or number change.
+- **Did (real, in-repo, no channel/steer needed):** Fixed the `docs/BUSINESS_CASE.md` `as_of`
+  staleness the independent GTM Auditor has flagged as a cosmetic nit across at least two prior
+  audits (2026-07-09's `business_case_honesty` A+ note and `artifact_freshness` A note both cite
+  "summary `as_of:2026-07-01` lags the doc"). Re-verified all 3 ARR figures are still
+  code-computed and unchanged (`validate-computation.mjs` PASS) before bumping `as_of` to
+  2026-07-13 — no ARR number or `floor_met_year1` changed. Refreshed `GROWTH_STATUS.md`
+  (`as_of`, validation block reconciled against the fresh QUALITY_SCORECARD read, a new
+  learnings entry, `next_actions`/`owner_blockers` updated). **Circuit-breaker escalation:** the
+  site-gate owner DECISION (`PENDING_OPS.md` `site-gate`, `ROADMAP.md:421-435`) has now gone 3
+  consecutive GTM reads (2026-07-09 reframe, 07-11, 07-13) with zero owner movement — re-verified
+  `PENDING_OPS.md` still shows `as_of: 2026-07-04`, `status: open`, unchanged since the reframe.
+  Flagged prominently in `owner_blockers` per the GTM_STANDARD brakes/circuit-breaker discipline
+  rather than silently re-asking the same question a 4th time. Independent reviewer (maker!=
+  checker, fresh subagent) reviewed the `BUSINESS_CASE.md` fix + `GROWTH_STATUS.md` update
+  together: verified every factual claim in the diff against the live repo state (re-ran
+  `gtm_engine_pct.py` and `validate-computation.mjs` itself, read both scorecards + PENDING_OPS +
+  GROWTH_MEMORY dates) — APPROVED, with one process note (this `GROWTH_MEMORY.md` entry was
+  missing at review time; added after review to close the gap).
+- **Recommended (to factory):** Unchanged priority — store-readiness (store screenshots +
+  bespoke icon + mobile IAP client) and business-case-strength (a live per-seat price +
+  real B2B adoption data) are the two remaining ship-critical gaps, both product-factory/owner
+  work. Zero outreach drafts this run (correct): `QUALITY_SCORECARD.ship_gate_met` is still
+  false. Demand_signal cadence checked: last run 2026-07-03 (10 days), ~quarterly refresh not
+  due until ~October.
+- **Meta / operational note:** Site-gate circuit breaker is now ACTIVE (3 consecutive quiet
+  reads since the 07-09 reframe). Unlike the pre-07-09 pattern (asking the owner to flip a
+  no-op env var for 5 straight reads), this ask is confirmed current and correct — it is a
+  genuine binary decision (A: reinstate the gate, B: drop the gated-beta track) sitting with the
+  owner, not a stale premise. Watching for either the owner's decision or a 4th consecutive
+  quiet read, whichever comes first.
+
+---
+
 ### 2026-06-27 — Bootstrap
 - **Observed:** No funnel exists. 0 visitors, 0 signups, 0 subscribers. No channels
   connected. (Insufficient data for any inference.)

@@ -159,5 +159,5 @@ BUSINESS_CASE_SUMMARY:
   floor_usd: 100000
   floor_met_year1: false
   time_to_floor: unknown_pre_launch
-  as_of: 2026-07-01
+  as_of: 2026-07-13
 ```
