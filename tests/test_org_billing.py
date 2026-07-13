@@ -179,6 +179,57 @@ def test_signed_subscription_event_activates_seats(client, monkeypatch, db_sessi
     assert row.stripe_subscription_id is not None
 
 
+def test_async_payment_persists_ids_and_activates_even_if_later_metadata_is_dropped(
+    client, monkeypatch, db_session
+):
+    """Async (bank transfer/SEPA) org checkout: the UNPAID completion grants nothing but must
+    persist the customer/subscription ids so the org can still activate from the later
+    ``customer.subscription.*`` event even if THAT event's ``org_id`` metadata is dropped.
+
+    Without persisting the ids on the unpaid completion, the only map back to the org is the
+    stamped metadata; if Stripe drops it on the activation event the org would never activate —
+    a paying customer charged with zero usable seats, stuck forever. This pins the defense.
+    """
+    monkeypatch.setenv("STRIPE_WEBHOOK_SECRET", WHSEC)
+    _, token = _register(client, "async@example.com")
+    org = client.post("/api/org", json={"name": "Team Async"}, headers=_auth(token)).json()
+
+    # 1) Async payment completes UNPAID: ids persisted, but NO grant yet.
+    unpaid = _event(
+        "checkout.session.completed",
+        {
+            "metadata": {"org_id": org["id"], "plan": "team_annual", "seats": "3"},
+            "customer": "cus_async1",
+            "subscription": "sub_async1",
+            "payment_status": "unpaid",
+        },
+    )
+    assert _post_event(client, unpaid).status_code == 200
+    db_session.expire_all()
+    row = db_session.query(Organization).filter(Organization.id == org["id"]).first()
+    assert row.stripe_customer_id == "cus_async1"
+    assert row.stripe_subscription_id == "sub_async1"
+    assert row.status != "active" and (row.seats_purchased or 0) == 0  # granted NOTHING yet
+
+    # 2) Payment clears; the activation event arrives with its org_id metadata DROPPED. The org
+    #    is still found via the id we stored in step 1, and now activates.
+    activate = _event(
+        "customer.subscription.created",
+        {
+            "id": "sub_async1",
+            "customer": "cus_async1",
+            "status": "active",
+            "metadata": {},  # org_id dropped — forces the stored-id fallback
+            "items": {"data": [{"quantity": 3}]},
+        },
+    )
+    assert _post_event(client, activate).status_code == 200
+    db_session.expire_all()
+    row = db_session.query(Organization).filter(Organization.id == org["id"]).first()
+    assert row.status == "active"
+    assert row.seats_purchased == 3
+
+
 def test_forged_webhook_grants_no_seats(client, monkeypatch, db_session):
     monkeypatch.setenv("STRIPE_WEBHOOK_SECRET", WHSEC)
     _, token = _register(client, "o7@example.com")

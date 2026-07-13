@@ -391,8 +391,18 @@ def apply_event(event, db: Session) -> Optional[str]:
         org = _org_for_event_obj(db, obj)
         if not org:
             return None
-        # Async payment methods complete unpaid — do not grant until the subscription is active.
+        # Async payment methods (bank transfer / SEPA / ACH) complete UNPAID: the subscription
+        # exists in `incomplete` status but seats are NOT granted until it activates. Still
+        # PERSIST the customer/subscription ids now — defense in depth for the later
+        # `customer.subscription.*` activation event. The primary map back to this org is by the
+        # stamped `org_id` metadata (_org_for_event_obj, line ~340), but if that metadata is ever
+        # dropped on the subscription event the ONLY fallback is a customer/subscription id we
+        # already stored; without this the async-payment org could never activate (paid customer,
+        # zero usable seats, stuck). Grant NOTHING yet — status/seats stay untouched.
         if obj.get("payment_status") not in (None, "paid", "no_payment_required"):
+            org.stripe_customer_id = obj.get("customer") or org.stripe_customer_id
+            org.stripe_subscription_id = obj.get("subscription") or org.stripe_subscription_id
+            db.flush()
             return org.id
         org.stripe_customer_id = obj.get("customer") or org.stripe_customer_id
         org.stripe_subscription_id = obj.get("subscription") or org.stripe_subscription_id
