@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from src.ai_coach.moderation import ContentModerator
 from src.db.models import JobPosting, PrepArtifact, User
-from src.llm import get_llm_client, chat_model, resilient_chat_completion
+from src.llm import get_llm_client, chat_model, resilient_chat_completion, journey_session_id
 
 logger = logging.getLogger("career_operator.llm_workflows")
 
@@ -103,8 +103,13 @@ class LLMWorkflows:
             + "\n"
         )
 
-    def _call_llm(self, system_prompt: str, user_prompt: str, json_mode: bool = False) -> str:
-        """Make a call to the LLM."""
+    def _call_llm(self, system_prompt: str, user_prompt: str, json_mode: bool = False,
+                  operation: str = None, session_id: str = None) -> str:
+        """Make a call to the LLM.
+
+        ``operation`` is the Margin node label for this specific call and ``session_id`` links
+        it into the job's journey chain — pure telemetry, both optional, never affect the call.
+        """
         if self.client is None:
             raise RuntimeError("GEMINI_API_KEY not configured")
         kwargs = {
@@ -122,7 +127,9 @@ class LLMWorkflows:
 
         # Route through the resilient wrapper so a decommissioned primary model transparently
         # falls back to a live one instead of 502-ing the whole paid AI surface (src/llm.py).
-        response = resilient_chat_completion(self.client, **kwargs)
+        response = resilient_chat_completion(
+            self.client, operation=operation, session_id=session_id, **kwargs
+        )
         try:
             content = response.choices[0].message.content
         except (IndexError, AttributeError):
@@ -152,7 +159,8 @@ class LLMWorkflows:
                 raise ModeratedContentError(verdict.safe_response or "")
         return content
 
-    def _refine(self, draft: str, kind: str, source_context: str) -> str:
+    def _refine(self, draft: str, kind: str, source_context: str,
+                operation: str = None, session_id: str = None) -> str:
         """Product-side maker≠checker: run ONE independent review-and-revise on a drafted artifact.
 
         The reviewer sees the SAME grounding context the drafter saw (so it can catch a fabricated
@@ -175,7 +183,8 @@ class LLMWorkflows:
             f"Return only the improved {kind}."
         )
         try:
-            improved = self._call_llm(system_prompt, user_prompt)
+            improved = self._call_llm(system_prompt, user_prompt,
+                                      operation=operation, session_id=session_id)
         except Exception:
             # Fail SAFE: the draft is already a valid, moderated artifact. A refinement failure
             # (provider error / empty / moderator-flagged refinement) must never degrade it.
@@ -213,7 +222,9 @@ Requirements:
 {job.requirements or 'N/A'}
 """
 
-        result = self._call_llm(system_prompt, user_prompt, json_mode=True)
+        result = self._call_llm(system_prompt, user_prompt, json_mode=True,
+                                operation="jobscraper-jd-parse",
+                                session_id=journey_session_id(job.id))
         return json.loads(result)
 
     def generate_prep_pack(self, job: JobPosting, user: User) -> PrepArtifact:
@@ -269,8 +280,11 @@ Create a prep pack with these sections:
 - Last-minute reminders
 """
 
-        content = self._call_llm(system_prompt, user_prompt)
-        content = self._refine(content, "interview prep pack", user_prompt)
+        _session = journey_session_id(job.id)
+        content = self._call_llm(system_prompt, user_prompt,
+                                 operation="jobscraper-prep-pack", session_id=_session)
+        content = self._refine(content, "interview prep pack", user_prompt,
+                               operation="jobscraper-prep-pack-refine", session_id=_session)
 
         # Save as artifact
         artifact = PrepArtifact(
@@ -303,8 +317,11 @@ For each day, include:
 - Specific topics, resources, and practice problems
 """
 
-        content = self._call_llm(system_prompt, user_prompt)
-        content = self._refine(content, "study plan", user_prompt)
+        _session = journey_session_id(job.id)
+        content = self._call_llm(system_prompt, user_prompt,
+                                 operation="jobscraper-study-plan", session_id=_session)
+        content = self._refine(content, "study plan", user_prompt,
+                               operation="jobscraper-study-plan-refine", session_id=_session)
 
         artifact = PrepArtifact(
             job_id=job.id,
@@ -338,8 +355,11 @@ Name: {user.full_name or 'Candidate'}
 Resume: {user.resume_text or 'Experienced professional'}
 {self._enriched_context(user)}"""
 
-        content = self._call_llm(system_prompt, user_prompt)
-        content = self._refine(content, "cover letter", user_prompt)
+        _session = journey_session_id(job.id)
+        content = self._call_llm(system_prompt, user_prompt,
+                                 operation="jobscraper-cover-letter", session_id=_session)
+        content = self._refine(content, "cover letter", user_prompt,
+                               operation="jobscraper-cover-letter-refine", session_id=_session)
 
         artifact = PrepArtifact(
             job_id=job.id,
@@ -400,8 +420,11 @@ and skills that match this role; mirror the posting's terminology where it is ge
 never invent anything.
 """
 
-        content = self._call_llm(system_prompt, user_prompt)
-        content = self._refine(content, "tailored résumé", user_prompt)
+        _session = journey_session_id(job.id)
+        content = self._call_llm(system_prompt, user_prompt,
+                                 operation="jobscraper-tailored-resume", session_id=_session)
+        content = self._refine(content, "tailored résumé", user_prompt,
+                               operation="jobscraper-tailored-resume-refine", session_id=_session)
 
         artifact = PrepArtifact(
             job_id=job.id,
@@ -459,8 +482,12 @@ Their top recurring skill gaps, most-demanded first: {skills}.
 
 Write the prioritised learning plan following the RULES."""
 
-        content = self._call_llm(system_prompt, user_prompt)
-        return self._refine(content, "learning plan", user_prompt)
+        # Cross-pipeline (spans ALL the user's jobs, no single job_id) → left unlinked (session
+        # None) rather than mis-attributed to one job's chain; still its own operation node.
+        content = self._call_llm(system_prompt, user_prompt,
+                                 operation="jobscraper-learning-plan")
+        return self._refine(content, "learning plan", user_prompt,
+                            operation="jobscraper-learning-plan-refine")
 
     def generate_salary_negotiation(self, job: JobPosting, target_salary: int) -> PrepArtifact:
         """Generate salary negotiation scripts and strategies."""
@@ -483,8 +510,11 @@ Include:
 6. Final acceptance script
 """
 
-        content = self._call_llm(system_prompt, user_prompt)
-        content = self._refine(content, "salary negotiation guide", user_prompt)
+        _session = journey_session_id(job.id)
+        content = self._call_llm(system_prompt, user_prompt,
+                                 operation="jobscraper-salary-negotiation", session_id=_session)
+        content = self._refine(content, "salary negotiation guide", user_prompt,
+                               operation="jobscraper-salary-negotiation-refine", session_id=_session)
 
         artifact = PrepArtifact(
             job_id=job.id,
@@ -564,7 +594,9 @@ Requirements: {job.requirements or 'N/A'}
 
 Return the JSON object with exactly {num_questions} questions."""
 
-        raw = self._call_llm(system_prompt, user_prompt, json_mode=True)
+        raw = self._call_llm(system_prompt, user_prompt, json_mode=True,
+                             operation="jobscraper-mock-interview-questions",
+                             session_id=journey_session_id(job.id))
         try:
             parsed = json.loads(raw)
         except (ValueError, TypeError):
@@ -639,7 +671,9 @@ CANDIDATE'S ANSWER:
 
 Score the answer and return the JSON object."""
 
-        raw = self._call_llm(system_prompt, user_prompt, json_mode=True)
+        raw = self._call_llm(system_prompt, user_prompt, json_mode=True,
+                             operation="jobscraper-mock-interview-scoring",
+                             session_id=journey_session_id(job.id))
         try:
             parsed = json.loads(raw)
         except (ValueError, TypeError):
