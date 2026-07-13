@@ -76,7 +76,12 @@ def _seed_bucket(engine, user_id, bucket):
 
 
 @pytest.mark.parametrize("method,path,bucket,body", MIGRATED_ENDPOINTS)
-def test_migrated_endpoint_is_per_user_not_per_ip(client, _engine, method, path, bucket, body):
+def test_migrated_endpoint_is_per_user_not_per_ip(client, _engine, method, path, bucket, body, monkeypatch):
+    # Freeze `time.time` so `_seed_bucket`'s window key and the request's own
+    # `_consume_counter` window key (`int(time.time() // 60)`) always match — a 60s boundary
+    # between the seed and the call otherwise sends A to a fresh, unseeded window (200, not
+    # 429). Fixed-window boundary flake class, fixed across the suite 2026-07-13.
+    monkeypatch.setattr(time, "time", lambda: 1_700_000_000.0)
     token_a = _register(client, "pu-a@example.com")
     token_b = _register(client, "pu-b@example.com")
     uid_a = _uid(sessionmaker(bind=_engine)(), "pu-a@example.com")
@@ -92,9 +97,12 @@ def test_migrated_endpoint_is_per_user_not_per_ip(client, _engine, method, path,
     assert rb.status_code != 429, f"{method} {path}: user B wrongly throttled off user A's tally ({rb.status_code})"
 
 
-def test_coach_suggestions_round_trip_via_real_consume_counter(client, db_session):
+def test_coach_suggestions_round_trip_via_real_consume_counter(client, db_session, monkeypatch):
     """A full HTTP round-trip that exhausts the budget through the REAL _consume_counter path
     (not a seeded row): A is 429, B on the same IP gets a real 200 with suggestions."""
+    # Freeze time so the 30 seeding consume-calls and the two HTTP requests all share ONE
+    # window; a boundary crossing mid-loop otherwise resets the count and A never reaches 30.
+    monkeypatch.setattr(time, "time", lambda: 1_700_000_000.0)
     token_a = _register(client, "rt-a@example.com")
     token_b = _register(client, "rt-b@example.com")
     uid_a = _uid(db_session, "rt-a@example.com")

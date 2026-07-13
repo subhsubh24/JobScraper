@@ -63,7 +63,12 @@ def _max_out_read_window(engine, user_id):
     session.close()
 
 
-def test_authed_reads_are_rate_limited_per_user(client, _engine):
+def test_authed_reads_are_rate_limited_per_user(client, _engine, monkeypatch):
+    # Freeze `time.time` so the seeded window (below) and the request's own
+    # `_consume_counter` window key (`int(time.time() // 60)`) always match — a 60s boundary
+    # falling between the seed and the call otherwise sends the request to a fresh, unseeded
+    # window (200, not 429). Same fixed-window flake class fixed across the suite 2026-07-13.
+    monkeypatch.setattr(time, "time", lambda: 1_700_000_000.0)
     reg = _register(client, "reader@example.com")
     # Seed the window to its limit BEFORE any real call, so the very next request to each read
     # endpoint 429s — including job detail, where the limiter fires before the 404 lookup
@@ -74,10 +79,13 @@ def test_authed_reads_are_rate_limited_per_user(client, _engine):
         assert r.status_code == 429, f"{path} was not rate-limited: {r.status_code} {r.text}"
 
 
-def test_reads_permit_normal_use_and_key_by_user_not_ip(client, _engine):
+def test_reads_permit_normal_use_and_key_by_user_not_ip(client, _engine, monkeypatch):
     """The point of per-USER keying: a second user on the SAME client/IP is unaffected when the
     first user's window is exhausted (an IP-keyed limit would wrongly 429 them) — and normal
     single-call use of every read endpoint stays well under the ceiling."""
+    # Freeze time so the seeded window and each request's window key match (see the sibling
+    # test above) — deterministic against the 60s fixed-window boundary flake.
+    monkeypatch.setattr(time, "time", lambda: 1_700_000_000.0)
     a = _register(client, "usera@example.com")
     b = _register(client, "userb@example.com")
     _max_out_read_window(_engine, a["user"]["id"])

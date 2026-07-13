@@ -4,6 +4,7 @@ Proves the real side-effect (a persisted, moderator-reviewable row), the input b
 (constrained category + bounded free-text), auth + rate-limit protection, and that the
 account-deletion cascade purges reports (store/GDPR: no orphaned user-owned rows).
 """
+import asgi
 from src.db.models import ContentReport, User
 
 
@@ -107,16 +108,26 @@ def test_report_rejects_overlong_free_text(client):
         assert r.status_code == 422, f"{field} should be rejected"
 
 
-def test_report_is_rate_limited(client):
-    """The 'report' bucket (20/window) throttles a flood so it can't spam the table."""
+def test_report_is_rate_limited(client, monkeypatch):
+    """The 'report' bucket (20/window) throttles a flood so it can't spam the table.
+
+    Determinism: the limiter uses a fixed 60s window (`window_key = int(time.time() //
+    window_seconds)`, asgi.py `_consume_counter`). Sending 22 requests across real
+    wall-clock time occasionally straddles a window boundary, splitting the burst across
+    two windows so neither side reaches the limit and NO 429 appears (~a few % flake that
+    reddened CI on 2026-07-13). Freeze `time.time` so all 22 hits share ONE window — the
+    real burst-throttling behaviour is exercised deterministically, not the boundary.
+    """
+    monkeypatch.setattr(asgi.time, "time", lambda: 1_700_000_000.0)
     token = _register(client, "flood@example.com")
     payload = {"content_type": "coach", "reason": "other"}
     codes = [
         client.post("/api/report", headers=_auth(token), json=payload).status_code
         for _ in range(22)
     ]
-    assert 200 in codes
-    assert 429 in codes
+    # First 20 pass, the last 2 are throttled — exact, not just "a 429 appears somewhere".
+    assert codes[:20] == [200] * 20, codes
+    assert codes[20:] == [429, 429], codes
 
 
 def test_reports_purged_on_account_deletion(client, db_session):
