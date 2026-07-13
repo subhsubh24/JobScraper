@@ -17,8 +17,8 @@ def _record_fit_outcome(score):  # pragma: no cover - outcome telemetry; never a
     """Emit the finalized job-fit score to Margin as an outcome. Fail-safe: errors swallowed.
 
     BLOCKING by design: on Vercel serverless the function is frozen once the handler returns,
-    which would kill a fire-and-forget thread before its POST lands. The meter's 2.0s timeout
-    bounds the worst case.
+    which would kill a fire-and-forget thread before its POST lands. The meter's per-call
+    timeout (MARGIN_INGEST_TIMEOUT_SECONDS, default 1.0s — src/llm.py) bounds the worst case.
     """
     if not _meter:
         return

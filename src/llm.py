@@ -10,6 +10,7 @@ scoring falls back to heuristics, and LLM features return a truthful "needs
 configuration" response instead of crashing. This module is the single place that
 decides whether the LLM is available and which models to use.
 """
+import math
 import os
 import time
 from typing import Optional
@@ -21,7 +22,31 @@ try:
     from margin_meter import MarginMeter
 except Exception:  # pragma: no cover - SDK optional; import must never break the host
     MarginMeter = None
-_meter = MarginMeter(timeout=2.0) if MarginMeter else None  # pragma: no cover
+
+
+def _margin_ingest_timeout() -> float:
+    """Seconds bounding a SINGLE Margin telemetry POST (env: MARGIN_INGEST_TIMEOUT_SECONDS).
+
+    The emit is BLOCKING on the LLM hot path by design (Vercel freezes post-response threads,
+    so a fire-and-forget POST would be killed mid-flight, #369). That makes the per-call timeout
+    the hard bound on how much a slow/degraded Margin ingest can inflate user-facing p99 — and
+    it STACKS per LLM call in multi-call workflows. Kept SHORT (default 1.0s, was a hardcoded
+    2.0s) so a degraded ingest can never add multiple seconds to a paid AI request; env-tunable
+    so ops can tighten it further without a deploy. Clamped to [0.1s, 5.0s]: a too-small value
+    would drop most emits, and a huge / `inf` / `nan` value (all of which `float()` accepts
+    without raising) would re-open the very unbounded-tail hole this exists to close. A malformed
+    (non-numeric) value falls back to the default rather than crashing the host on import.
+    """
+    try:
+        raw = float(os.getenv("MARGIN_INGEST_TIMEOUT_SECONDS", "1.0"))
+    except (TypeError, ValueError):
+        return 1.0
+    if not math.isfinite(raw):  # inf / -inf / nan are valid floats but must not bound the hot path
+        return 1.0
+    return max(0.1, min(5.0, raw))
+
+
+_meter = MarginMeter(timeout=_margin_ingest_timeout()) if MarginMeter else None  # pragma: no cover
 
 
 # Default Margin operation label (workflow_id) for a call site that does not name one, so
@@ -57,7 +82,8 @@ def _emit_call_metrics(  # pragma: no cover - telemetry, must never affect the c
 
     BLOCKING by design: on Vercel serverless the function is frozen the instant the handler
     returns, which would kill a fire-and-forget thread before its POST lands. The meter's own
-    2.0s timeout bounds the worst case, negligible next to the multi-second LLM call.
+    per-call timeout (MARGIN_INGEST_TIMEOUT_SECONDS, default 1.0s — see _margin_ingest_timeout)
+    bounds the worst case; kept short so a degraded ingest can't inflate a paid request's tail.
     """
     if not _meter:
         return
