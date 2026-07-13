@@ -57,18 +57,23 @@ def _emit_call_metrics(resp, model, elapsed, status):  # pragma: no cover - tele
 GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
 
 # Model names are env-overridable so they can be changed without a code deploy.
-_DEFAULT_CHAT_MODEL = "gemini-2.5-flash"
+# The DEFAULT primary chat model is the FLOATING alias `gemini-flash-latest`, NOT a pinned
+# `gemini-X.Y-flash`. A pinned model can be DECOMMISSIONED by Google at any time — on 2026-07-09
+# the then-pinned default (`gemini-2.5-flash`) returned a hard 404 and 502'd the ENTIRE monetized
+# AI surface (a ship-critical incident, QUALITY_SCORECARD functional-reality D). The floating alias
+# rolls forward to the current GA flash model, so the HOT path can't be version-decommissioned out
+# from under us — removing the last pinned single-point-of-failure (the fallback below already
+# covers a re-decommission, but the primary call should not be the thing that dies first).
+# Env-overridable via GEMINI_MODEL.
+_DEFAULT_CHAT_MODEL = "gemini-flash-latest"
 _DEFAULT_EMBEDDING_MODEL = "gemini-embedding-001"
 
 # Curated, verified-live fallback chat models (probed against the REAL Gemini endpoint
-# 2026-07-09: all returned 200). A PINNED model can be DECOMMISSIONED by Google at any time
-# — e.g. `gemini-2.0-flash` now returns 404 "no longer available" — and without a fallback a
-# single upstream model death 502s the ENTIRE monetized AI surface (mock interview, coach,
-# prep pack, cover letter, tailored résumé, salary negotiation, learning plan). The primary
-# fallback is `gemini-flash-latest`: a FLOATING alias Google rolls forward to the current GA
-# flash model, so it cannot be version-decommissioned the way a pinned `gemini-X.Y-flash` can.
-# Env-overridable (comma-separated) so ops can adjust without a code deploy.
-_DEFAULT_FALLBACK_CHAT_MODELS = ("gemini-flash-latest", "gemini-2.5-flash-lite")
+# 2026-07-09/07-11: all returned 200), tried in order ONLY on a model-not-found (404). With the
+# floating alias as the primary, these are two CONCRETE alternates so the chain still degrades if
+# the alias itself ever resolves to a dead target. Env-overridable (comma-separated) via
+# GEMINI_FALLBACK_MODELS so ops can adjust without a code deploy.
+_DEFAULT_FALLBACK_CHAT_MODELS = ("gemini-2.5-flash", "gemini-2.5-flash-lite")
 
 # DEEP_DIAGNOSIS rule (a): every external/LLM call MUST time out SHORTER than the
 # serverless function budget (vercel.json maxDuration=60s) — a graceful try/except is

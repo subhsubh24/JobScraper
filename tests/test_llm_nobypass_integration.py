@@ -112,14 +112,14 @@ def _workflow_with_client(fake_client):
 
 def test_workflow_structured_path_degrades_when_primary_model_is_decommissioned(monkeypatch):
     """The structured (JSON) generation path serves the fallback instead of raising on a dead primary."""
-    monkeypatch.setattr(llm, "_DEFAULT_FALLBACK_CHAT_MODELS", ("gemini-flash-latest",))
+    monkeypatch.setattr(llm, "_DEFAULT_FALLBACK_CHAT_MODELS", ("gemini-2.5-flash",))
     fake = _DeadPrimaryClient(dead_models={LLMWorkflows.MODEL}, reply='{"ok": true}')
     wf = _workflow_with_client(fake)
 
     content = wf._call_llm("system", "user", json_mode=True)
 
     assert content == '{"ok": true}'  # transparently served, not a 502
-    assert fake.attempts == [LLMWorkflows.MODEL, "gemini-flash-latest"]  # primary tried, then fell back
+    assert fake.attempts == [LLMWorkflows.MODEL, "gemini-2.5-flash"]  # primary tried, then fell back
 
 
 def test_workflow_prose_path_degrades_when_primary_model_is_decommissioned(monkeypatch):
@@ -128,7 +128,7 @@ def test_workflow_prose_path_degrades_when_primary_model_is_decommissioned(monke
     Benign fallback content passes the conservative output moderator, so the only thing exercised
     is the model-death fallback — proving the resilient wrapper is reached on the prose path too.
     """
-    monkeypatch.setattr(llm, "_DEFAULT_FALLBACK_CHAT_MODELS", ("gemini-flash-latest",))
+    monkeypatch.setattr(llm, "_DEFAULT_FALLBACK_CHAT_MODELS", ("gemini-2.5-flash",))
     fake = _DeadPrimaryClient(
         dead_models={LLMWorkflows.MODEL},
         reply="Here are three concrete talking points for your interview.",
@@ -138,14 +138,14 @@ def test_workflow_prose_path_degrades_when_primary_model_is_decommissioned(monke
     content = wf._call_llm("system", "user", json_mode=False)
 
     assert content == "Here are three concrete talking points for your interview."
-    assert fake.attempts == [LLMWorkflows.MODEL, "gemini-flash-latest"]
+    assert fake.attempts == [LLMWorkflows.MODEL, "gemini-2.5-flash"]
 
 
 def test_workflow_fails_loud_when_every_model_is_dead(monkeypatch):
     """If the WHOLE chain is decommissioned the workflow raises — never a fake/blank success (§6)."""
-    monkeypatch.setattr(llm, "_DEFAULT_FALLBACK_CHAT_MODELS", ("gemini-flash-latest",))
+    monkeypatch.setattr(llm, "_DEFAULT_FALLBACK_CHAT_MODELS", ("gemini-2.5-flash",))
     fake = _DeadPrimaryClient(
-        dead_models={LLMWorkflows.MODEL, "gemini-flash-latest"}, reply="unused"
+        dead_models={LLMWorkflows.MODEL, "gemini-2.5-flash"}, reply="unused"
     )
     wf = _workflow_with_client(fake)
 

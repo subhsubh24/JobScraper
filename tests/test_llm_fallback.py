@@ -113,6 +113,44 @@ def test_none_client_fails_loud():
         resilient_chat_completion(None, model="gemini-2.5-flash", messages=[])
 
 
+def test_default_primary_is_a_floating_alias_not_a_pinned_version():
+    """The DEFAULT primary model must be the floating alias, never a pinned gemini-X.Y-flash.
+
+    A pinned default is a single point of failure: on 2026-07-09 the then-pinned default
+    ``gemini-2.5-flash`` was 404'd by Google and 502'd the whole monetized AI surface
+    (QUALITY_SCORECARD functional-reality D). ``gemini-flash-latest`` is a floating alias Google
+    rolls forward, so the HOT path can't be version-decommissioned. This pins that invariant so a
+    future edit can't silently re-introduce a pinned default.
+    """
+    import re
+
+    default = llm._DEFAULT_CHAT_MODEL
+    assert default == "gemini-flash-latest"
+    assert not re.match(r"^gemini-\d", default), (
+        f"default primary {default!r} is a PINNED version — use the floating alias so an upstream "
+        "model decommission can't take out the hot path"
+    )
+    # chat_model() (used to seed LLMWorkflows.MODEL / CareerCoach.MODEL at import) resolves to it
+    # when GEMINI_MODEL is unset.
+    assert llm.chat_model() == "gemini-flash-latest"
+
+
+def test_default_fallback_chain_is_two_deep_and_excludes_the_primary_alias():
+    """Fallbacks stay a real, ≥2-deep chain of CONCRETE alternates (not the floating alias again).
+
+    With the alias as primary, listing it again as a fallback would collapse the chain to one
+    real model on an alias-death. The concrete alternates keep a genuine second line of defense.
+    """
+    fallbacks = llm._DEFAULT_FALLBACK_CHAT_MODELS
+    assert len(fallbacks) >= 2
+    assert "gemini-flash-latest" not in fallbacks
+    # resilient_chat_completion de-dupes primary from the fallbacks; assert the real attempt order.
+    client = _FakeClient(dead_models={"gemini-flash-latest", *fallbacks})
+    with pytest.raises(RuntimeError, match="All configured LLM models are unavailable"):
+        resilient_chat_completion(client, messages=[])  # no explicit model → uses the default
+    assert client.attempts == ["gemini-flash-latest", *fallbacks]
+
+
 def test_real_openai_notfounderror_is_classified():
     """Guard the isinstance branch against the ACTUAL openai SDK error type (not just status)."""
     import httpx
