@@ -124,6 +124,7 @@ class CaseResult:
     call_emitted: bool = False
     outcome_emitted: bool = False
     skipped: bool = False
+    errored: bool = False
 
 
 @dataclass
@@ -134,6 +135,7 @@ class RunSummary:
     total: int = 0
     passed: int = 0
     skipped: int = 0
+    errored: int = 0
     per_band_total: Counter = field(default_factory=Counter)
     per_band_passed: Counter = field(default_factory=Counter)
     scores: list = field(default_factory=list)
@@ -262,12 +264,23 @@ def run_one_mock(ctx, case, meter, run_id, use_llm):  # pragma: no cover - live-
     prev = llm_mod._meter
     if meter is not None:
         llm_mod._meter = _RetagMeter(meter, MOCK_WORKFLOW_ID, f"eval:{run_id}", sink)
+    overall = None
     try:
         job = _new_job(ctx["db"], case)
         result = ctx["llm"].score_mock_interview_answer(job, case["question"], case["answer"])
         overall = float(result["overall"])
+    except Exception as exc:
+        # A real Gemini error (rate limit, malformed/empty/moderated) must NOT abort the batch.
+        # The call cost was already metered; pair it with a failed outcome and move on.
+        print(f"  [error] mock case {case['id']} failed: {exc}", file=sys.stderr)
     finally:
         llm_mod._meter = prev
+    if overall is None:
+        res = CaseResult(case["id"], case["expected_band"], 0.0, False, errored=True)
+        res.input_tokens = sum(t for t, _ in sink)
+        res.call_emitted = any(ok for _, ok in sink)
+        _emit_outcome(meter, MOCK_WORKFLOW_ID, run_id, False, 0.0, "eval-error", res, case["id"])
+        return res
     passed, landed = grade(case["expected_band"], overall, MOCK_BANDS)
     res = CaseResult(case["id"], case["expected_band"], overall, passed, landed)
     res.input_tokens = sum(t for t, _ in sink)
@@ -286,6 +299,7 @@ def run_one_cover(ctx, case, meter, run_id, use_llm):  # pragma: no cover - live
     prev = llm_mod._meter
     if meter is not None:
         llm_mod._meter = _RetagMeter(meter, COVER_WORKFLOW_ID, f"eval:{run_id}", sink)
+    text = None
     try:
         db = ctx["db"]
         u = User(email=f"eval-{run_id}-{case['id']}@example.com", password_hash="x",
@@ -297,8 +311,17 @@ def run_one_cover(ctx, case, meter, run_id, use_llm):  # pragma: no cover - live
         db.flush()
         artifact = ctx["llm"].generate_cover_letter(job, u)
         text = getattr(artifact, "content", "") or ""
+    except Exception as exc:
+        # A generation error (provider/moderation) is a real FAILED outcome, not a batch-killer.
+        print(f"  [error] cover case {case['id']} failed: {exc}", file=sys.stderr)
     finally:
         llm_mod._meter = prev
+    if text is None:
+        res = CaseResult(case["id"], case.get("expected_band", "valid"), 0.0, False, errored=True)
+        res.input_tokens = sum(t for t, _ in sink)
+        res.call_emitted = any(ok for _, ok in sink)
+        _emit_outcome(meter, COVER_WORKFLOW_ID, run_id, False, 0.0, "eval-error", res, case["id"])
+        return res
     passed, quality, reasons = grade_cover_letter(text, case)
     res = CaseResult(case["id"], case.get("expected_band", "valid"), quality * 100, passed)
     res.input_tokens = sum(t for t, _ in sink)
@@ -363,13 +386,24 @@ def run_workflow(spec, meter, run_id, use_embeddings, use_llm, limit, max_llm) -
             and ctx["scorer"].client) else ("llm" if (spec.requires_llm and llm_active) else "heuristic"))
     s = RunSummary(workflow=spec.slug, run_id=run_id, mode=mode, telemetry_enabled=meter is not None)
     for case in cases:
-        if spec.requires_llm:
-            res = spec.run_one(ctx, case, meter, run_id, llm_active)
-        else:
-            res = spec.run_one(ctx, case, meter, run_id, use_embeddings)
+        try:
+            if spec.requires_llm:
+                res = spec.run_one(ctx, case, meter, run_id, llm_active)
+            else:
+                res = spec.run_one(ctx, case, meter, run_id, use_embeddings)
+        except Exception as exc:  # backstop — one bad case never aborts the batch
+            print(f"  [error] {spec.slug} case {case.get('id')} crashed: {exc}", file=sys.stderr)
+            s.total += 1
+            s.errored += 1
+            continue
         s.total += 1
         if res.skipped:
             s.skipped += 1
+            continue
+        if res.errored:
+            s.errored += 1
+            s.calls_emitted += int(res.call_emitted)
+            s.outcomes_emitted += int(res.outcome_emitted)
             continue
         s.per_band_total[res.expected_band] += 1
         if res.passed:
@@ -383,12 +417,14 @@ def run_workflow(spec, meter, run_id, use_embeddings, use_llm, limit, max_llm) -
 
 
 def _print_summary(s: RunSummary):
-    graded = s.total - s.skipped
+    graded = s.total - s.skipped - s.errored
     print("")
     print(f"== margin_eval — {s.workflow} (id={WORKFLOWS[s.workflow].workflow_id}) ==")
     print(f"run_id={s.run_id}  mode={s.mode}  session=eval:{s.run_id}")
     if s.skipped:
         print(f"SKIPPED {s.skipped}/{s.total} (LLM-only workflow, no GEMINI_API_KEY)")
+    if s.errored:
+        print(f"ERRORED {s.errored}/{s.total} (LLM/provider failure -> failed outcome emitted, batch continued)")
     if graded:
         print(f"graded={graded}  passed={s.passed}  accuracy={s.passed / graded * 100:.1f}%")
         for band in ("strong", "partial", "weak", "mismatch", "valid"):
@@ -430,9 +466,12 @@ def main(argv=None):
 
     for slug in slugs:
         spec = WORKFLOWS[slug]
-        s = run_workflow(spec, meter, run_id, args.embeddings, use_llm,
-                         args.limit, args.max_llm_cases)
-        _print_summary(s)
+        try:  # one workflow's total failure must never stop the others
+            s = run_workflow(spec, meter, run_id, args.embeddings, use_llm,
+                             args.limit, args.max_llm_cases)
+            _print_summary(s)
+        except Exception as exc:
+            print(f"[error] workflow {slug} aborted: {exc}", file=sys.stderr)
     return 0
 
 
