@@ -51,7 +51,8 @@ cases**. That property is asserted in the CI test — the suite can't silently d
 always-pass.
 
 Emitted outcome fields: `workflow_id="jobscraper-fit-scoring"`, `passed=<in-band>`,
-`quality_score=<score/100>`, `quality_method="eval-band-grader"`, `session_id="eval:<run-id>"`.
+`quality_score=<score/100>`, `quality_method="ground_truth"` (the score is graded against
+each case's **labeled expected band** — Margin's honest provenance label), `session_id="eval:<run-id>"`.
 
 ## Modes
 
