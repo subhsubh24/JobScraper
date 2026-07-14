@@ -97,3 +97,49 @@ def test_score_job_local_only_never_touches_configured_client(db_session):
 
     score = scorer.score_job(job, user, use_embeddings=False)
     assert score.overall_score == 70.0
+
+
+def test_score_job_degrades_when_consented_user_has_no_resume(db_session):
+    """A CONSENTED user with no résumé yet still gets a real, bounded heuristic score.
+
+    Distinct realistic path from the erroring-client test above: consent (Apple 5.1.2(i)) is
+    NOT sequenced after résumé entry, so a user can grant AI consent and add a job before ever
+    saving a résumé. ``create_job`` then computes ``use_embeddings = llm_available() and
+    ai_consent_ok(user)`` == True (asgi.py) and calls ``score_job(..., use_embeddings=True)`` on
+    a user whose ``resume_text`` is None.
+
+    Inside ``score_job`` that hits ``ensure_user_embedding``'s "no resume text" guard
+    (scorer.py) — a ``ValueError`` raised BEFORE any provider call, a DIFFERENT origin than the
+    erroring-client case. The scorer's docstring promises "the user still gets a real, honest fit
+    score without embeddings"; this pins the no-résumé branch of that promise: the guard must be
+    caught and degraded to the neutral 0.5 semantic baseline, never escape as a crash (which would
+    silently drop the job to UNSCORED via create_job's outer catch — no fit score shown).
+
+    Load-bearing revert: hoist ``ensure_user_embedding`` out of ``score_job``'s try (or add an
+    early no-résumé raise) and only THIS test errors — the erroring-client test (non-empty
+    résumé, error INSIDE the provider call) stays green.
+    """
+    user = User(
+        email="scorer-no-resume@example.com",
+        password_hash="x",
+        tier=UserTier.FREE,
+        full_name="No Resume User",
+        resume_text=None,  # consented, but hasn't entered a résumé yet
+    )
+    db_session.add(user)
+    db_session.flush()
+    job = _job(db_session, user)
+
+    scorer = JobScorer(db_session)
+    scorer.client = _ErroringClient()  # a configured client is present, as in prod post-consent
+
+    # Embeddings ENABLED, but no résumé -> ensure_user_embedding raises -> degrade, don't crash.
+    score = scorer.score_job(job, user, use_embeddings=True)
+
+    assert isinstance(score, JobScore)
+    assert not math.isnan(score.overall_score)
+    assert 0.0 <= score.overall_score <= 100.0
+    # semantic degrades to 0.5; skills_score == 0 (empty résumé vs a JD with 3 skills):
+    # overall = (0.5*0.6 + 0.0*0.4)*100 == 30.0.
+    assert score.overall_score == 30.0
+    assert score.skills_match == 0.0
