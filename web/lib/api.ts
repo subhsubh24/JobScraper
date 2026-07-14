@@ -430,6 +430,13 @@ export const api = {
       .url;
   },
 
+  // Self-serve subscription management: opens Stripe's hosted Billing Portal where an existing
+  // subscriber upgrades/downgrades, updates their card, or cancels. Throws ApiError(503) when
+  // billing isn't live yet and ApiError(400) when there's no subscription to manage.
+  async startBillingPortal(): Promise<string> {
+    return (await request<{ url: string }>('/api/billing/portal', { method: 'POST' })).url;
+  },
+
   // Cross-pipeline skill-gap heatmap — FREE, computed locally on the server (no LLM). Returns the
   // ranked gaps + strengths across ALL the user's tracked jobs vs their résumé.
   async skillGaps(): Promise<SkillGapAnalysis> {
