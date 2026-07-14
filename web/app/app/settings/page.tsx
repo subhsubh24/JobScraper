@@ -7,6 +7,46 @@ import { AiConsentSetting } from '@/components/ai-consent';
 import { api, ApiError, type Competency, type ReferralStats } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 
+// Self-serve subscription management for an active subscriber: opens Stripe's hosted Billing
+// Portal (change plan / update card / cancel). Replaces the old "email support" dead-end. Honest
+// degradation: if the portal isn't live yet the server returns 503 and we say so — no fake success.
+function ManageSubscriptionButton() {
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  async function openPortal() {
+    setBusy(true);
+    setNotice(null);
+    try {
+      const url = await api.startBillingPortal();
+      window.location.assign(url); // hand off to Stripe's hosted portal
+    } catch (e) {
+      setNotice(
+        e instanceof ApiError && e.status === 503
+          ? 'Self-serve plan management isn’t live yet — check back soon.'
+          : 'Could not open subscription management. Please try again.',
+      );
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="mt-3">
+      <Button variant="secondary" onClick={openPortal} disabled={busy}>
+        {busy ? 'Opening…' : 'Manage subscription'}
+      </Button>
+      <p className="mt-2 text-sm text-slate-400">
+        Change your plan, update your payment method, or cancel — anytime.
+      </p>
+      {notice && (
+        <div className="mt-2">
+          <ErrorText>{notice}</ErrorText>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ResumeCard() {
   const [resume, setResume] = useState<string | null>(null); // null = still loading
   const [saved, setSaved] = useState('');
@@ -355,15 +395,7 @@ export default function SettingsPage() {
             <LinkButton href="/pricing">Upgrade</LinkButton>
           )}
         </div>
-        {user.tier === 'premium' && (
-          <p className="mt-3 text-sm text-slate-400">
-            To change or cancel your plan, email{' '}
-            <a href="mailto:support@careeroperator.app" className="rounded text-indigo-400 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400">
-              support@careeroperator.app
-            </a>{' '}
-            and we&rsquo;ll take care of it.
-          </p>
-        )}
+        {user.tier === 'premium' && <ManageSubscriptionButton />}
       </Card>
 
       <ResumeCard />

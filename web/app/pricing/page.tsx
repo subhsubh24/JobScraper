@@ -61,11 +61,20 @@ export default function PricingPage() {
       if (e instanceof ApiError && e.status === 503) {
         setNotice('Subscriptions aren’t live yet — no charge was made. Check back soon.');
       } else if (e instanceof ApiError && e.status === 400) {
-        // Honest: an existing subscriber can't start a second checkout (that would
-        // double-bill). In-app plan changes via the Stripe billing portal are coming soon.
-        setNotice(
-          'You already have an active subscription. To switch plans, contact support — in-app plan changes are coming soon.',
-        );
+        // An existing subscriber can't start a SECOND checkout (that would double-bill). Instead
+        // of a dead-end, hand off to Stripe's Billing Portal to switch plans / update card /
+        // cancel. If the portal itself isn't live yet, degrade honestly (no fake success).
+        try {
+          const portalUrl = await api.startBillingPortal();
+          window.location.assign(portalUrl);
+          return; // navigating away to Stripe's hosted portal
+        } catch (pe) {
+          setNotice(
+            pe instanceof ApiError && pe.status === 503
+              ? 'You already have an active subscription. Self-serve plan changes aren’t live yet — check back soon.'
+              : 'You already have an active subscription. We couldn’t open subscription management just now — please try again.',
+          );
+        }
       } else {
         setNotice(e instanceof ApiError ? e.message : 'Could not start checkout. Try again.');
       }

@@ -100,6 +100,73 @@ def test_checkout_blocks_when_already_premium(client, monkeypatch, db_session):
     assert r.status_code == 400
 
 
+# --------------------------------------------------------------------------- billing portal
+def test_portal_refuses_honestly_when_unconfigured(client, monkeypatch):
+    """No Stripe key -> honest 503, never a fake portal URL."""
+    monkeypatch.delenv("STRIPE_SECRET_KEY", raising=False)
+    _, token = _register(client)
+    r = client.post("/api/billing/portal", headers=_auth(token))
+    assert r.status_code == 503
+
+
+def test_portal_400_when_user_has_no_subscription(client, monkeypatch):
+    """Configured, but the user never checked out (no Stripe customer on record) -> honest 400,
+    no fake portal (there is nothing to manage)."""
+    monkeypatch.setenv("STRIPE_SECRET_KEY", "sk_test_x")
+    _, token = _register(client)
+    r = client.post("/api/billing/portal", headers=_auth(token))
+    assert r.status_code == 400
+
+
+def test_portal_creates_real_stripe_session(client, monkeypatch, db_session):
+    """When configured AND the user has a Stripe customer on record, the endpoint makes the REAL
+    stripe.billing_portal.Session.create call scoped to THAT customer and returns its hosted URL."""
+    import stripe
+
+    monkeypatch.setenv("STRIPE_SECRET_KEY", "sk_test_x")
+    user_id, token = _register(client)
+    # A prior grant recorded the Stripe customer for this user (as a real webhook would).
+    db_session.add(
+        Subscription(user_id=user_id, stripe_customer_id="cus_portal_1", status="active")
+    )
+    db_session.commit()
+
+    captured = {}
+
+    def fake_create(**kwargs):
+        captured.update(kwargs)
+        return SimpleNamespace(url="https://billing.stripe.test/portal_xyz")
+
+    monkeypatch.setattr(stripe.billing_portal.Session, "create", staticmethod(fake_create))
+
+    r = client.post("/api/billing/portal", headers=_auth(token))
+    assert r.status_code == 200, r.text
+    assert r.json()["url"] == "https://billing.stripe.test/portal_xyz"
+    # The real call was scoped to THIS user's customer and carries a return_url back into the app.
+    assert captured["customer"] == "cus_portal_1"
+    assert "return_url" in captured and captured["return_url"].endswith("/app/settings")
+
+
+def test_portal_maps_stripe_timeout_to_honest_503(client, monkeypatch, db_session):
+    """A transient Stripe failure on the portal call becomes a retryable 503, never an uncaught
+    500 (mirrors the checkout timeout contract; DEEP_DIAGNOSIS rule (a))."""
+    import stripe
+
+    monkeypatch.setenv("STRIPE_SECRET_KEY", "sk_test_x")
+    user_id, token = _register(client)
+    db_session.add(
+        Subscription(user_id=user_id, stripe_customer_id="cus_timeout", status="active")
+    )
+    db_session.commit()
+
+    def _raise_timeout(**kwargs):
+        raise stripe.error.APIConnectionError("Request timed out.")
+
+    monkeypatch.setattr(stripe.billing_portal.Session, "create", staticmethod(_raise_timeout))
+    r = client.post("/api/billing/portal", headers=_auth(token))
+    assert r.status_code == 503
+
+
 # --------------------------------------------------------------------------- webhook
 def test_webhook_grants_premium_on_signed_checkout_completed(client, monkeypatch, db_session):
     """The round-trip: a signature-VERIFIED checkout.session.completed flips the user to

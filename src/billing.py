@@ -159,6 +159,12 @@ class UnknownPlan(Exception):
     """Raised when an unrecognized plan id is requested."""
 
 
+class NoBillingCustomer(Exception):
+    """Raised when a billing-portal session is requested for a user who has no Stripe
+    customer on record (never subscribed) — so there is nothing to manage. The caller
+    maps this to an honest 400, never a fake portal URL."""
+
+
 class BillingProviderUnavailable(Exception):
     """Raised when Stripe IS configured but was transiently unreachable while creating a
     Checkout session — a timeout (the sub-budget ``STRIPE_HTTP_TIMEOUT_SECONDS`` firing) or a
@@ -219,6 +225,45 @@ def create_checkout_session(
         # The sub-budget timeout (or a connection failure) fired before Stripe responded. Surface
         # an HONEST, retryable error instead of letting it escape as an uncaught 500 — no charge
         # was created (this is the pre-checkout step).
+        raise BillingProviderUnavailable(str(exc)) from exc
+    return session.url
+
+
+def create_billing_portal_session(db: Session, user: User, return_url: str) -> str:
+    """Create a REAL Stripe Billing Portal session and return its hosted URL.
+
+    This is the self-serve subscription-management surface: an existing subscriber uses it to
+    upgrade/downgrade their plan, update the card, or cancel — the standard, PCI-offloaded way
+    Stripe supports plan changes (which is why the checkout endpoint refuses a SECOND checkout
+    for an active subscriber rather than double-billing). Like ``create_checkout_session`` it
+    makes a REAL Stripe call and NEVER fakes a URL:
+
+    - ``BillingNotConfigured`` when Stripe isn't configured (owner keys absent) → honest 503.
+    - ``NoBillingCustomer`` when the user has no Stripe customer on record (never subscribed) →
+      honest 400; there is nothing to manage.
+    - ``BillingProviderUnavailable`` when Stripe was configured but transiently unreachable (the
+      sub-budget timeout fired) → retryable 503. No entitlement changes here; the portal only
+      hands off to Stripe's hosted page, and any actual plan change flows back through the signed
+      webhook exactly like a first purchase.
+    """
+    if not billing_enabled():
+        raise BillingNotConfigured("STRIPE_SECRET_KEY is not set.")
+
+    # One Subscription row per user (unique user_id); the customer id is stamped by the grant
+    # webhook. No row / no customer id → the user never checked out, so there is nothing to
+    # manage — fail honestly rather than open an empty portal.
+    sub = db.query(Subscription).filter(Subscription.user_id == user.id).first()
+    customer_id = sub.stripe_customer_id if sub else None
+    if not customer_id:
+        raise NoBillingCustomer("No Stripe customer on record for this user.")
+
+    stripe = configure_stripe()
+    try:
+        session = stripe.billing_portal.Session.create(
+            customer=customer_id,
+            return_url=return_url,
+        )
+    except stripe.error.APIConnectionError as exc:
         raise BillingProviderUnavailable(str(exc)) from exc
     return session.url
 

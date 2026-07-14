@@ -1198,6 +1198,46 @@ def billing_checkout(
     return {"url": url}
 
 
+@app.post("/api/billing/portal", dependencies=[Depends(rate_limit("billing", 10))])
+def billing_portal(
+    request: Request,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Create a real Stripe Billing Portal session and return its hosted URL.
+
+    The self-serve subscription-management surface: an existing subscriber upgrades/downgrades,
+    updates their card, or cancels here (Stripe's hosted portal), instead of hitting the
+    "you already have a subscription" dead-end. SIDE-EFFECT INTEGRITY: this makes a REAL
+    stripe.billing_portal.Session.create call; when Stripe isn't configured it returns an HONEST
+    503 (no fake URL), and a user with no Stripe customer on record gets an honest 400. Entitlement
+    never changes here — any plan change flows back through the signed webhook.
+    """
+    base = _web_base_url(request)
+    try:
+        url = billing.create_billing_portal_session(
+            db, user, return_url=f"{base}/app/settings"
+        )
+    except billing.NoBillingCustomer:
+        raise HTTPException(
+            status_code=400,
+            detail="No active subscription to manage.",
+        )
+    except billing.BillingNotConfigured:
+        raise HTTPException(
+            status_code=503,
+            detail="Subscription management isn't available yet.",
+        )
+    except billing.BillingProviderUnavailable:
+        # Stripe was configured but transiently unreachable (the sub-budget timeout fired).
+        # Retryable, and nothing changed — surface an honest 503, never an uncaught 500.
+        raise HTTPException(
+            status_code=503,
+            detail="The billing service is temporarily unavailable. Please try again in a moment.",
+        )
+    return {"url": url}
+
+
 @app.post("/api/billing/webhook")
 async def billing_webhook(request: Request, db: Session = Depends(get_db)):
     """Receive Stripe webhook events, VERIFY the signature, and persist entitlement.
