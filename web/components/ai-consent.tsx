@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button, Card, ErrorText } from '@/components/ui';
 import { api, ApiError } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
@@ -45,12 +45,18 @@ export function useAiConsent() {
     });
   }
 
-  function settle(granted: boolean) {
+  // Stable identity: the focus-trap effect in AiConsentDialog depends on `onCancel`, so an
+  // inline arrow (new identity every parent render) would tear down + re-init the trap on
+  // unrelated re-renders while the dialog is open — yanking focus out of the modal and back.
+  // useCallback keeps it stable (settle only touches a ref + stable setState setters).
+  const settle = useCallback((granted: boolean) => {
     setOpen(false);
     const resolve = resolverRef.current;
     resolverRef.current = null;
     resolve?.(granted);
-  }
+  }, []);
+
+  const handleCancel = useCallback(() => settle(false), [settle]);
 
   async function enable() {
     setBusy(true);
@@ -71,7 +77,7 @@ export function useAiConsent() {
       busy={busy}
       error={error}
       onEnable={enable}
-      onCancel={() => settle(false)}
+      onCancel={handleCancel}
     />
   );
 
@@ -92,12 +98,20 @@ function AiConsentDialog({
   onCancel: () => void;
 }) {
   const dialogRef = useRef<HTMLDivElement>(null);
+  // Latest-value ref so the Escape handler can honour the in-flight `busy` state WITHOUT
+  // `busy` being an effect dependency (which would re-run the trap on every busy flip and
+  // re-steal focus). Escape must match the visible "Not now" button, which is disabled while busy.
+  const busyRef = useRef(busy);
+  useEffect(() => {
+    busyRef.current = busy;
+  }, [busy]);
 
   // Accessible modal behaviour: move focus into the dialog on open, trap Tab inside it (so
   // keyboard users can't drift to the inert page behind), let Escape dismiss it, and restore
   // focus to the triggering element on close. Without this a keyboard/screen-reader user can
   // tab out of a modal that visually blocks the page — a real a11y break on the surface that
-  // gates every AI feature.
+  // gates every AI feature. Deps are [open, onCancel] only (onCancel is a stable useCallback),
+  // so the trap sets up/tears down on real open/close transitions, never on unrelated re-renders.
   useEffect(() => {
     if (!open) return;
     const previouslyFocused = document.activeElement as HTMLElement | null;
@@ -106,6 +120,9 @@ function AiConsentDialog({
 
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === 'Escape') {
+        // Don't dismiss mid-request (matches the disabled "Not now" button) — else we'd resolve
+        // "declined" while the grant call is still in flight and could land afterward.
+        if (busyRef.current) return;
         e.preventDefault();
         onCancel();
         return;

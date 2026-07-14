@@ -147,6 +147,26 @@ def test_portal_creates_real_stripe_session(client, monkeypatch, db_session):
     assert "return_url" in captured and captured["return_url"].endswith("/app/settings")
 
 
+def test_portal_maps_stripe_timeout_to_honest_503(client, monkeypatch, db_session):
+    """A transient Stripe failure on the portal call becomes a retryable 503, never an uncaught
+    500 (mirrors the checkout timeout contract; DEEP_DIAGNOSIS rule (a))."""
+    import stripe
+
+    monkeypatch.setenv("STRIPE_SECRET_KEY", "sk_test_x")
+    user_id, token = _register(client)
+    db_session.add(
+        Subscription(user_id=user_id, stripe_customer_id="cus_timeout", status="active")
+    )
+    db_session.commit()
+
+    def _raise_timeout(**kwargs):
+        raise stripe.error.APIConnectionError("Request timed out.")
+
+    monkeypatch.setattr(stripe.billing_portal.Session, "create", staticmethod(_raise_timeout))
+    r = client.post("/api/billing/portal", headers=_auth(token))
+    assert r.status_code == 503
+
+
 # --------------------------------------------------------------------------- webhook
 def test_webhook_grants_premium_on_signed_checkout_completed(client, monkeypatch, db_session):
     """The round-trip: a signature-VERIFIED checkout.session.completed flips the user to
