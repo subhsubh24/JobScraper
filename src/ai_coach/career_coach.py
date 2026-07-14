@@ -8,6 +8,24 @@ from src.db.models import ApplicationStatus, ChatMessage, User, JobPosting, Appl
 from src.llm import get_llm_client, llm_available, chat_model, resilient_chat_completion
 
 
+def _content_or_fail_loud(response) -> str:
+    """Extract the completion text, FAILING LOUD on a malformed/empty response.
+
+    The same contract the prep-tool generators enforce in ``LLMWorkflows._call_llm``: a
+    malformed completion (no ``choices``, no ``message``) or a blank one must raise here so the
+    caller surfaces an honest error (and the endpoint refunds the LLM ceiling) instead of raising
+    a bare IndexError or persisting/returning a blank coach reply as a "success" (SIDE-EFFECT
+    INTEGRITY, §6). Shared by every LLM-calling path in this module.
+    """
+    try:
+        content = response.choices[0].message.content
+    except (IndexError, AttributeError):
+        raise RuntimeError("LLM returned a malformed response (no message content).")
+    if not content or not content.strip():
+        raise RuntimeError("LLM returned an empty response.")
+    return content
+
+
 class CareerCoach:
     """AI-powered career coaching through a chat interface."""
 
@@ -159,7 +177,7 @@ burnout) supportively is in scope; generating harmful content is not."""
             max_tokens=1000,
         )
 
-        assistant_message = response.choices[0].message.content
+        assistant_message = _content_or_fail_loud(response)
         tokens_used = response.usage.total_tokens if response.usage else None
 
         # SAFETY (output): safety net in case the model ignores the system-prompt guidance and
@@ -291,7 +309,7 @@ burnout) supportively is in scope; generating harmful content is not."""
             max_tokens=300,
         )
 
-        summary = response.choices[0].message.content
+        summary = _content_or_fail_loud(response)
         # Defense in depth: this summarizes stored history (which could contain a harmful
         # thread), so run the same output safety net before surfacing it.
         post = self.moderator.check_output(summary)
