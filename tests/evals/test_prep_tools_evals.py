@@ -136,6 +136,36 @@ def test_generate_tailored_resume_persists_artifact(db_session):
     assert len(rows) == 1 and rows[0].artifact_type == "tailored_resume"
 
 
+def test_generate_learning_plan_returns_grounded_markdown(db_session):
+    """The cross-pipeline learning plan had ONLY a nightly real-output eval — no deterministic
+    guard, the one gap in the eval-coverage ratchet its sibling generators all satisfy. Pin its
+    shape here (fake LLM, key-free) so a pipeline regression that stubs/unstructures it reddens
+    per-PR. Unlike the siblings it returns markdown CONTENT (not a persisted PrepArtifact)."""
+    user, _job = _seed(db_session)
+    wf = LLMWorkflows(db_session)
+    wf.client = _FakeLLM(
+        "# Kubernetes\nWhy it matters for Platform roles. Fundamentals -> hands-on -> a small "
+        "portfolio project. ~4 weeks to job-ready.\n# Terraform\nStart with the official docs."
+    )
+
+    content = wf.generate_learning_plan(["kubernetes", "terraform"], ["Platform Engineer"], user)
+
+    assert isinstance(content, str) and len(content) > 100
+    assert content.count("#") >= 2  # markdown structure — one heading per gap skill
+    assert "Kubernetes" in content
+
+
+def test_learning_plan_blank_completion_fails_loud(db_session):
+    """A blank completion must raise (honest 502 upstream), never return an empty 'plan' and
+    report it as a generated result — same SIDE-EFFECT INTEGRITY contract (§6) as the persisted
+    generators, enforced by the shared _call_llm chokepoint before the refine pass runs."""
+    user, _job = _seed(db_session)
+    wf = LLMWorkflows(db_session)
+    wf.client = _FakeLLM("   ")  # whitespace-only == empty
+    with pytest.raises(RuntimeError):
+        wf.generate_learning_plan(["kubernetes"], ["Platform Engineer"], user)
+
+
 def test_generate_salary_negotiation_persists_artifact(db_session):
     """Salary-negotiation (the Career+ exclusive) had its only deterministic eval OUTSIDE
     tests/evals/ (in tests/test_llm_workflows.py) — its siblings all live here. Bring it to

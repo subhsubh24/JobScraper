@@ -7,6 +7,8 @@ wallet-drain defense. (The Free-user 403 gate and the key-free crisis-moderation
 round-trip are already covered in tests/journeys + tests/test_coach_safety.py.)
 """
 
+import pytest
+
 import asgi
 from src.db.models import User, UserTier
 
@@ -86,3 +88,41 @@ def test_coach_daily_ceiling_blocks(client, db_session, monkeypatch):
     blocked = client.post("/api/coach/chat", headers=_auth(token), json={"message": "hi"})
     assert blocked.status_code == 429
     assert "daily" in blocked.json()["detail"].lower()
+
+
+def test_coach_malformed_llm_response_fails_loud(db_session, monkeypatch):
+    """A malformed completion (empty ``choices`` / no message) must FAIL LOUD rather than raise a
+    bare IndexError or persist a blank coach reply as a "success" — the coach analogue of the
+    prep-tool generators' guard (SIDE-EFFECT INTEGRITY §6). Exercises CareerCoach.chat directly so
+    it pins the function-level contract, not just the endpoint's exception handler."""
+    from src.ai_coach import career_coach as cc
+
+    user = User(email="coach-malformed@example.com", password_hash="x", tier=UserTier.PREMIUM)
+    db_session.add(user)
+    db_session.commit()
+
+    coach = cc.CareerCoach(db_session)
+    coach.client = object()  # non-None so the key gate passes; the LLM call is patched below
+
+    class _Malformed:
+        choices: list = []  # no choice → choices[0] raises IndexError
+        usage = None
+
+    monkeypatch.setattr(cc, "resilient_chat_completion", lambda *a, **k: _Malformed())
+    with pytest.raises(RuntimeError, match="malformed"):
+        coach.chat(user, "How do I negotiate my offer?")
+
+    class _Empty:
+        class _Choice:
+            class message:
+                content = "   "  # whitespace-only == empty
+        choices = [_Choice()]
+        usage = None
+
+    monkeypatch.setattr(cc, "resilient_chat_completion", lambda *a, **k: _Empty())
+    with pytest.raises(RuntimeError, match="empty"):
+        coach.chat(user, "How do I negotiate my offer?")
+
+    # Neither failure persisted a coach reply (no fake success).
+    from src.db.models import ChatMessage
+    assert db_session.query(ChatMessage).filter(ChatMessage.user_id == user.id).count() == 0

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { Button, Card, ErrorText, Field, Skeleton } from '@/components/ui';
 import { api, ApiError } from '@/lib/api';
+import { useAuth } from '@/lib/auth';
 import {
   STATUS_LABELS,
   scoreColor,
@@ -13,11 +14,20 @@ import {
 } from '@/lib/types';
 
 export default function PipelinePage() {
+  const { user, refresh } = useAuth();
   const [jobs, setJobs] = useState<Job[]>([]);
   const [stats, setStats] = useState<PipelineStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(false);
+
+  // Free-tier quota, surfaced HONESTLY so a user sees a limit coming instead of hitting a wall
+  // (the server returns these on `/me`; premium tiers report the string "unlimited", so a numeric
+  // value means a real, finite free-plan allowance). null → no quota UI (unlimited / not loaded).
+  const jobsRemaining = typeof user?.jobs_remaining === 'number' ? user.jobs_remaining : null;
+  const prepRemaining =
+    typeof user?.prep_packs_remaining === 'number' ? user.prep_packs_remaining : null;
+  const atJobLimit = jobsRemaining === 0;
 
   const load = useCallback(async () => {
     setError(null);
@@ -44,7 +54,14 @@ export default function PipelinePage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-extrabold">Your pipeline</h1>
-        <Button onClick={() => setShowAdd((v) => !v)}>{showAdd ? 'Close' : '+ Add a job'}</Button>
+        {/* At the free-tier job limit, adding is impossible — so don't offer a button that leads
+            to an error; disable it (the quota note below explains why + links to upgrade). */}
+        <Button
+          onClick={() => setShowAdd((v) => !v)}
+          disabled={atJobLimit && !showAdd}
+        >
+          {showAdd ? 'Close' : '+ Add a job'}
+        </Button>
       </div>
 
       {stats && (
@@ -55,7 +72,40 @@ export default function PipelinePage() {
         </div>
       )}
 
-      {showAdd && <AddSection onAdded={() => { setShowAdd(false); load(); }} />}
+      {jobsRemaining !== null && (
+        <p className="text-sm text-slate-400" role="status">
+          {atJobLimit ? (
+            <>
+              You&apos;ve reached your free plan&apos;s job limit.{' '}
+              <Link href="/pricing" className="font-semibold text-indigo-400 hover:text-indigo-300">
+                Upgrade for unlimited tracking
+              </Link>
+              .
+            </>
+          ) : (
+            <>
+              {jobsRemaining} job{jobsRemaining === 1 ? '' : 's'}
+              {prepRemaining !== null
+                ? ` and ${prepRemaining} prep pack${prepRemaining === 1 ? '' : 's'}`
+                : ''}{' '}
+              left on your free plan.
+            </>
+          )}
+        </p>
+      )}
+
+      {showAdd && (
+        <AddSection
+          onAdded={() => {
+            setShowAdd(false);
+            load();
+            // Refresh the cached /me so the quota line + Add-button state reflect the job just
+            // added — without this they'd stay frozen at the pre-add count (showing "1 left" and
+            // an enabled button after the user spent their last slot: the exact wall this avoids).
+            refresh().catch(() => {});
+          }}
+        />
+      )}
       <ErrorText>{error}</ErrorText>
 
       {jobs.length === 0 ? (
