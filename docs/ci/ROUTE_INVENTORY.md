@@ -7,7 +7,7 @@ test (browser for web, in-process for the API) — not merely return `<400`.
 
 Keep this current as routes are added. A new route with no journey coverage is a gap. The
 **Complete API route → coverage matrix** below is the authoritative, exhaustive list of every
-route in `asgi.py` (all 49) and the test that exercises it — so completeness is verifiable, not
+route in `asgi.py` (all 50) and the test that exercises it — so completeness is verifiable, not
 asserted. The web/mobile tables and the API-flow narrative give the richer per-flow context.
 
 ## Web app routes (`web/app/**/page.tsx`)
@@ -92,7 +92,7 @@ asserted. The web/mobile tables and the API-flow narrative give the richer per-f
   (no orphaned org rows) are all tested. Web/mobile management surface is a follow-up (backend-first,
   like the Career+ tier PR #152). Live Stripe team Price ID is owner-only (PENDING_OPS).
 
-### Complete API route → coverage matrix (all 49 routes in `asgi.py`)
+### Complete API route → coverage matrix (all 50 routes in `asgi.py`)
 Exhaustive by construction: every `@app.<verb>` route in `asgi.py` appears exactly once with the
 test that exercises it. If a new route is added to `asgi.py` without a row here (and a real test),
 the inventory is out of date — that is the gap this matrix makes visible. Auth/tier is the
@@ -112,6 +112,7 @@ server-enforced gate; "public" means no bearer token required.
 | POST | `/api/demo/skill-match` | public | `test_demo_skill_match.py`, `evals/test_demo_match_evals.py` |
 | POST | `/api/auth/verify-purchase` | authed | `journeys/test_core_journey.py` (501, no fake grant), `test_api_input_hardening.py` |
 | POST | `/api/billing/checkout` | authed | `test_billing.py`, `test_billing_timeout.py` |
+| POST | `/api/billing/portal` | authed | `test_billing.py` (real portal call fires; honest 503 unconfigured; 400 no-subscription) |
 | POST | `/api/billing/webhook` | public (Stripe sig) | `test_billing.py`, `test_org_billing.py` |
 | POST | `/api/billing/revenuecat-webhook` | public (RC sig) | `test_mobile_billing.py`, `test_org_billing.py` |
 | POST | `/api/org` | authed | `test_org_billing.py`, `test_org_hardening.py` |
