@@ -46,10 +46,22 @@ async function fetchMatch(jobDescription: string, resumeText: string): Promise<M
   } finally {
     clearTimeout(timer);
   }
-  const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+  let data: Record<string, unknown> = {};
+  let parsedOk = true;
+  try {
+    data = (await res.json()) as Record<string, unknown>;
+  } catch {
+    parsedOk = false;
+  }
   if (!res.ok) {
     const detail = typeof data.detail === 'string' ? data.detail : 'Something went wrong. Please try again.';
     throw new Error(detail);
+  }
+  if (!parsedOk) {
+    // A 2xx whose body isn't valid JSON (e.g. an edge/proxy HTML error page) must surface as an
+    // HONEST error — never a silent {} that Results would render as fake success ("your résumé
+    // already covers every skill this role names"). See loop-memory 2026-07-15.
+    throw new Error('That result could not be read — please try again.');
   }
   return data as unknown as MatchResult;
 }
