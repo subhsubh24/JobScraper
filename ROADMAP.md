@@ -486,7 +486,7 @@ bootcamps / outplacement firms / employers buy a POOL of seats and assign them t
       `record_event()` (best-effort, allowlisted, never raises) writes an `AggregateEvent`
       daily `(event_type, event_date)` COUNT (no PII, no user id, no raw events) at signup →
       job_added → fit_score_generated (the activation funnel) + prep_pack/coach; drift-gated
-      migration `b2c8d4e6f1a5`. `tests/test_analytics.py` (12) incl. the real funnel
+      migration `b2c8d4e6f1a5`. `tests/test_analytics.py` (10) incl. the real funnel
       round-trip (PR #146, 2 Sonnet reviewers). Retention needs per-user cohorts, deliberately
       NOT stored — only aggregate activation/engagement is derivable here.
 - [ ] Launch plan doc
