@@ -6,6 +6,60 @@ pre-launch.
 
 ---
 
+### 2026-07-15 — Daily GTM review (both scorecards unchanged; site-gate circuit-breaker now 4 reads; ASO-copy nit verified, not edited; new Vercel connector noted)
+- **Observed:** Phase still `pre_launch`. Re-verified `ListConnectors` — Gmail (connected,
+  enabled) + Google Drive (connected, not enabled-in-chat) + Google Calendar (unknown, not
+  enabled) + Mobbin (connected, enabled) — plus **one new entry: a "Vercel" connector**
+  (installState: connected at the org level) that was absent on every prior GTM read. Checked
+  whether it changes anything: `enabledInChat: false`, and `ToolSearch` for `mcp__Vercel__*`
+  returned **zero matching tools** — nothing is actually callable this session, so it is recorded
+  as a new `vercel` row in `GROWTH_STATUS.validation.sources` with `status: unavailable`
+  (fail-closed, not claimed) rather than silently ignored. `channels_connected: []` stays honest.
+  Shell env: only `GEMINI_API_KEY` present, no `PROD_URL`/`ANALYTICS_READ_TOKEN`. Re-ran
+  `analysis/gtm_engine_pct.py` (unchanged, 50) and `node scripts/validate-computation.mjs` (4/4
+  figures PASS, none changed). Both independent scorecards read fresh and **UNCHANGED** since the
+  last GTM read: **QUALITY_SCORECARD** still the 7th audit (`as_of: 2026-07-13`, overall B,
+  `ship_gate_met: false`, same two ship-critical gaps — store-readiness C, business-case-strength
+  B). **GTM_SCORECARD** still `as_of: 2026-07-09` (A, `ship_gate_met: true`) — now the **4th
+  consecutive GTM read** (07-09, 07-11, 07-13, 07-15) without a fresh grade; noted, not treated as
+  a stall since GTM's own ship-gate is unaffected.
+- **Concluded:** No real funnel/PMF data justifies a ROADMAP/BUSINESS_CASE ARR/VISION steer this
+  run (same reasoning as every prior pre-launch read — 0 users, 0 funnel data). Nothing scorecard-
+  or channel-side changed enough to warrant a new asset or steer.
+- **Did (real, in-repo, verification not edit):** Spot-checked the one still-open GTM_SCORECARD
+  compliance nit — `ASO_COPY.md:42`'s Pro-tier "Ask the AI Career Coach about ... salary
+  negotiation" line, flagged as worth watching against Career+'s dedicated "salary-negotiation
+  coaching tool" (`:65`) — against the actual source instead of assuming either a fix or a pass:
+  `src/ai_coach/career_coach.py:38`'s `SYSTEM_PROMPT` genuinely lists "Negotiate salaries" as an
+  in-scope Pro-tier chat topic, while Career+'s `generate_salary_negotiation`
+  (`src/enrichment/llm_workflows.py:492`) is a separate structured artifact (a generated
+  scripts-and-strategies document), not chat. The copy accurately describes two different depths
+  of the same topic, not a double-sell or overlapping claim — verified honest against the live
+  code, so **no edit was made**. Refreshed `GROWTH_STATUS.md` (`as_of`, validation block with the
+  new `vercel` source row, a new learnings entry, `next_actions`/`owner_blockers` re-worded to
+  reflect "unchanged since the last read" rather than stale "this run's read" phrasing carried
+  over from 07-13). **Circuit-breaker escalation:** the site-gate owner DECISION (`PENDING_OPS.md`
+  `site-gate`, `ROADMAP.md:421-435`) has now gone **4 consecutive GTM reads** (2026-07-09 reframe,
+  07-11, 07-13, 07-15) with zero owner movement — re-verified `PENDING_OPS.md` still shows
+  `as_of: 2026-07-04`, `status: open`, unchanged. This is now the longest-running circuit-breaker
+  instance in this loop's history (longer than the 5-read `SITE_GATE_PASSWORD` episode that
+  preceded the 07-09 reframe), named explicitly as the single highest-leverage next owner action
+  in `owner_blockers`.
+- **Recommended (to factory):** Unchanged priority — store-readiness (store screenshots + bespoke
+  icon + mobile IAP client) and business-case-strength (a live per-seat price + real B2B adoption
+  data) are the two remaining ship-critical gaps, both product-factory/owner work. Zero outreach
+  drafts this run (correct): `QUALITY_SCORECARD.ship_gate_met` is still false. Demand_signal
+  cadence checked: last run 2026-07-03 (12 days), ~quarterly refresh not due until ~October.
+- **Meta / operational note:** This was a routine dashboard-bookkeeping refresh (dates +
+  validation reconciliation + one verification check that made no copy edit, consistent with the
+  2026-07-07 precedent) — no maker≠checker review was run since no ROADMAP/BUSINESS_CASE/VISION/
+  asset/copy change was made this run. Worth watching whether the owner enables the new Vercel
+  connector in-chat next run — if so, it may expose real deployment/traffic data that could
+  legitimately upgrade `product_analytics` from `unavailable`, the first potential channel-side
+  movement in this loop's history.
+
+---
+
 ### 2026-07-13 — Daily GTM review (QUALITY_SCORECARD 7th-audit reconcile; site-gate circuit-breaker escalation; business-case as_of freshness fix)
 - **Observed:** Phase still `pre_launch`. Re-verified `ListConnectors` (only Gmail/Drive/
   Calendar, no analytics/billing/ESP MCP) and shell env (no `PROD_URL`/`ANALYTICS_READ_TOKEN`)
