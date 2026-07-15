@@ -40,6 +40,15 @@ def _sign(payload: bytes, secret: str = WHSEC) -> str:
     return f"t={ts},v1={sig}"
 
 
+def _sign_at(payload: bytes, ts: int, secret: str = WHSEC) -> str:
+    """Like ``_sign`` but stamps an EXPLICIT timestamp so a test can produce a signature with a
+    VALID HMAC yet an out-of-window ``t=`` — exercising Stripe's replay (tolerance) check rather
+    than the HMAC check."""
+    signed = f"{ts}.".encode() + payload
+    sig = hmac.new(secret.encode(), signed, hashlib.sha256).hexdigest()
+    return f"t={ts},v1={sig}"
+
+
 def _event(etype: str, obj: dict) -> bytes:
     return json.dumps(
         {"id": "evt_test", "object": "event", "type": etype, "data": {"object": obj}}
@@ -237,6 +246,42 @@ def test_webhook_rejects_forged_signature_and_grants_nothing(client, monkeypatch
     )
     assert r.status_code == 400
     assert db_session.query(User).filter(User.id == user_id).first().tier == UserTier.FREE
+
+
+def test_webhook_rejects_replayed_ancient_timestamp_and_grants_nothing(client, monkeypatch, db_session):
+    """A signature with a VALID HMAC but an ANCIENT timestamp must be rejected on Stripe's
+    replay-window (tolerance ~5 min) check — a DISTINCT defense from the forged-HMAC case above.
+
+    Regression net: every other signed-webhook test uses ``_sign`` (a fresh ``time.time()``
+    timestamp), so the replay-window path was never exercised. If a library bump or a
+    misconfiguration disabled the timestamp check, a captured, correctly-signed event could be
+    replayed to re-grant entitlement — and nothing here would have caught it. Deterministic; no
+    live Stripe call.
+    """
+    monkeypatch.setenv("STRIPE_WEBHOOK_SECRET", WHSEC)
+    user_id, _ = _register(client)
+    payload = _event(
+        "checkout.session.completed",
+        {
+            "id": "cs_replay",
+            "client_reference_id": user_id,
+            "payment_status": "paid",
+            "metadata": {"user_id": user_id, "plan": "pro_monthly"},
+        },
+    )
+    # Valid HMAC over the payload, but the timestamp is from 1970 — far outside the tolerance.
+    r = client.post(
+        "/api/billing/webhook",
+        content=payload,
+        headers={"stripe-signature": _sign_at(payload, 1000)},
+    )
+    assert r.status_code == 400, r.text
+    db_session.expire_all()
+    assert db_session.query(User).filter(User.id == user_id).first().tier == UserTier.FREE
+    # And the replayed event created no Subscription row.
+    assert (
+        db_session.query(Subscription).filter(Subscription.user_id == user_id).first() is None
+    )
 
 
 def test_webhook_unconfigured_returns_503(client, monkeypatch):
