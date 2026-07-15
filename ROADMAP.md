@@ -286,7 +286,7 @@ bootcamps / outplacement firms / employers buy a POOL of seats and assign them t
       refuses honestly 503) + org webhook (signature-verified; forged grants nothing); the paid-seat
       invariant enforced on assign + on a webhook seat reduction (`.with_for_update()` lock, newest
       freed); owner-only authz + tenant isolation + account-deletion purge. Team seat grants Pro
-      (Career+ stays individual-only). `tests/test_org_billing.py` (21). Live Stripe team Price ID
+      (Career+ stays individual-only). `tests/test_org_billing.py` (23). Live Stripe team Price ID
       (`STRIPE_PRICE_TEAM_ANNUAL`) is owner-only (PENDING_OPS `stripe-account`).
 - [ ] **Seat tier — WEB/MOBILE MANAGEMENT SURFACE** — the org-admin UI (create org, buy seats,
       invite/remove members, seat-usage view) on web + mobile. Backend-first like the Career+ tier
