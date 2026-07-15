@@ -139,12 +139,14 @@ def test_create_job_duplicate_resubmit_loads_relationships_in_one_query(db_sessi
 
 
 def test_list_jobs_limit_is_additive_and_optional(db_session):
-    """``limit`` must default to returning ALL jobs (no silent truncation of existing
-    clients); supplying it pages the result."""
+    """Omitting ``limit`` returns up to the default cap (bounded, never unbounded — see
+    ``test_list_jobs_omitted_limit_is_bounded_not_unbounded``); supplying it pages the
+    result. Here the 5 seeded jobs are well under the 500 default, so an omitted limit
+    still returns all five."""
     user = _seed_user_with_jobs(db_session, 5, "perf-jobs-limit@example.com")
     db_session.expire_all()
     _, all_res = _count_queries(db_session, lambda: asgi.list_jobs(user=user, db=db_session, limit=None, offset=0))
-    assert len(all_res["jobs"]) == 5  # omitting limit returns everything
+    assert len(all_res["jobs"]) == 5  # 5 < default cap → all returned, no truncation
 
     db_session.expire_all()
     _, paged = _count_queries(
@@ -157,6 +159,31 @@ def test_list_jobs_limit_is_additive_and_optional(db_session):
         db_session, lambda: asgi.list_jobs(user=user, db=db_session, limit=2, offset=4)
     )
     assert len(offset_res["jobs"]) == 1  # 5 jobs, offset 4 -> the last one
+
+
+def test_list_jobs_omitted_limit_is_bounded_not_unbounded(db_session, monkeypatch):
+    """An omitted ``limit`` must NOT trigger an unbounded scan. Paid tiers have no job cap, so
+    "return all" could load thousands of rows + serialize a multi-MB response on the dashboard
+    hot path (every session restore), risking the serverless budget. Omitting ``limit`` now
+    bounds to ``_JOBS_LIST_DEFAULT_LIMIT`` (the same ``le=500`` ceiling an explicit limit is
+    capped at). Patched low here so the guard is fast + LOAD-BEARING: reverting the fix to an
+    unbounded default (``if limit is not None: query = query.limit(limit)``) returns all 5 and
+    reddens the first assertion."""
+    monkeypatch.setattr(asgi, "_JOBS_LIST_DEFAULT_LIMIT", 3)
+    user = _seed_user_with_jobs(db_session, 5, "perf-jobs-bounded@example.com")
+
+    db_session.expire_all()
+    _, res = _count_queries(
+        db_session, lambda: asgi.list_jobs(user=user, db=db_session, limit=None, offset=0)
+    )
+    assert len(res["jobs"]) == 3, "omitted limit must be bounded by the default cap, not unbounded"
+
+    # An explicit limit still overrides the default (and is itself route-capped at le=500).
+    db_session.expire_all()
+    _, res2 = _count_queries(
+        db_session, lambda: asgi.list_jobs(user=user, db=db_session, limit=5, offset=0)
+    )
+    assert len(res2["jobs"]) == 5
 
 
 def test_pipeline_stats_is_not_n_plus_one(db_session):

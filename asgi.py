@@ -1554,6 +1554,18 @@ def create_job(
     return {"success": True, "job": job_public(job)}
 
 
+# Default cap for ``GET /api/jobs`` when the client omits ``limit``. Paid tiers have NO job
+# cap, so an unbounded "return all" could load thousands of rows (+3 eager relationships each)
+# and serialize a multi-MB response on the dashboard hot path (called on every session
+# restore), risking the Vercel 60s budget. Bound an omitted limit to the SAME ceiling an
+# explicit ``limit`` is already capped at (``le=500``), so the default is "up to 500 most
+# recent", never unbounded. The dashboard's "Tracked" total comes from the separate aggregate
+# ``/api/analytics/pipeline`` endpoint, so this display cap never distorts any count; the API
+# supports paging older rows via explicit ``limit``/``offset`` (no client paginates the list
+# UI today — a >500-job cohort seeing only the 500 most recent is a named fast-follow).
+_JOBS_LIST_DEFAULT_LIMIT = 500
+
+
 @app.get("/api/jobs", dependencies=[Depends(rate_limit_user("user_read", 120))])
 def list_jobs(
     user: User = Depends(get_current_user),
@@ -1563,8 +1575,8 @@ def list_jobs(
 ):
     # Eager-load the relationships ``job_public`` reads (application/score/company) so the
     # serializer never lazy-loads per row: one query per relationship instead of 3N+1.
-    # ``limit`` is OPTIONAL and additive — omitting it preserves the original "return all"
-    # contract (no client truncation); supplying it lets a client page an unbounded list.
+    # ``limit`` is OPTIONAL: supplying it pages the result; omitting it applies the bounded
+    # default cap (``_JOBS_LIST_DEFAULT_LIMIT``) — never an unbounded scan.
     query = (
         db.query(JobPosting)
         .filter(JobPosting.user_id == user.id)
@@ -1577,8 +1589,8 @@ def list_jobs(
     )
     if offset:
         query = query.offset(offset)
-    if limit is not None:
-        query = query.limit(limit)
+    # Always bound the result set: an explicit page size (already ``le=500``) or the default.
+    query = query.limit(limit if limit is not None else _JOBS_LIST_DEFAULT_LIMIT)
     jobs = query.all()
     return {"success": True, "jobs": [job_public(j) for j in jobs]}
 
