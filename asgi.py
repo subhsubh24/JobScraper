@@ -1528,10 +1528,20 @@ def create_job(
     # is still created, just UNSCORED (the same graceful outcome as a scoring error) — never a
     # blocked add. A False ``may_score`` here always means "key present but over the ceiling".
     scored = False
+    embedding_outage = False
     if may_score:
         try:
-            JobScorer(db).score_job(job, user, use_embeddings=use_embeddings)
+            scorer = JobScorer(db)
+            scorer.score_job(job, user, use_embeddings=use_embeddings)
             scored = True
+            # A requested paid embedding that FAILED (provider outage / no résumé) degraded to
+            # the neutral baseline INSIDE score_job (it never re-raises), so the outer except
+            # never fires and the up-front score_daily slot would be silently burned for a call
+            # that cost nothing. Remember it and refund AFTER the commit below (a refund here
+            # would db.commit() the still-pending JobPosting insert into its own transaction,
+            # orphaning it from the Application/usage rows — the exact hazard the consume-first
+            # comment above guards against).
+            embedding_outage = use_embeddings and getattr(scorer, "embedding_failed", False)
         except Exception:
             logger.exception("Scoring failed for job %s; continuing unscored", job.id)
     else:
@@ -1546,6 +1556,21 @@ def create_job(
     auth.increment_job_usage(user)
     db.commit()
     db.refresh(job)
+    # Refund the up-front per-day scoring slot when the paid embedding call OUTAGED (degraded to
+    # the neutral baseline with no billable spend). Done post-commit so ``_refund_counter``'s own
+    # commit only persists the decrement — the job/Application/usage rows are already durable, so
+    # there is nothing pending to split. Best-effort (§32): a refund failure must NEVER abort the
+    # already-succeeded job add — swallow + log so the core action stands.
+    if embedding_outage:
+        try:
+            _refund_counter(db, user.id, "score_daily", 86400)
+        except Exception:
+            logger.warning(
+                "score_daily refund failed for user %s after embedding outage on job %s",
+                user.id,
+                job.id,
+                exc_info=True,
+            )
     # Privacy-safe aggregate metrics (best-effort, post-commit; counts only, no PII). The
     # signup→job_added→fit_score_generated funnel is the activation ("aha") leading indicator.
     analytics.record_event(db, "job_added")
