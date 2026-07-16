@@ -1,10 +1,17 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { useEffect } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Button, Card } from '@/components/ui';
 import { useAuth } from '@/contexts/auth';
+import {
+  PlanId,
+  PurchaseCancelled,
+  PurchasesUnavailable,
+  purchasePlan,
+  restorePurchases,
+} from '@/services/purchases';
 import { colors, radius, spacing } from '@/theme';
 
 // Features included at the Pro tier. Career+ is a strict superset: Pro + the exclusive below.
@@ -36,14 +43,73 @@ function FeatureRow({ label }: { label: string }) {
 // from the auth context and refreshes on open, so a user who upgraded elsewhere (e.g. web
 // Stripe checkout) sees their real status instead of a stale prompt. CRITICAL honesty rule:
 // a Pro (premium, not Career+) user must NOT be told they already have the Career+ exclusive
-// (salary-negotiation coaching) — that would be a false claim + a dead end. The actual in-app
-// purchase (StoreKit / Play Billing via RevenueCat) is Track C and owner-gated; until it's
-// live we are HONEST (no fake "purchase complete"), never granting access here — entitlement
-// only ever flips server-side from a verified webhook.
+// (salary-negotiation coaching) — that would be a false claim + a dead end.
+//
+// The in-app purchase runs the native StoreKit / Play Billing flow via RevenueCat
+// (@/services/purchases). It is HONEST end-to-end: we never grant access here — a completed
+// purchase is confirmed by RevenueCat's signature-verified webhook server-side, and the screen
+// reflects it only by refetching /me. Until the owner connects the RevenueCat SDK key the
+// client is inert and the button degrades to an honest "in-app purchase unavailable" (no charge,
+// and no steering to the web to pay — App Store guideline 3.1.1).
 export default function PaywallScreen() {
   const { user, refresh } = useAuth();
   const isPremium = user?.tier === 'premium';
   const isCareerPlus = user?.career_plus === true;
+  const [plan, setPlan] = useState<PlanId>('annual');
+  const [busy, setBusy] = useState(false);
+
+  async function purchase() {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await purchasePlan(plan);
+      // StoreKit/Play reported a completed purchase. Entitlement is granted server-side by the
+      // verified RevenueCat webhook — pull the REAL tier from the server, never assume it here.
+      Alert.alert(
+        'Thank you!',
+        'Your purchase is being confirmed — your access will unlock shortly.',
+      );
+      await refresh();
+    } catch (err) {
+      if (err instanceof PurchaseCancelled) return; // user dismissed the sheet — no-op
+      if (err instanceof PurchasesUnavailable) {
+        Alert.alert(
+          'In-app purchase unavailable',
+          'In-app purchases aren’t available right now — no charge was made and your plan is '
+            + 'unchanged. Please try again later.',
+        );
+      } else {
+        Alert.alert('Purchase failed', 'Something went wrong and no charge was made. Please try again.');
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function restore() {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const found = await restorePurchases();
+      await refresh();
+      // When an entitlement was recovered, refresh() flips the tier and the screen re-renders to
+      // the entitled state. When nothing was found, say so honestly instead of doing nothing.
+      if (!found) {
+        Alert.alert(
+          'No purchases found',
+          'We couldn’t find any active purchases to restore on this account.',
+        );
+      }
+    } catch (err) {
+      if (err instanceof PurchasesUnavailable) {
+        Alert.alert('Nothing to restore yet', 'In-app purchases aren’t available yet.');
+      } else {
+        Alert.alert('Restore failed', 'We couldn’t restore your purchases. Please try again.');
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
 
   // Re-check entitlement when the paywall opens. A user may have subscribed on another
   // surface; this keeps the screen from showing an upgrade CTA to someone already entitled.
@@ -99,8 +165,7 @@ export default function PaywallScreen() {
           <Text style={styles.upsellTitle}>Career+ adds</Text>
           <Text style={styles.feature}>{CAREERPLUS_FEATURE}</Text>
           <Text style={styles.upsellNote}>
-            In-app upgrade to Career+ is coming soon — you can switch plans on the web. No charge
-            is made here.
+            In-app upgrade to Career+ is coming soon. No charge is made here.
           </Text>
         </Card>
 
@@ -109,17 +174,6 @@ export default function PaywallScreen() {
           Manage or cancel your subscription anytime in your app store account.
         </Text>
       </ScrollView>
-    );
-  }
-
-  function purchase() {
-    // HONEST, not a fake success: no charge is made and the plan is unchanged. In-app
-    // purchases unlock once the owner connects the store accounts (Track C); entitlement is
-    // then granted server-side by a verified RevenueCat webhook, never from this screen.
-    Alert.alert(
-      'In-app purchase coming soon',
-      'Subscriptions are being finalized for the App Store and Play Store. No charge was made '
-        + 'and your plan is unchanged — check back shortly.',
     );
   }
 
@@ -138,28 +192,33 @@ export default function PaywallScreen() {
       </Card>
 
       <View style={styles.plans}>
-        <View
-          style={[styles.plan, styles.planHighlight]}
-          accessible
+        <Pressable
+          style={[styles.plan, plan === 'annual' && styles.planSelected]}
+          accessibilityRole="button"
+          accessibilityState={{ selected: plan === 'annual' }}
           accessibilityLabel="Annual plan, $96 per year. Save about 33%, best value."
+          onPress={() => setPlan('annual')}
         >
           <Text style={styles.planName}>Annual</Text>
           <Text style={styles.planPrice}>$96<Text style={styles.per}>/yr</Text></Text>
           <Text style={styles.planNote}>Save ~33% · best value</Text>
-        </View>
-        <View
-          style={styles.plan}
-          accessible
+        </Pressable>
+        <Pressable
+          style={[styles.plan, plan === 'monthly' && styles.planSelected]}
+          accessibilityRole="button"
+          accessibilityState={{ selected: plan === 'monthly' }}
           accessibilityLabel="Monthly plan, $12 per month. Cancel anytime."
+          onPress={() => setPlan('monthly')}
         >
           <Text style={styles.planName}>Monthly</Text>
           <Text style={styles.planPrice}>$12<Text style={styles.per}>/mo</Text></Text>
           <Text style={styles.planNote}>Cancel anytime</Text>
-        </View>
+        </Pressable>
       </View>
 
-      <Button label="Start Pro" onPress={purchase} />
-      <Button label="Maybe later" variant="secondary" onPress={() => router.back()} />
+      <Button label="Start Pro" onPress={purchase} loading={busy} />
+      <Button label="Restore purchases" variant="secondary" onPress={restore} disabled={busy} />
+      <Button label="Maybe later" variant="secondary" onPress={() => router.back()} disabled={busy} />
       <Text style={styles.legal}>
         Subscriptions renew automatically until cancelled. Manage in your app store account.
       </Text>
@@ -187,7 +246,7 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     alignItems: 'center',
   },
-  planHighlight: { borderColor: colors.primary },
+  planSelected: { borderColor: colors.primary, borderWidth: 2 },
   planName: { color: colors.textMuted, fontWeight: '600' },
   planPrice: { color: colors.text, fontSize: 26, fontWeight: '800', marginVertical: 4 },
   per: { fontSize: 14, color: colors.textMuted, fontWeight: '600' },

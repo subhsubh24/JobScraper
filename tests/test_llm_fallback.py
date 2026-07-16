@@ -160,3 +160,39 @@ def test_real_openai_notfounderror_is_classified():
     err = NotFoundError("model no longer available", response=resp, body=None)
     assert llm._is_model_unavailable(err) is True
     assert llm._is_model_unavailable(_Status429("nope")) is False
+
+
+# Models Google has ANNOUNCED as decommissioned — they return a hard 404 "no longer available".
+# On 2026-07-09 the then-DEFAULT `gemini-2.0-flash` was 404'd and 502'd the whole monetized AI
+# surface. Keep this current as Google publishes end-of-life notices.
+_KNOWN_DECOMMISSIONED = frozenset({"gemini-2.0-flash"})
+
+
+def _resolved_chain():
+    """The models that will be tried, in order (primary + fallbacks) after env resolution."""
+    return [llm.chat_model(), *llm._fallback_chat_models()]
+
+
+def test_default_model_chain_excludes_known_decommissioned_models(monkeypatch):
+    """The committed DEFAULT chat chain (primary + fallbacks) must contain no known-dead model.
+
+    SCOPE (deliberately honest — this is NOT a live-deploy guard): it pins the code DEFAULTS in
+    ``src/llm.py``, not the production config. The live ``GEMINI_MODEL`` / ``GEMINI_FALLBACK_MODELS``
+    overrides live in the Vercel deploy env, which a per-PR pytest job cannot see; detecting a
+    genuinely-dead model at runtime stays the nightly live evals. The value ADDED over the existing
+    default tests is the FALLBACK LIST: ``test_default_primary_is_a_floating_alias`` guards only the
+    PRIMARY and ``test_default_fallback_chain_is_two_deep`` only checks depth + alias-exclusion, so
+    nothing else stops a future edit from adding a known-dead id (e.g. ``gemini-2.0-flash``) to
+    ``_DEFAULT_FALLBACK_CHAT_MODELS``. This test does, and also pins the fallbacks duplicate-free.
+    """
+    monkeypatch.delenv("GEMINI_MODEL", raising=False)  # assert the COMMITTED defaults
+    monkeypatch.delenv("GEMINI_FALLBACK_MODELS", raising=False)
+    dead = [m for m in _resolved_chain() if m in _KNOWN_DECOMMISSIONED]
+    assert not dead, f"default LLM chain includes known-decommissioned model(s): {dead}"
+
+    fallbacks = list(llm._fallback_chat_models())
+    assert len(set(fallbacks)) == len(fallbacks), f"duplicate default fallbacks: {fallbacks}"
+
+    # NON-VACUOUS: the blocklist genuinely detects a dead model when one IS in the chain.
+    monkeypatch.setenv("GEMINI_MODEL", "gemini-2.0-flash")
+    assert any(m in _KNOWN_DECOMMISSIONED for m in _resolved_chain())

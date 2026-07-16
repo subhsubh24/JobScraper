@@ -7,7 +7,7 @@
 // expo-router + the auth context are mocked so the screen renders headlessly.
 
 import { Alert } from 'react-native';
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 
 const mockBack = jest.fn();
 jest.mock('expo-router', () => ({
@@ -98,19 +98,34 @@ describe('PaywallScreen', () => {
     expect(screen.getByLabelText('AI Career Coach')).toBeTruthy();
   });
 
-  it('purchase is honest — no fake success, no navigation', () => {
+  it('purchase is honest when IAP is unconfigured — no fake success, no navigation', async () => {
+    // With no RevenueCat SDK key (the default in tests + any build the owner hasn't connected),
+    // the purchase path throws PurchasesUnavailable and the screen degrades to an HONEST
+    // "in-app purchase unavailable" alert: no charge, no tier change, no navigation as if
+    // purchased, and no steering to the web to pay (App Store guideline 3.1.1).
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     mockTier = 'free';
     render(<PaywallScreen />);
-    // The screen wires "Start Pro" to an honest alert. Invoke the handler the same way a
-    // press would, by finding the button and triggering its onPress via the alert side-effect.
     // fireEvent.press bubbles from the label Text to the Button's Pressable ancestor.
     fireEvent.press(screen.getByText('Start Pro'));
-    expect(alertSpy).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(alertSpy).toHaveBeenCalledTimes(1));
     const [title, body] = alertSpy.mock.calls[0];
-    expect(String(title)).toMatch(/coming soon/i);
+    expect(String(title)).toMatch(/unavailable/i);
     expect(String(body)).toMatch(/no charge was made/i);
     // Honest dead-stop, not a fake unlock — we never navigate as if purchased.
+    expect(mockBack).not.toHaveBeenCalled();
+    alertSpy.mockRestore();
+  });
+
+  it('offers Restore purchases (App Store requirement) and stays honest when unconfigured', async () => {
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    mockTier = 'free';
+    render(<PaywallScreen />);
+    expect(screen.getByText('Restore purchases')).toBeTruthy();
+    fireEvent.press(screen.getByText('Restore purchases'));
+    await waitFor(() => expect(alertSpy).toHaveBeenCalledTimes(1));
+    const [title] = alertSpy.mock.calls[0];
+    expect(String(title)).toMatch(/nothing to restore/i);
     expect(mockBack).not.toHaveBeenCalled();
     alertSpy.mockRestore();
   });
