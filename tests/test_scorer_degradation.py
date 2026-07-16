@@ -65,6 +65,37 @@ class _ErroringClient:
     embeddings = _AlwaysRaisingEmbeddings()
 
 
+class _FakeEmbeddingResponse:
+    """Minimal stand-in for the provider's embeddings response (``.data[0].embedding``)."""
+
+    class _Item:
+        def __init__(self, embedding):
+            self.embedding = embedding
+
+    def __init__(self, embedding):
+        self.data = [self._Item(embedding)]
+
+
+class _FirstSucceedsThenFailsEmbeddings:
+    """First ``create`` RETURNS a real (billable) embedding; every later call raises. Simulates
+    the résumé embedding billing successfully and then the JD embedding 502-ing — the case where
+    real spend DID occur, so the scoring slot must NOT be refunded."""
+
+    def __init__(self):
+        self.calls = 0
+
+    def create(self, *args, **kwargs):
+        self.calls += 1
+        if self.calls == 1:
+            return _FakeEmbeddingResponse([0.11, 0.22, 0.33])
+        raise RuntimeError("simulated Gemini 502 on the 2nd (JD) embedding call")
+
+
+class _FirstSucceedsThenFailsClient:
+    def __init__(self):
+        self.embeddings = _FirstSucceedsThenFailsEmbeddings()
+
+
 def test_score_job_degrades_when_configured_embedding_call_fails(db_session):
     """CONFIGURED-but-failing embedding path degrades to the neutral baseline, not a crash."""
     user = _user(db_session)
@@ -83,6 +114,41 @@ def test_score_job_degrades_when_configured_embedding_call_fails(db_session):
     # Degraded to the neutral 0.5 semantic baseline: 30 + 40*skills_score, skills_score == 1.0.
     assert score.overall_score == 70.0
     assert not math.isnan(score.skills_match)
+    # The outage signal is set so a metered caller (asgi.create_job) can refund the paid slot —
+    # no embedding call succeeded, so no billable spend occurred.
+    assert scorer.embedding_failed is True
+
+
+def test_no_refund_signal_when_one_embedding_billed_before_a_later_failure(db_session):
+    """If a billable embedding SUCCEEDED before a later one failed, embedding_failed stays False.
+
+    The résumé embedding (cache-miss → a live billed call) returns, then the JD embedding raises.
+    Real spend occurred, so the up-front score_daily slot must NOT be refunded — otherwise an
+    attacker could craft JDs that fail the SECOND call post-billing and get unlimited refunded
+    adds, weakening the wallet-drain ceiling. The score still degrades to the neutral baseline.
+
+    Load-bearing: broaden the signal back to an unconditional ``self.embedding_failed = True`` in
+    score_job's except and ONLY this test reddens (the always-raising and no-résumé cases, where
+    zero calls billed, stay green).
+    """
+    user = _user(db_session, email="scorer-partial-bill@example.com")  # has résumé text
+    job = _job(db_session, user)
+
+    scorer = JobScorer(db_session)
+    client = _FirstSucceedsThenFailsClient()
+    scorer.client = client
+
+    score = scorer.score_job(job, user, use_embeddings=True)
+
+    # Two live calls attempted: résumé embedding billed OK, JD embedding raised.
+    assert client.embeddings.calls == 2
+    assert scorer._billable_embeddings == 1  # exactly one billable call succeeded
+    # A real embedding was billed, so NO refund is owed — the slot is honestly consumed.
+    assert scorer.embedding_failed is False
+    # Scoring still degraded gracefully to the neutral baseline (skills_score == 1.0 → 70.0).
+    assert isinstance(score, JobScore)
+    assert not math.isnan(score.overall_score)
+    assert score.overall_score == 70.0
 
 
 def test_score_job_local_only_never_touches_configured_client(db_session):
@@ -97,6 +163,8 @@ def test_score_job_local_only_never_touches_configured_client(db_session):
 
     score = scorer.score_job(job, user, use_embeddings=False)
     assert score.overall_score == 70.0
+    # No paid embedding was requested, so there is nothing to refund — the signal stays False.
+    assert scorer.embedding_failed is False
 
 
 def test_score_job_degrades_when_consented_user_has_no_resume(db_session):
@@ -143,3 +211,6 @@ def test_score_job_degrades_when_consented_user_has_no_resume(db_session):
     # overall = (0.5*0.6 + 0.0*0.4)*100 == 30.0.
     assert score.overall_score == 30.0
     assert score.skills_match == 0.0
+    # No résumé → the embedding guard raised before any provider call → outage signal set, so
+    # the up-front paid slot is refundable (no billable embedding ran).
+    assert scorer.embedding_failed is True

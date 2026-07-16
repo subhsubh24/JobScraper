@@ -46,6 +46,23 @@ class JobScorer:
         # Per-instance cache of link-discovered competencies keyed by user id, so a bulk
         # re-score (one JobScorer, many jobs) loads a user's enrichment ONCE, not per job.
         self._enriched_cache: dict = {}
+        # Set True by ``score_job`` ONLY when a requested paid embedding path degraded to the
+        # neutral baseline AND **zero** billable embedding calls actually succeeded this scoring
+        # (a pure outage / no-résumé guard / a failure on the very first call). Lets a metered
+        # caller (asgi.create_job) refund the per-day scoring slot it consumed up-front, honestly:
+        # an embedding path where NOTHING billable succeeded incurred no spend, so burning the
+        # slot would contradict the project's refund principle (count calls that actually cost
+        # money, not provider outages) — the same rule ``refund_llm_ceiling`` honors elsewhere.
+        # Crucially it stays False if ANY billable embedding call succeeded before a LATER one
+        # failed (e.g. the résumé embedding billed, then the JD embedding 502'd): real spend
+        # occurred, so the slot is honestly consumed — refunding it would weaken the wallet-drain
+        # ceiling (an attacker could craft JDs that fail the second call post-billing). False
+        # whenever embeddings were not requested or fully succeeded.
+        self.embedding_failed: bool = False
+        # Count of billable embedding calls (a live ``embeddings.create`` that RETURNED) made in
+        # the CURRENT ``score_job``. Reset per call; incremented in ``get_embedding`` on success.
+        # ``embedding_failed`` is only set when this is 0 in the degrade branch.
+        self._billable_embeddings: int = 0
 
     def _enriched_skills(self, user: User) -> set:
         """The user's link-discovered competencies as a skill set (empty if none).
@@ -83,6 +100,9 @@ class JobScorer:
             raise
         _emit_call_metrics(response, self.EMBEDDING_MODEL, time.perf_counter() - _t0, "ok",
                            operation=operation, session_id=session_id)  # pragma: no cover
+        # A live embedding call RETURNED = billable spend occurred. Track it so score_job's
+        # degrade branch only flags a refund when ZERO billable calls succeeded (see attr doc).
+        self._billable_embeddings += 1
         return response.data[0].embedding
 
     def cosine_similarity(self, vec1: List[float], vec2: List[float]) -> float:
@@ -195,6 +215,10 @@ class JobScorer:
         Default is False = FAIL CLOSED: a caller must OPT IN to sending data to the third party,
         so a new or forgotten call site can never leak personal data to Gemini by omission.
         """
+        # Reset the per-call outage signal + billable-call counter (an instance may score many
+        # jobs — asgi bulk paths), so each score_job's refund decision is independent.
+        self.embedding_failed = False
+        self._billable_embeddings = 0
         # Get embeddings (only when allowed — see ``use_embeddings``).
         if use_embeddings:
             # Shared session id links this job's fit-score AI calls to the rest of its journey
@@ -213,6 +237,10 @@ class JobScorer:
                 logger.warning(
                     "embedding failed during scoring; using neutral 0.5 baseline", exc_info=True
                 )
+                # Signal a refundable outage ONLY if NO billable embedding call succeeded this
+                # scoring. If an earlier call already billed (e.g. the résumé embedding) before a
+                # later one failed, real spend occurred → keep the slot consumed (see attr doc).
+                self.embedding_failed = self._billable_embeddings == 0
                 semantic_score = 0.5  # Default if API fails
         else:
             # Consent not granted (or no key): stay fully local, never call the third party.
