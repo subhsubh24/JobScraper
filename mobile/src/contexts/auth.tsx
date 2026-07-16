@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
 import { api, getToken } from '@/services/api';
+import { identifyUser } from '@/services/purchases';
 import type { User } from '@/types';
 
 interface AuthState {
@@ -31,7 +32,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     (async () => {
       try {
         const token = await getToken();
-        if (token) setUser(await api.me());
+        if (token) {
+          const u = await api.me();
+          setUser(u);
+          // Link the RevenueCat identity to this user (no-op when IAP is unconfigured).
+          void identifyUser(u.id);
+        }
       } catch {
         // Stale/invalid token — stay logged out, no crash.
       } finally {
@@ -41,11 +47,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signIn = useCallback(async (email: string, password: string) => {
-    setUser(await api.login(email, password));
+    const u = await api.login(email, password);
+    setUser(u);
+    void identifyUser(u.id);
   }, []);
 
   const signUp = useCallback<AuthState['signUp']>(async (input) => {
-    setUser(await api.register(input));
+    const u = await api.register(input);
+    setUser(u);
+    void identifyUser(u.id);
   }, []);
 
   const signOut = useCallback(async () => {

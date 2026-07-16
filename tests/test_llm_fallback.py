@@ -160,3 +160,51 @@ def test_real_openai_notfounderror_is_classified():
     err = NotFoundError("model no longer available", response=resp, body=None)
     assert llm._is_model_unavailable(err) is True
     assert llm._is_model_unavailable(_Status429("nope")) is False
+
+
+# Models Google has ANNOUNCED as decommissioned — they return a hard 404 "no longer available".
+# On 2026-07-09 the then-configured default `gemini-2.0-flash` was 404'd and 502'd the whole
+# monetized AI surface. The live evals that would catch a genuinely-dead CONFIGURED model are
+# nightly-only, so a deploy that pins/reverts GEMINI_MODEL or GEMINI_FALLBACK_MODELS to a dead id
+# would sail past every per-PR gate green. Keep this current as Google publishes EOL notices.
+_KNOWN_DECOMMISSIONED = frozenset({"gemini-2.0-flash"})
+
+
+def _resolved_chain():
+    """The models that will actually be tried, in order, after env resolution."""
+    return [llm.chat_model(), *llm._fallback_chat_models()]
+
+
+def test_resolved_model_chain_has_no_known_decommissioned_model(monkeypatch):
+    """The ENV-RESOLVED chat model chain must contain no Google-decommissioned model.
+
+    The existing tests pin the DEFAULT constants; this guards the actually-CONFIGURED values
+    (``GEMINI_MODEL`` / ``GEMINI_FALLBACK_MODELS`` after env resolution) per-PR so a deploy can't
+    silently revert the hot path to a dead model that only the nightly live evals would catch.
+    """
+    monkeypatch.delenv("GEMINI_MODEL", raising=False)
+    monkeypatch.delenv("GEMINI_FALLBACK_MODELS", raising=False)
+    dead = [m for m in _resolved_chain() if m in _KNOWN_DECOMMISSIONED]
+    assert not dead, (
+        f"configured LLM chain includes known-decommissioned model(s): {dead}. Point "
+        "GEMINI_MODEL / GEMINI_FALLBACK_MODELS (or the src/llm.py defaults) at live models."
+    )
+
+    # The guard is NOT vacuous: a config that DOES pin a dead model is genuinely detected.
+    monkeypatch.setenv("GEMINI_MODEL", "gemini-2.0-flash")
+    assert any(m in _KNOWN_DECOMMISSIONED for m in _resolved_chain())
+
+
+def test_resolved_fallback_chain_is_healthy(monkeypatch):
+    """The resolved fallback chain stays a real, >=2-deep, duplicate-free line of defense.
+
+    Complements ``test_default_fallback_chain_*`` (which checks the constants) by validating the
+    values AFTER env override, catching a corrupted/typo'd ``GEMINI_FALLBACK_MODELS`` per-PR.
+    """
+    monkeypatch.delenv("GEMINI_MODEL", raising=False)
+    monkeypatch.delenv("GEMINI_FALLBACK_MODELS", raising=False)
+    primary = llm.chat_model()
+    fallbacks = list(llm._fallback_chat_models())
+    assert len(fallbacks) >= 2, f"fallback chain too shallow ({len(fallbacks)}): {fallbacks}"
+    assert primary not in fallbacks, f"primary {primary!r} duplicated in fallbacks {fallbacks}"
+    assert len(set(fallbacks)) == len(fallbacks), f"duplicate fallbacks: {fallbacks}"

@@ -256,9 +256,19 @@ FIRST; voice/delivery is a later, owner-gated increment.
       (PR #40, F4.1).
 - [x] Web: server-side entitlement gating on paid endpoints — `users.tier` gates coach + job/
       prep limits server-side; the webhook is now the real source that grants/revokes it (PR #40).
-- [ ] Mobile: RevenueCat/StoreKit + Play Billing integration code — SERVER half done (see
-      below); the on-device client SDK (`react-native-purchases` to INITIATE purchases) is
-      native + owner-blocked (needs RevenueCat keys + store accounts) and stays unticked.
+- [x] Mobile: RevenueCat/StoreKit + Play Billing integration code — the on-device client
+      (`react-native-purchases` v10, `mobile/src/services/purchases.ts`) now INITIATES the native
+      purchase + restore-purchases flow, wired into `paywall.tsx` (plan select → purchase → refetch
+      `/me`) and identified to the backend `User.id` on sign-in/session-restore. HONEST +
+      inert-when-unset: with no `EXPO_PUBLIC_REVENUECAT_SDK_KEY` the client never loads the native
+      SDK and the paywall degrades to an honest "in-app purchase unavailable" (no charge, no
+      web-steering → App Store 3.1.1-safe); a completed purchase grants entitlement ONLY via the
+      already-shipped signature-verified webhook (below), never client-side. Verified at every level
+      possible on Linux: `tsc --noEmit` + `expo lint` + jest (82/82, incl. honest-unconfigured +
+      restore) all green (run 56). The remaining half — RevenueCat keys + store products + a signed
+      native build + the on-device sandbox-charge round-trip — is Human-Core (PENDING_OPS
+      `revenuecat`); building this client code alone does NOT by itself close ACCEPTANCE_AUDIT
+      A4/G4 (which require that signed-build round-trip).
 - [x] Mobile: entitlement gate reads verified subscription state — the entitlement gate
       (server-side `users.tier` checks + the mobile app reading `tier` via `/me`) now reads
       state that is verified-subscription-backed for BOTH web (Stripe) and mobile (RevenueCat).
