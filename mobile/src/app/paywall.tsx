@@ -90,8 +90,16 @@ export default function PaywallScreen() {
     if (busy) return;
     setBusy(true);
     try {
-      await restorePurchases();
+      const found = await restorePurchases();
       await refresh();
+      // When an entitlement was recovered, refresh() flips the tier and the screen re-renders to
+      // the entitled state. When nothing was found, say so honestly instead of doing nothing.
+      if (!found) {
+        Alert.alert(
+          'No purchases found',
+          'We couldn’t find any active purchases to restore on this account.',
+        );
+      }
     } catch (err) {
       if (err instanceof PurchasesUnavailable) {
         Alert.alert('Nothing to restore yet', 'In-app purchases aren’t available yet.');

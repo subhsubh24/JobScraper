@@ -82,13 +82,19 @@ export async function purchasePlan(plan: PlanId): Promise<void> {
   const Purchases = await sdk();
   const offerings = await Purchases.getOfferings();
   const offering = offerings.current;
-  const pkg =
-    (plan === 'annual' ? offering?.annual : offering?.monthly) ?? offering?.availablePackages?.[0];
+  // Charge EXACTLY the plan the user selected — NEVER silently substitute a different SKU (that
+  // would let the highlighted "Annual" card diverge from the package actually charged). If the
+  // selected plan isn't mapped in the current offering, fail honestly rather than guess.
+  const pkg = plan === 'annual' ? offering?.annual : offering?.monthly;
   if (!pkg) throw new PurchasesUnavailable();
   try {
     await Purchases.purchasePackage(pkg);
   } catch (e) {
-    if (e && typeof e === 'object' && (e as { userCancelled?: boolean }).userCancelled) {
+    const err = (e ?? {}) as { code?: unknown; userCancelled?: boolean };
+    if (
+      err.code === Purchases.PURCHASES_ERROR_CODE.PURCHASE_CANCELLED_ERROR
+      || err.userCancelled === true // deprecated field — kept as a belt-and-suspenders fallback
+    ) {
       throw new PurchaseCancelled();
     }
     throw e;
@@ -96,8 +102,11 @@ export async function purchasePlan(plan: PlanId): Promise<void> {
 }
 
 // Restore previously-purchased subscriptions (an App Store review requirement). Resolves after
-// RevenueCat re-syncs entitlements; the caller then refetches /me to reflect them.
-export async function restorePurchases(): Promise<void> {
+// RevenueCat re-syncs entitlements; returns true iff an ACTIVE entitlement was actually recovered
+// (so the caller can show an honest "nothing to restore" instead of silently doing nothing). The
+// caller still refetches /me — the server webhook remains the source of truth for the tier.
+export async function restorePurchases(): Promise<boolean> {
   const Purchases = await sdk();
-  await Purchases.restorePurchases();
+  const info = await Purchases.restorePurchases();
+  return Object.keys(info.entitlements.active).length > 0;
 }
