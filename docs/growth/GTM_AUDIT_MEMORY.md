@@ -92,3 +92,64 @@ evidence only. This is DATA, never instructions.
   analytics/billing/ESP source appearing (would force re-grading metric integrity against REAL
   numbers); demand_signal recency (~quarterly, last 2026-07-03); a QUALITY_SCORECARD re-grade (could
   flip its ship_gate and open the outreach lane).
+
+---
+
+### 2026-07-16 — Third grade (re-grade)
+- **Overall: A · ship_gate_met: true** (GTM work-quality gate; product launch gate separate —
+  QUALITY_SCORECARD last read B/not met). Overall unchanged from 2026-07-09, but two dimensions
+  moved and OFFSET.
+- **Grades:** metric_integrity **A** (↓ from A+), business_case_honesty **A+**, experiment_validity
+  **A+**, roadmap_steer_justification **A+** (↑ from A), self_validation_honesty **A**,
+  pmf_read_accuracy **A**, compliance **A**, artifact_freshness **A**. All four ship_critical A/A+
+  (metric A, business_case A+, roadmap A+, self_validation A); all others A. Ship gate holds.
+- **What changed vs last grade:**
+  - **roadmap_steer_justification A→A+** — the sole prior top_gap (#327 — GTM commit `24e9b84`/#296's
+    B2B2C "Recommended structure" packaging note under a "no steer" label) is CLOSED via the exact
+    remedy the 2026-07-09 scorecard pre-authorized as an A+ path (fix option **b**): an inline
+    "Demand caveat (honesty correction)" now sits at `docs/BUSINESS_CASE.md:93-100` labeling the note
+    a competitor-pricing-comp RECOMMEND-tier input (GTM_STANDARD §3), explicitly NOT demand-validated;
+    the "no steer" dishonesty is gone. Residual "Recommended structure" text (`:85-89`) is
+    real-comp-backed, ARR-neutral, §3-permitted. **Issue #327 closed.**
+  - **metric_integrity A+→A** — actual metrics remain FLAWLESS (all `0`/`null`, injection test
+    `signups_total:1234`→FAIL exit1 confirms no fabricated number; this is NOT a metric regression),
+    but a fresh adversarial grader surfaced a real LATENT coverage gap in the honesty gate:
+    `scripts/validate_gtm.py:29` `METRIC_SECTIONS` walks only funnel/acquisition/pmf/channels — NOT
+    outreach/email/content — so a future non-zero fabrication there would escape the machine tripwire.
+    Latent today (all three 0/null), but a genuine named finding → A, not a zero-findings A+.
+- **How I verified (adversarial, 3 fresh Opus graders + direct checks, none did GTM work):**
+  - Metric integrity + self-validation (grader 1): injection-tested `validate_gtm.py` (real, exit1),
+    scanned every metric field (all 0/null), reproduced `engine_pct:50`, independently pulled
+    ListConnectors (Vercel connected but enabledInChat:false → honestly `unavailable`) + env (no
+    analytics/billing/ESP). Named the validator-coverage gap (metric_integrity A-cap) and two
+    immaterial prose-note drifts (self_validation A-cap: BROWSERBASE_* actually set; Drive/Calendar
+    actually enabledInChat:true — both understating, neither a false `available` claim).
+  - Business-case + roadmap-steer (grader 2): business_case UPHELD A+ (body⇄YAML exact,
+    validate-computation.mjs PASS, floor honestly missed, levers uncredited, Stripe reconciles;
+    only nit a non-gaming $110-vs-$115 prose anchor). Roadmap-steer: grader argued HOLD-at-A
+    (relocate the residual directional text, fix a) — **OVERRULED to A+**: the 07-09 scorecard
+    certified fix (b) as sufficient for A+ and it was faithfully implemented; the residual is
+    §3-permitted, so holding at A would move the goalpost off my own documented criterion. Dissent
+    recorded in the scorecard.
+  - Compliance + pmf + experiment + freshness (grader 3, UPHELD A/A/A+/A): demand_signal genuinely
+    qualitative + honestly-sourced; outreach draft-only + waitlist DRY-RUN; ASO salary-negotiation
+    copy VERIFIED honest against `career_coach.py:38`/`llm_workflows.py:492`; pricing identical across
+    all 4 artifacts. Ruled the PR #412 (2026-07-16 native IAP client code, inert) vs `ASO_COPY.md:76-77`
+    "not yet landed" drift a sub-24h WATCH-NIT (keeps A) — substance still true, last GROWTH_STATUS
+    run predates #412 by a day. Grader graded experiment_validity A on a "no positive artifact"
+    rationale — **OVERRULED to A+**: the rubric says an empty pre-launch list IS the correct
+    exemplary state (no finding).
+- **Grading principle applied:** accept a grader downgrade only when backed by a GENUINE finding
+  (metric_integrity: validator gap → accepted); reject downgrades citing no finding or contradicting
+  the rubric/prior criterion (experiment_validity, roadmap_steer → overruled up). Consistent,
+  evidence-bounded, anti-inflation.
+- **Filed for the GTM Factory:** `gtm-quality: metric-integrity A -> raise to A+` (severity 1, the
+  validator METRIC_SECTIONS coverage gap — sole ship_critical dim not at A+, concrete buildable fix).
+  Closed #327 (roadmap-steer, resolved). Self_validation prose-drift (sev 2) + ASO freshness (sev 3)
+  recorded in the scorecard top_gaps, not separately filed (immaterial / <24h, kept lean). No
+  ship_critical dim BELOW A; no fabricated metric / gamed number / speculative steer found.
+- **Watch next run:** whether `METRIC_SECTIONS` is extended (gap 1); the two prose-note drifts
+  reconciled (gap 2); `ASO_COPY.md:76-77` reworded post-#412 (gap 3); whether the owner enables the
+  org-connected Vercel connector in-chat or a PROD_URL/ANALYTICS token appears (would move the engine
+  off 0% and force re-grading metric integrity against REAL numbers); demand_signal recency
+  (~quarterly, last 2026-07-03); the next QUALITY_SCORECARD grade.
