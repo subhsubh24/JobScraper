@@ -152,6 +152,35 @@ def test_discover_caps_total(monkeypatch):
     assert len(out) <= github_enricher._MAX_COMPETENCIES
 
 
+# --------------------------------------------------------------------------- degradation
+def test_enriched_context_degrades_to_empty_when_the_lookup_raises(db_session, monkeypatch):
+    """Degradation integrity on the PAID generation path (``LLMWorkflows._enriched_context``).
+
+    The enrichment block is OPTIONAL grounding: prep packs, cover letters, tailored résumés,
+    study plans and negotiation scripts fold it into their prompt. This outer try/except is
+    defense-in-depth around resolving + reading the user's link-enriched skills — ANY failure
+    (an import error, or a bug outside github_enricher's own inner guard) must NEVER break a paid
+    generation: the method swallows it and returns "" so the prompt is simply un-enriched, exactly
+    as it is for a user who has no enrichment at all. This except branch had no coverage.
+    LOAD-BEARING: drop the try/except and the RuntimeError propagates (this call raises) instead
+    of returning "".
+    """
+    from src.enrichment.llm_workflows import LLMWorkflows
+
+    def boom(_db, _user):
+        raise RuntimeError("enrichment store unavailable")
+
+    # _enriched_context does `from ...github_enricher import user_enriched_skills` at call time,
+    # so the name is resolved off the github_enricher module — patch it there.
+    monkeypatch.setattr(github_enricher, "user_enriched_skills", boom)
+
+    user = User(email="degrade@example.com", password_hash="x", resume_text="Python engineer")
+    db_session.add(user)
+    db_session.flush()
+
+    assert LLMWorkflows(db_session)._enriched_context(user) == ""
+
+
 # --------------------------------------------------------------------------- persistence
 def test_replace_is_idempotent_upsert(db_session):
     user = User(email="p@example.com", password_hash="x", tier=UserTier.PREMIUM)

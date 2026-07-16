@@ -65,6 +65,63 @@ def test_counter_new_window_resets_and_prunes_stale_rows(_engine, monkeypatch):
     db.close()
 
 
+def test_counter_recovers_from_a_concurrent_insert_race(_engine, monkeypatch):
+    """The insert-race retry (``asgi._consume_counter``'s ``except IntegrityError`` branch).
+
+    Two serverless instances can both see NO row for the same (subject, bucket, window) and race
+    to INSERT it; the loser's commit hits the unique constraint and the DB raises IntegrityError.
+    The counter must ROLL BACK its lost insert and RETRY the window as an UPDATE of the winner's
+    row — returning a correct allow/deny, never surfacing an uncaught 500 to the caller (this is
+    the cross-instance rate-limit / LLM spend-ceiling wallet-drain defense, so a spurious error
+    here would wrongly reject a legitimate request or drop a spend increment). This except +
+    retry-as-update branch had no coverage.
+
+    Faithful simulation (deterministic): freeze the clock so the window key is fixed, then make the
+    first commit discard our losing insert, durably commit a WINNER row for that exact window, and
+    raise the IntegrityError our own commit would have hit. On the retry the SELECT now finds the
+    winner and takes the UPDATE path (``row.count += 1``) — so the final count is 2 (winner's 1 +
+    our retried increment), the real two-request outcome. LOAD-BEARING: remove the
+    ``except IntegrityError: rollback; continue`` and this call raises IntegrityError instead of
+    returning True; a naive re-insert (not an update) would leave count == 1, so the ``== 2``
+    assert also pins that the retry genuinely hit the update branch.
+    """
+    from sqlalchemy.exc import IntegrityError
+
+    db = _session(_engine)
+    base = 1_000_000.0
+    monkeypatch.setattr(asgi.time, "time", lambda: base)  # fix the window key
+    window_key = int(base // 60)
+    real_commit = db.commit
+    calls = {"n": 0}
+
+    def flaky_commit():
+        calls["n"] += 1
+        if calls["n"] == 1:
+            # Our INSERT lost the race: drop it, durably commit the WINNER's row for this exact
+            # window, then raise the unique-violation the real DB would have raised on our commit.
+            db.rollback()
+            db.add(RateCounter(subject="racer", bucket="write", window_key=window_key, count=1))
+            real_commit()
+            raise IntegrityError("duplicate window", {}, Exception("UNIQUE constraint failed"))
+        return real_commit()
+
+    monkeypatch.setattr(db, "commit", flaky_commit)
+
+    result = asgi._consume_counter(db, "racer", "write", 5, 60)
+
+    assert result is True  # recovered via retry-as-update, not an uncaught IntegrityError/500
+    assert calls["n"] >= 2  # the retry path actually executed (the first commit raised)
+    row = (
+        db.query(RateCounter)
+        .filter(RateCounter.subject == "racer", RateCounter.bucket == "write")
+        .first()
+    )
+    # Winner's count (1) + our retried update (+1) == 2 — proof the retry took the UPDATE branch
+    # (a re-insert would have left count == 1). The readback is a pure query (no commit needed).
+    assert row is not None and row.count == 2
+    db.close()
+
+
 def test_llm_ceiling_enforced_over_http(client, db_session, monkeypatch):
     """A premium user past the daily LLM ceiling gets a 429 from the coach endpoint, proving
     check_llm_ceiling is wired to the DB counter end-to-end."""
