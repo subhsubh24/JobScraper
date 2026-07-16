@@ -4,6 +4,56 @@
 > and the standing gaps. Read this FIRST each run and diff vs the last grade. Owned by the
 > Quality Auditor only.
 
+## 2026-07-16 — 8th independent audit
+
+**Overall: B (=) · ship_gate_met: false.** No overall change, but real evidence-backed movement
+in BOTH directions. Per-dimension (Δ vs 2026-07-13): functional-reality **A+** (=), correctness
+**A** (▼ from A+), security **A** (=), design-taste **A** (=), store-readiness **B** (▲ from C),
+artifact-integrity **A** (=), business-case-strength **B** (=), tests-evals **A** (=), performance
+**A** (=).
+
+Method: 9 fresh independent adversarial grader subagents (maker ≠ checker), each ran its own
+mechanical signal + cited file/line. Auditor pre-ran the shared gate at HEAD `add0e1c`: flake8
+clean, asgi imports, **747 backend pass @ 91.80% cov** (floor 88), 15 journeys, 147 non-live
+evals, `test_llm_fallback.py` 10 passed; **live AI-output evals 10/10** with a real GEMINI_API_KEY;
+live Gemini probe `gemini-flash-latest`/`gemini-2.5-flash`/`-lite`→**200**, dead `gemini-2.0-flash`→404;
+no tracked secrets; `check_quality parse` OK / `readiness` FAIL; `check_blocks` OK
+(`floor_met_year1=false`, `engine_pct=50`); `arr_base`→57500.
+
+**What moved UP (store-readiness C→B):** #412 (`70f6ba7`) landed a REAL mobile IAP client —
+`react-native-purchases ^10.4.3` + `mobile/src/services/purchases.ts` (real StoreKit/Play-Billing
+purchase/restore/identify, server-side-only entitlement, honest inert-when-unkeyed) + `paywall.tsx`
+live flow + Restore button — closing the biggest loop-buildable store blocker. An independent grader
+RENDERED `mobile/assets/images/icon.png` and confirmed it is bespoke (chevron-"A" on a blueprint grid),
+NOT the Expo template. Only the store **screenshots** remain genuinely unmet (Human-Core signed build).
+Held at B not A because (1) screenshots absent and (2) `ACCEPTANCE_AUDIT.md` is STALE.
+
+**What moved DOWN (correctness A+→A):** adversarial grading surfaced a real, pre-existing,
+non-blocking spend-ceiling asymmetry — `create_job` burns a per-day embedding slot (`asgi.py:1507`)
+never refunded on a Gemini embedding OUTAGE (`scorer.py:209-216` swallows→0.5), contradicting the
+project's own refund principle (`asgi.py:349-351`). Non-blocking (defensible as "job created unscored
+= graceful") but a genuine inconsistency, so A not A+.
+
+**Standing ship-critical blockers (both hold overall at B):** store-readiness **B** (screenshots +
+stale audit doc) and business-case **B** (`arr_base`→57500 < $100K, `floor_met_year1=false`, no lever
+monetized/validated to cross the floor).
+
+**Highest-leverage single finding this cycle:** the STALE `docs/store/ACCEPTANCE_AUDIT.md` — A4/G4
+say IAP "NOT integrated" (false, #412 built it) and G7 says the icon is "still the Expo template"
+(false, it's bespoke). This one stale doc is BOTH a store-readiness cap AND the artifact-integrity
+A→A+ gap, and it keeps `check_quality.py readiness` FAILing on already-closed work. Fixing the doc
+text (A4/G4 FAIL→OPEN, correct the G7 icon language) is the cheapest path to reflect true state.
+
+**Resolved since last cycle:** the ROUTE_INVENTORY doc-lag (now self-verifying via
+`tests/test_route_inventory_complete.py`, all 50 routes); the unbounded `/api/jobs` scan (#405,
+bounded to 500 + `selectinload`). #389 tightened the Margin telemetry timeout 2.0s→1.0s (mitigation,
+not resolution — still blocking-by-design). #412 added a per-PR static LLM config-drift guard (real,
+but not a live smoke).
+
+**Issues:** updating the two standing ship-critical quality issues — #93 (store-readiness) with the
+C→B movement + the stale-audit-doc finding, and #92 (business-case) confirming it holds at B. No new
+issue for correctness (non-blocking A-level nit, captured in the scorecard top_gaps).
+
 ## 2026-06-29 — first independent audit (bootstrap)
 
 **Overall: C · ship_gate_met: false.** First time the rubric + scorecard exist, so there is
