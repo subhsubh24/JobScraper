@@ -15,6 +15,7 @@ from datetime import datetime
 from types import SimpleNamespace
 
 import pytest
+from fastapi.testclient import TestClient
 
 from src.billing import _period_end, _user_for_subscription
 from src.db.models import Subscription, User, UserTier
@@ -250,6 +251,158 @@ def test_webhook_redelivered_checkout_is_idempotent_one_subscription_row(
     assert len(rows) == 1
     assert rows[0].stripe_subscription_id == "sub_redeliver"
     assert rows[0].status == "active"
+
+
+def test_webhook_recovers_from_concurrent_insert_race_one_row(_engine, monkeypatch):
+    """CONCURRENT first delivery of the same event (distinct from the SEQUENTIAL redelivery
+    above): two instances both SELECT no Subscription row and INSERT; the loser's commit trips
+    the ``subscriptions.user_id`` UNIQUE constraint -> IntegrityError. The webhook must ROLL
+    BACK and RE-APPLY (retry-as-update), returning 200 with EXACTLY ONE Subscription row +
+    PREMIUM — not an uncaught 500 that makes Stripe re-deliver and delays entitlement.
+
+    Deterministic simulation (mirrors ``tests/test_rate_counter.py``'s insert-race test). The
+    real ``IntegrityError`` surfaces at ``_upsert_subscription``'s explicit ``db.flush()``
+    (``billing.py``), NOT at the later ``db.commit()`` — so this injects the fault at FLUSH to
+    be faithful: on the webhook's first flush the per-request session discards our losing
+    INSERT, durably commits a WINNER Subscription row for the same user, then raises the
+    IntegrityError the DB would have raised on our duplicate flush. On the retry,
+    ``billing.apply_event``'s SELECT finds the winner and takes the idempotent UPDATE path ->
+    one row. LOAD-BEARING: revert the webhook's ``except IntegrityError`` retry loop (or narrow
+    the ``try`` back to only ``db.commit()``) and this call 500s (the flush-time error is
+    uncaught).
+    """
+    from sqlalchemy.exc import IntegrityError
+    from sqlalchemy.orm import sessionmaker
+
+    import asgi
+    from src.db import get_db
+
+    monkeypatch.setenv("STRIPE_WEBHOOK_SECRET", WHSEC)
+    TestingSession = sessionmaker(autocommit=False, autoflush=False, bind=_engine)
+    state = {"armed": False, "user_id": None, "flushes": 0}
+
+    def override_get_db():
+        db = TestingSession()
+        real_flush = db.flush
+        real_commit = db.commit
+
+        def flaky_flush(*a, **k):
+            # Trip exactly once, on the webhook's apply_event insert-flush (after arming). All
+            # other flushes (registration, the retry's UPDATE flush) pass straight through.
+            if not state["armed"]:
+                return real_flush(*a, **k)
+            state["armed"] = False  # one-shot
+            state["flushes"] += 1
+            db.rollback()  # our losing INSERT is discarded
+            db.add(
+                Subscription(
+                    user_id=state["user_id"], status="active",
+                    stripe_subscription_id="sub_winner",
+                )
+            )
+            real_commit()  # the concurrent WINNER's row is now durable
+            raise IntegrityError("dup", {}, Exception("UNIQUE constraint failed: subscriptions.user_id"))
+
+        db.flush = flaky_flush
+        try:
+            yield db
+        finally:
+            db.close()
+
+    asgi.app.dependency_overrides[get_db] = override_get_db
+    try:
+        with TestClient(asgi.app) as c:
+            uid, _ = _register(c)
+            state["user_id"] = uid
+            state["armed"] = True  # arm the race for the webhook's first apply_event flush
+            payload = _event(
+                "checkout.session.completed",
+                {
+                    "id": "cs_race",
+                    "object": "checkout.session",
+                    "client_reference_id": uid,
+                    "customer": "cus_race",
+                    "subscription": "sub_redeliver",
+                    "payment_status": "paid",
+                    "metadata": {"user_id": uid, "plan": "pro_annual"},
+                },
+            )
+            r = c.post(
+                "/api/billing/webhook", content=payload, headers={"stripe-signature": _sign(payload)}
+            )
+            assert r.status_code == 200, r.text  # recovered, not an uncaught 500
+        verify = TestingSession()
+        rows = verify.query(Subscription).filter(Subscription.user_id == uid).all()
+        assert len(rows) == 1  # winner + our retried UPDATE == one row, not a duplicate/crash
+        assert rows[0].stripe_subscription_id == "sub_redeliver"  # the retry UPDATED the winner
+        assert verify.query(User).filter(User.id == uid).first().tier == UserTier.PREMIUM
+        assert state["flushes"] == 1  # the race fired at flush and the retry recovered
+        verify.close()
+    finally:
+        asgi.app.dependency_overrides.clear()
+
+
+def test_webhook_fails_closed_when_integrityerror_persists(_engine, monkeypatch):
+    """If BOTH retry attempts hit an IntegrityError (a persistent constraint problem, not the
+    ordinary first-delivery race that one UPDATE resolves), the webhook must FAIL CLOSED — a 500
+    so Stripe re-delivers — and grant NOTHING. It must NEVER return 200 with nothing committed
+    (that would make Stripe stop retrying and silently drop the entitlement update). Pins the
+    fail-closed guarantee (mirrors ``_consume_counter`` exhausting its retry with ``return
+    False`` rather than claiming success)."""
+    from sqlalchemy.exc import IntegrityError
+    from sqlalchemy.orm import sessionmaker
+
+    import asgi
+    from src.db import get_db
+
+    monkeypatch.setenv("STRIPE_WEBHOOK_SECRET", WHSEC)
+    TestingSession = sessionmaker(autocommit=False, autoflush=False, bind=_engine)
+    state = {"armed": False}
+
+    def override_get_db():
+        db = TestingSession()
+        real_flush = db.flush
+
+        def always_failing_flush(*a, **k):
+            if not state["armed"]:
+                return real_flush(*a, **k)
+            db.rollback()  # discard the pending insert; no winner is ever committed
+            raise IntegrityError("dup", {}, Exception("UNIQUE constraint failed: subscriptions.user_id"))
+
+        db.flush = always_failing_flush
+        try:
+            yield db
+        finally:
+            db.close()
+
+    asgi.app.dependency_overrides[get_db] = override_get_db
+    try:
+        with TestClient(asgi.app, raise_server_exceptions=False) as c:
+            uid, _ = _register(c)
+            state["armed"] = True  # every subsequent apply_event flush raises -> both attempts fail
+            payload = _event(
+                "checkout.session.completed",
+                {
+                    "id": "cs_persist",
+                    "object": "checkout.session",
+                    "client_reference_id": uid,
+                    "customer": "cus_persist",
+                    "subscription": "sub_persist",
+                    "payment_status": "paid",
+                    "metadata": {"user_id": uid, "plan": "pro_annual"},
+                },
+            )
+            r = c.post(
+                "/api/billing/webhook", content=payload, headers={"stripe-signature": _sign(payload)}
+            )
+            assert r.status_code == 500  # FAIL CLOSED, never a fake 200
+        verify = TestingSession()
+        # Grant NOTHING: no Subscription row, tier stays FREE.
+        assert verify.query(Subscription).filter(Subscription.user_id == uid).count() == 0
+        assert verify.query(User).filter(User.id == uid).first().tier == UserTier.FREE
+        verify.close()
+    finally:
+        asgi.app.dependency_overrides.clear()
 
 
 def test_webhook_unpaid_async_checkout_grants_nothing(client, monkeypatch, db_session):

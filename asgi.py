@@ -1257,9 +1257,41 @@ async def billing_webhook(request: Request, db: Session = Depends(get_db)):
     # Route ORG (team-seat) events first — they carry an ``org_id`` and map to a known
     # Organization; anything else falls back to individual-subscription handling. Both run only
     # on a signature-VERIFIED event, so neither entitlement path can be forged.
-    if org_billing.apply_event(event, db) is None:
-        billing.apply_event(event, db)
-    db.commit()
+    #
+    # Concurrency: Stripe delivers at-least-once, so the SAME event can arrive on two instances
+    # near-simultaneously. Each ``apply_event`` does SELECT-then-create for the single per-user
+    # (or per-org) Subscription row, so a first-delivery race has both instances INSERT and the
+    # loser trips the ``user_id``/``org_id`` unique constraint -> IntegrityError. We catch it,
+    # roll back, and re-apply ONCE: the winner's row now exists, so the retry takes the idempotent
+    # UPDATE path and commits cleanly (mirroring ``_consume_counter``'s insert-race retry). Without
+    # this the loser 500s, Stripe re-delivers, and entitlement is merely delayed a retry cycle —
+    # with it, both concurrent deliveries succeed and exactly one Subscription row results.
+    # ``apply_event`` is idempotent (SELECT-then-upsert + deterministic ``recompute_user_tier``),
+    # so re-running it after the rollback is safe.
+    for _attempt in (1, 2):
+        try:
+            # The whole apply is inside the try: ``_upsert_subscription`` does an explicit
+            # ``db.flush()``, so a concurrent first-delivery insert-race surfaces the
+            # IntegrityError HERE (at flush inside apply_event), not only at the later commit.
+            if org_billing.apply_event(event, db) is None:
+                billing.apply_event(event, db)
+            db.commit()
+            break
+        except IntegrityError:
+            db.rollback()  # concurrent first-delivery won the insert race — retry as an update
+            if _attempt == 2:
+                # The retry ALSO hit the unique constraint — this is no longer the ordinary
+                # first-delivery race (which one UPDATE resolves). FAIL CLOSED, never a fake
+                # success: re-raise so the webhook 500s and Stripe RE-DELIVERS, rather than
+                # returning 200 with nothing committed (which would make Stripe stop retrying
+                # and silently drop the entitlement update). Mirrors _consume_counter, which
+                # returns False rather than claiming success when its own retry is exhausted.
+                logger.warning(
+                    "billing webhook: IntegrityError persisted after retry for event %s — "
+                    "failing closed (500) so Stripe re-delivers",
+                    event.get("id"),
+                )
+                raise
     return {"received": True}
 
 
