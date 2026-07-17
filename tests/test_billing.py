@@ -208,6 +208,50 @@ def test_webhook_grants_premium_on_signed_checkout_completed(client, monkeypatch
     assert sub.status == "active"
 
 
+def test_webhook_redelivered_checkout_is_idempotent_one_subscription_row(
+    client, monkeypatch, db_session
+):
+    """Stripe redelivers webhook events (retries on any non-2xx, network blip, or at-least-once
+    delivery) — the SAME signed ``checkout.session.completed`` can legitimately arrive more than
+    once. Entitlement must be idempotent: the second delivery must return 200, keep exactly one
+    Subscription row, and not corrupt state. Two layers guarantee this, and nothing pinned
+    EITHER: (1) app-level, ``_upsert_subscription`` keeps one row per user
+    (SELECT-then-create-if-absent), so redelivery is a clean UPDATE; (2) DB-level, ``user_id`` has
+    a UNIQUE constraint as defense-in-depth. A refactor to a blind ``db.add(Subscription(...))``
+    would trip that constraint on redelivery → IntegrityError → the webhook 500s, so Stripe keeps
+    retrying and entitlement bookkeeping breaks — this test catches that (the second delivery must
+    still 200 and leave exactly one row). Deterministic; no live call.
+    """
+    monkeypatch.setenv("STRIPE_WEBHOOK_SECRET", WHSEC)
+    user_id, _ = _register(client)
+    payload = _event(
+        "checkout.session.completed",
+        {
+            "id": "cs_redeliver",
+            "object": "checkout.session",
+            "client_reference_id": user_id,
+            "customer": "cus_redeliver",
+            "subscription": "sub_redeliver",
+            "payment_status": "paid",
+            "metadata": {"user_id": user_id, "plan": "pro_annual"},
+        },
+    )
+    # Same event id ("evt_test" from _event) + same signature body = a true Stripe redelivery.
+    for _ in range(2):
+        r = client.post(
+            "/api/billing/webhook", content=payload, headers={"stripe-signature": _sign(payload)}
+        )
+        assert r.status_code == 200, r.text
+
+    user = db_session.query(User).filter(User.id == user_id).first()
+    assert user.tier == UserTier.PREMIUM
+    # The load-bearing assertion: redelivery upserts, it does not duplicate.
+    rows = db_session.query(Subscription).filter(Subscription.user_id == user_id).all()
+    assert len(rows) == 1
+    assert rows[0].stripe_subscription_id == "sub_redeliver"
+    assert rows[0].status == "active"
+
+
 def test_webhook_unpaid_async_checkout_grants_nothing(client, monkeypatch, db_session):
     """An async-payment checkout that completes UNPAID must not grant Premium — money
     hasn't cleared. Entitlement waits for the subscription to go active."""
