@@ -6,6 +6,80 @@ pre-launch.
 
 ---
 
+### 2026-07-17 — Daily GTM review (both scorecards refreshed; closed 2 of 3 GTM_SCORECARD top_gaps; site-gate circuit-breaker now 5 reads)
+- **Observed:** Phase still `pre_launch`. Re-verified `ListConnectors` — Gmail (connected,
+  enabledInChat:true), Google Drive (connected, enabledInChat:false), Google Calendar
+  (installState unknown, enabledInChat:false), Mobbin (connected, enabledInChat:true), Vercel
+  (connected at org level, enabledInChat:false, zero `mcp__Vercel__*` tools loaded per
+  `ToolSearch`) — unchanged, `channels_connected: []` stays honest. Shell env: `GEMINI_API_KEY`
+  + both `BROWSERBASE_*` vars present (validator infra, not a GTM source), no
+  `PROD_URL`/`ANALYTICS_READ_TOKEN`/`STRIPE_*`/`SMTP_*`/`DATABASE_URL`. Re-ran
+  `analysis/gtm_engine_pct.py` (unchanged, 50) and `node scripts/validate-computation.mjs` (4/4
+  PASS, none changed). **Both independent scorecards read FRESH this run** — the first fresh
+  read for both in several cycles: **QUALITY_SCORECARD** (8th audit, `as_of: 2026-07-16`):
+  overall B (=), `ship_gate_met: false`, but real movement — `store-readiness` **C→B** (PR #412's
+  mobile IAP client + a confirmed-bespoke icon closed the biggest loop-buildable blocker; only
+  store screenshots remain, a Human-Core signed-build item) and `correctness` **A+→A** (a new,
+  non-blocking finding: `create_job` doesn't refund an embedding-ceiling slot on a Gemini
+  embedding outage). A same-day follow-up commit (`2f5b4ad`) claims to fix that exact finding,
+  but per GTM_STANDARD §4 / FACTORY_STANDARD §28 this loop does not self-certify from an
+  adjacent commit — read as-is, watching the next audit. **GTM_SCORECARD** (3rd grade,
+  `as_of: 2026-07-16`): overall A, `ship_gate_met: true` — ends the 4-read staleness streak
+  flagged on 2026-07-15. `roadmap_steer_justification` **A→A+** (the #327 B2B2C-packaging
+  honesty gap closed). `metric_integrity` **A+→A** on a genuine new finding: `validate_gtm.py`'s
+  `METRIC_SECTIONS` walked only `funnel/acquisition/pmf/channels`, leaving `outreach/email/
+  content` metric-fabrication-blind.
+- **Concluded:** No real funnel/PMF data justifies a ROADMAP/BUSINESS_CASE ARR/VISION steer this
+  run (same reasoning as every prior pre-launch read). The three fixes below close real,
+  independently-identified gaps this loop owns — not a steer, not padding.
+- **Did (real, in-repo, maker≠checker reviewed):**
+  1. **Closed the metric_integrity gap** — extended `scripts/validate_gtm.py`'s
+     `METRIC_SECTIONS` to include `outreach`, `email`, `content` alongside the original four
+     sections, and added `tests/test_validate_gtm.py` (9 cases: 4 parametrized on the original
+     sections, 3 parametrized on the newly-covered sections, plus a zero-metrics-pass case and a
+     declared-source-pass case). Verified the fix is load-bearing, not decorative: ran the 3
+     newly-covered-section tests against the pre-fix code via `git stash` — they genuinely FAIL
+     (`0 == 1`) before the fix and PASS after. `flake8` clean, `pytest` 9/9 green.
+  2. **Investigated both halves of GTM_SCORECARD's `self_validation_honesty` gap #2
+     independently, rather than trusting the audit at face value** (the discipline GTM_STANDARD
+     §4 demands — fail closed on what YOU can verify, not what an upstream doc asserts). The
+     `BROWSERBASE_*` claim was a REAL drift: this run's own env check confirms both vars present,
+     while the 2026-07-15 prose wrongly said "no BROWSERBASE_* this run either" — fixed in
+     `GROWTH_STATUS.md`'s validation note. The Drive/Calendar "not enabled-in-chat" claim was
+     **NOT** a drift: this run's own fresh `ListConnectors` call shows both still
+     `enabledInChat: false`, matching what was already written and contradicting the auditor's
+     claim that "ListConnectors shows both enabledInChat:true" — left unedited, with the
+     discrepancy recorded plainly in the validation note, rather than blindly implementing an
+     auditor suggestion that contradicts this run's own primary evidence.
+  3. **Reworded `docs/store/ASO_COPY.md:76-77`** (the `artifact_freshness` watch-nit) — confirmed
+     PR #412 (`70f6ba7`) landed the real RevenueCat purchase/restore client
+     (`mobile/package.json:26` `react-native-purchases ^10.4.3`, `mobile/src/services/
+     purchases.ts`, a wired Restore button in `paywall.tsx`), so "not yet landed" was stale; now
+     states the client has landed in code but stays inert pending owner RevenueCat keys/products
+     and a signed build.
+  Independent reviewer (maker≠checker, fresh subagent) reviewed all three changes together: see
+  PR. **Circuit-breaker escalation, now 5 consecutive quiet GTM reads:** the site-gate owner
+  DECISION (`PENDING_OPS.md` `site-gate`, `ROADMAP.md:421-435`) has gone 5 straight GTM reads
+  (2026-07-09 reframe, 07-11, 07-13, 07-15, 07-17) with zero owner movement — re-verified
+  `PENDING_OPS.md` still shows `as_of: 2026-07-04`, `status: open`, unchanged.
+- **Recommended (to factory):** store-readiness is now down to ONE purely-software gap (store
+  screenshots, needs a signed native build — the same build the owner needs for IAP/RevenueCat
+  anyway, so bundle them). business-case-strength unchanged: a live per-seat price + real B2B
+  adoption data. Watch whether the correctness A+→A finding is confirmed closed by the next
+  independent audit (the same-day fix commit is real code but not yet independently re-graded).
+  Zero outreach drafts this run (correct): `QUALITY_SCORECARD.ship_gate_met` is still false.
+  Demand_signal cadence checked: last run 2026-07-03 (14 days), ~quarterly refresh not due until
+  ~October.
+- **Meta / operational note:** This run did real, substantive GTM-owned engineering (a script fix
+  + a regression test + a doc-accuracy fix) rather than pure bookkeeping — went through the full
+  maker≠checker review, unlike the routine dashboard-only refreshes on 07-07/07-15. Worth noting
+  as a pattern: an independent auditor's claimed drift is a HYPOTHESIS to verify against this
+  run's own fresh tool calls, not a fact to transcribe — one of the two claimed drifts in gap #2
+  did not hold up under independent re-verification, and recording that (rather than silently
+  "fixing" something that wasn't broken) is itself the more honest outcome.
+
+---
+
 ### 2026-07-15 — Daily GTM review (both scorecards unchanged; site-gate circuit-breaker now 4 reads; ASO-copy nit verified, not edited; new Vercel connector noted)
 - **Observed:** Phase still `pre_launch`. Re-verified `ListConnectors` — Gmail (connected,
   enabled) + Google Drive (connected, not enabled-in-chat) + Google Calendar (unknown, not

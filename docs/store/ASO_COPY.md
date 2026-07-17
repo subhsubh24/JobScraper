@@ -73,11 +73,14 @@ Start free today and run your search like an operator.
 > Career Operator offers auto-renewing subscriptions: Pro ($12/month or $96/year) and
 > Career+ ($24/month or $192/year). Payment is charged to your account at confirmation. Subscriptions renew automatically
 > unless cancelled at least 24 hours before the end of the period; manage or cancel in your
-> account settings. **Restore purchases will be available in the app** (Settings → Restore)
-> once mobile in-app subscriptions are integrated (StoreKit/Play Billing — not yet landed).
+> account settings. **Restore purchases is available in the app** (Settings → Restore) — the
+> native purchase/restore client (StoreKit/Play Billing via RevenueCat) has landed in code, but
+> stays inert pending owner RevenueCat keys/product mapping and a signed store build (see
+> PENDING_OPS `revenuecat`); it is not yet usable by a real customer.
 > The subscription Terms of Use and Privacy Policy are linked at the point of purchase
 > (Apple 3.1.2 requires the functional Terms + Privacy links + a Restore action in the
-> paywall UI, not just this text — wire them when StoreKit lands).
+> paywall UI — the Restore action now exists in the paywall UI; the Terms/Privacy links should
+> be verified once the native client goes live).
 
 ## Release notes — v1.0.0
 > First release. Score job fit, generate role-specific interview prep, chat with the AI

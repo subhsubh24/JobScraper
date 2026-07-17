@@ -6,10 +6,10 @@ Growth/GTM auditor judges the SOFT stuff (is the analysis sound?); this enforces
 machine-checkable honesty rules — a Python port of AptDesignerAI's scripts/validate-gtm.mjs:
 
   1. GROWTH_STATUS fenced YAML parses.
-  2. METRIC-WITHOUT-A-SOURCE tripwire: if any funnel/acquisition/pmf/channels metric is
-     non-zero, a connected source MUST be declared (channels_connected truthy, OR a
-     sources/validation block with a connected/available entry). A real number with no
-     connected source = fabrication risk -> FAIL. (Pre-launch: all 0/null -> passes.)
+  2. METRIC-WITHOUT-A-SOURCE tripwire: if any funnel/acquisition/pmf/channels/outreach/email/
+     content metric is non-zero, a connected source MUST be declared (channels_connected
+     truthy, OR a sources/validation block with a connected/available entry). A real number
+     with no connected source = fabrication risk -> FAIL. (Pre-launch: all 0/null -> passes.)
   3. GTM_SCORECARD (if present) parses, grades in {A+,A,B,C,D,F,null}, ship_gate_met set.
   4. --readiness: additionally require GTM_SCORECARD to exist with no ship_critical dim < A.
 
@@ -26,7 +26,7 @@ ROOT = Path(__file__).resolve().parent.parent
 STATUS = ROOT / "docs" / "growth" / "GROWTH_STATUS.md"
 SCORECARD = ROOT / "docs" / "growth" / "GTM_SCORECARD.md"
 GRADES = {"A+", "A", "B", "C", "D", "F", None}
-METRIC_SECTIONS = ["funnel", "acquisition", "pmf", "channels"]
+METRIC_SECTIONS = ["funnel", "acquisition", "pmf", "channels", "outreach", "email", "content"]
 
 
 def _block(path: Path, key):
