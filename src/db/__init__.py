@@ -1,4 +1,5 @@
 """Database initialization and session management."""
+import math
 import os
 from contextlib import contextmanager
 from sqlalchemy import create_engine
@@ -13,10 +14,51 @@ DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///data/jobscraper.db")
 if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
+
+def _db_connect_timeout() -> float:
+    """Seconds bounding a SINGLE Postgres CONNECTION attempt (env: DB_CONNECT_TIMEOUT_SECONDS).
+
+    DEEP_DIAGNOSIS rule (a): every external call needs a timeout SHORTER than the serverless
+    budget so a hung dependency fails INSIDE the function window instead of riding to Vercel's
+    60s hard limit. Every other external call already carries one (LLM 45s, Stripe 25s, HTTP
+    12-20s); the database engine was the last unbounded one — a stalled connection (network
+    partition, exhausted pooler) would hang the whole request. This is psycopg2's ``connect_timeout``
+    (a pure libpq CLIENT-side wait on the TCP+auth handshake): it never touches the server and is
+    NOT a Postgres startup parameter, so it is safe with any connection pooler (Neon/Supabase
+    pgBouncer) — unlike a server-side ``statement_timeout``, which a transaction-mode pooler may
+    reject at startup, so that is deliberately NOT set here (see loop-memory).
+
+    Kept well under the 60s budget (default 10.0s) and env-tunable so ops can tighten it without a
+    deploy. Clamped to [1.0s, 30.0s]: too small would fail healthy connects on a cold pooler, and a
+    huge / inf / nan value (all of which float() accepts without raising) would re-open the very
+    unbounded-tail hole this closes. A malformed (non-numeric) value falls back to the default
+    rather than crashing the host on import.
+    """
+    try:
+        raw = float(os.getenv("DB_CONNECT_TIMEOUT_SECONDS", "10.0"))
+    except (TypeError, ValueError):
+        return 10.0
+    if not math.isfinite(raw):  # inf / -inf / nan are valid floats but must not bound the connect
+        return 10.0
+    return max(1.0, min(30.0, raw))
+
+
+def _build_connect_args(database_url: str) -> dict:
+    """DBAPI connect_args for ``database_url``. Postgres gets a client-side connect timeout;
+    SQLite (local dev / tests) rejects the psycopg2 keyword, so it gets none."""
+    if database_url.startswith("postgresql"):
+        return {"connect_timeout": int(_db_connect_timeout())}
+    return {}
+
+
 _engine_kwargs = {
     "echo": os.getenv("SQL_DEBUG", "false").lower() == "true",
     "pool_pre_ping": True,
 }
+
+_connect_args = _build_connect_args(DATABASE_URL)
+if _connect_args:
+    _engine_kwargs["connect_args"] = _connect_args
 
 # On serverless (Vercel) each invocation is short-lived and a per-process pool would
 # leak/exhaust connections — use NullPool so connections are opened/closed per request.
