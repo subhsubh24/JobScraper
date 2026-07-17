@@ -44,6 +44,20 @@ describe('ReportButton', () => {
     await waitFor(() => expect(screen.getByText(/flagged for review/i)).toBeTruthy());
   });
 
+  it('announces the success state to screen readers (alert + live region), like the error path', async () => {
+    // Regression: a screen-reader user who reports harmful AI content must hear the confirmation,
+    // not silence. The done text carries accessibilityRole="alert" + a polite live region so it is
+    // announced when it replaces the control — matching the error path (no inequitable outcome on
+    // the store-required GenAI safety affordance).
+    render(<ReportButton contentType="coach" contentExcerpt="bad advice" />);
+    fireEvent.press(screen.getByLabelText('Report this response'));
+    fireEvent.press(screen.getByText('Submit report'));
+
+    const done = await screen.findByText(/flagged for review/i);
+    expect(done.props.accessibilityRole).toBe('alert');
+    expect(done.props.accessibilityLiveRegion).toBe('polite');
+  });
+
   it('surfaces an error and does NOT show success when the report fails', async () => {
     (api.reportContent as jest.Mock).mockRejectedValueOnce(new ApiError(500, 'Server error'));
     render(<ReportButton contentType="prep_pack" contentExcerpt="x" />);
