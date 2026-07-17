@@ -278,7 +278,7 @@ FIRST; voice/delivery is a later, owner-gated increment.
       shared-secret `Authorization` header (constant-time) and flips `users.tier` ONLY from a
       verified lifecycle event (grant on purchase/renewal, revoke on EXPIRATION/PAUSED).
       Forged/missing header grants NOTHING (401); unconfigured refuses honestly (503). Round-
-      trip tested (`tests/test_mobile_billing.py`: 12 cases incl. forged/unconfigured/malformed
+      trip tested (`tests/test_mobile_billing.py`: 21 cases incl. forged/unconfigured/malformed
       grant-nothing) — no client-trusted unlock (PR #87, 2 Sonnet reviewers). Live RevenueCat
       keys are Human-Core (PENDING_OPS).
 
