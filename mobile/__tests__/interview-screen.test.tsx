@@ -167,4 +167,20 @@ describe('MockInterviewScreen', () => {
     render(<MockInterviewScreen />);
     expect(await screen.findByText('Could not load this interview.')).toBeTruthy();
   });
+
+  it('past-session rows expose ONE complete accessibility label (status + progress + action)', async () => {
+    // a11y: a screen reader must announce a past session as a single meaningful row, not a bare
+    // "button" or two fragmented Text nodes. The explicit accessibilityLabel guarantees it
+    // regardless of platform child-text aggregation.
+    mockUser = { id: 'u1', tier: 'premium', ai_consent: true };
+    mockList.mockResolvedValue([
+      { id: 'iv-done', job_id: 'job-1', status: 'completed', answered_count: 3, total: 3 },
+      { id: 'iv-wip', job_id: 'job-1', status: 'in_progress', answered_count: 1, total: 4 },
+    ]);
+    render(<MockInterviewScreen />);
+    expect(
+      await screen.findByLabelText('Completed interview, 3 of 3 answered. Review.'),
+    ).toBeTruthy();
+    expect(screen.getByLabelText('In progress interview, 1 of 4 answered. Resume.')).toBeTruthy();
+  });
 });

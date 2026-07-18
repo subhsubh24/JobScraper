@@ -215,6 +215,14 @@ function StartScreen({
             <Pressable
               key={s.id}
               accessibilityRole="button"
+              // Explicit label so a screen reader announces ONE complete, meaningful row —
+              // status + progress + the action — instead of a bare "button" or two fragmented
+              // Text nodes (child-text aggregation on a Pressable is platform-dependent).
+              accessibilityLabel={`${
+                s.status === 'completed' ? 'Completed' : 'In progress'
+              } interview, ${s.answered_count} of ${s.total} answered. ${
+                s.status === 'completed' ? 'Review' : 'Resume'
+              }.`}
               onPress={() => onOpen(s.id)}
               style={styles.sessionRow}
             >
