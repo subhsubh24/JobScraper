@@ -331,10 +331,12 @@ bootcamps / outplacement firms / employers buy a POOL of seats and assign them t
       rendered from reviewable HTML (`scripts/store/feature_graphic.html` + a reproducible render
       script) on the real brand tokens, guarded per-PR by `tests/test_store_assets.py`, with a
       committed alt-text/a11y description. Clears THE DESIGNER QUESTION (2 Sonnet reviewers incl.
-      a pixel-level design pass). STILL OPEN before this box ticks: **store screenshots** (need a
-      signed native build — not producible on Linux; web captures are NOT substituted) and a
-      **bespoke app icon** (`mobile/assets/images/icon.png` is the Expo template; an illustrative
-      brand mark is owner/designer work — auto-gen fails the DESIGNER QUESTION). Box stays `[ ]`.
+      a pixel-level design pass). **BESPOKE ICON LANDED:** `mobile/assets/images/icon.png` is a
+      committed 1024×1024 bespoke brand mark (a chevron-"A" on a blueprint-grid field — NOT the
+      Expo template), independently RENDERED + confirmed by the Quality Auditor (QUALITY_SCORECARD
+      8th audit, 2026-07-16) and reconciled in `docs/store/ACCEPTANCE_AUDIT.md`. STILL OPEN before
+      this box ticks: **store screenshots** (need a signed native build — not producible on Linux;
+      web captures are NOT substituted). Box stays `[ ]` on the screenshots alone.
 - [x] ASO / store copy (title, subtitle, keywords, descriptions) — `docs/store/ASO_COPY.md`
       (title/subtitle/keywords within char limits, descriptions honest to shipped features,
       auto-renew + restore-purchases disclosure) (PR #43).
