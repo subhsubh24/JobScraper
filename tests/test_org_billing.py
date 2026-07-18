@@ -618,3 +618,34 @@ def test_deleting_member_frees_their_seat(client, monkeypatch, db_session):
     assert org_row is not None
     got = client.get("/api/org", headers=_auth(otoken)).json()["organization"]
     assert got["seats_used"] == 0
+
+
+# --- price_id_for_org_plan: the seat-tier (highest-ARPA lever) price resolver ------------------
+# Cheap deterministic guards on the two error branches. A typo in a new plan's env-var name, or
+# a forgotten STRIPE_PRICE_* in the deploy env, must be caught HERE — not silently at webhook
+# time after the customer has already clicked "buy seats".
+
+def test_price_id_for_org_plan_returns_configured_price(monkeypatch):
+    from src.org_billing import price_id_for_org_plan
+
+    monkeypatch.setenv("STRIPE_PRICE_TEAM_ANNUAL", "price_team_annual_123")
+    assert price_id_for_org_plan("team_annual") == "price_team_annual_123"
+
+
+def test_price_id_for_org_plan_unknown_plan_raises(monkeypatch):
+    from src.org_billing import price_id_for_org_plan, UnknownPlan
+    import pytest
+
+    with pytest.raises(UnknownPlan):
+        price_id_for_org_plan("no_such_plan")
+
+
+def test_price_id_for_org_plan_unconfigured_price_raises(monkeypatch):
+    # A KNOWN plan whose price env var is unset must fail loud (BillingNotConfigured), never
+    # return an empty/None price that would produce a broken Stripe checkout.
+    from src.org_billing import price_id_for_org_plan, BillingNotConfigured
+    import pytest
+
+    monkeypatch.delenv("STRIPE_PRICE_TEAM_ANNUAL", raising=False)
+    with pytest.raises(BillingNotConfigured):
+        price_id_for_org_plan("team_annual")
