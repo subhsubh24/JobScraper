@@ -254,6 +254,21 @@ function ReferAFriendCard() {
   );
 }
 
+// Entry point to the team / seat-tier management surface (web parity with the /app/team nav
+// link). Shown to every user; the Team screen itself honestly handles the "not on a team" case.
+function TeamCard() {
+  return (
+    <Card>
+      <Text style={styles.referTitle}>Team</Text>
+      <Text style={styles.referBody}>
+        On a team plan? Manage your teammates&apos; Pro seats — assign or free a seat, and see
+        who&apos;s using them.
+      </Text>
+      <Button label="Manage team" variant="secondary" onPress={() => router.push('/team')} />
+    </Card>
+  );
+}
+
 export default function SettingsScreen() {
   const { user, signOut } = useAuth();
 
@@ -326,6 +341,8 @@ export default function SettingsScreen() {
         <AiConsentSetting />
 
         <GithubEnrichmentCard />
+
+        <TeamCard />
 
         <ReferAFriendCard />
 

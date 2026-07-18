@@ -21,6 +21,7 @@ export default function RootLayout() {
           <Stack.Screen name="(auth)" options={{ headerShown: false }} />
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="job/[id]" options={{ title: 'Job' }} />
+          <Stack.Screen name="team" options={{ title: 'Team' }} />
           <Stack.Screen
             name="paywall"
             options={{ presentation: 'modal', title: 'Upgrade' }}

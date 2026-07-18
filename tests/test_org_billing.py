@@ -494,6 +494,52 @@ def test_webhook_seat_reduction_frees_newest_members(client, monkeypatch, db_ses
     ).first().seats_purchased == 1
 
 
+def test_webhook_update_without_line_items_preserves_seats(client, monkeypatch, db_session):
+    """A benign subscription.updated that carries NO line items must NOT clobber seats.
+
+    Stripe sends `customer.subscription.updated` for many reasons (a metadata edit, a payment-
+    method change, a status refresh) and such an event may omit `items.data`. `_seat_quantity`
+    returns None then, and `apply_event` must LEAVE `seats_purchased` untouched — a regression
+    that unconditionally wrote `max(qty or 0, 0)` would silently zero the org's paid seats and
+    strip every member's entitlement off a no-op event. This pins that protection.
+    """
+    _, otoken = _register(client, "owner-noitems@example.com")
+    member_id, _ = _register(client, "member-noitems@example.com")
+    org = client.post("/api/org", json={"name": "Team NoItems"}, headers=_auth(otoken)).json()
+    _activate_org(client, monkeypatch, org["id"], seats=3)
+    client.post("/api/org/members", json={"email": "member-noitems@example.com"}, headers=_auth(otoken))
+    db_session.expire_all()
+    assert db_session.query(User).filter(User.id == member_id).first().tier == UserTier.PREMIUM
+
+    # subscription.updated with an EMPTY items list (no quantity) — e.g. a metadata-only change.
+    monkeypatch.setenv("STRIPE_WEBHOOK_SECRET", WHSEC)
+    payload = _event(
+        "customer.subscription.updated",
+        {"id": f"sub_{org['id'][:6]}", "customer": f"cus_{org['id'][:6]}", "status": "active",
+         "metadata": {"org_id": org["id"], "plan": "team_annual"},
+         "items": {"data": []}},
+    )
+    assert _post_event(client, payload).status_code == 200
+    db_session.expire_all()
+    # Seats survive the itemless event; the member keeps their entitlement.
+    assert db_session.query(Organization).filter(
+        Organization.id == org["id"]
+    ).first().seats_purchased == 3
+    assert db_session.query(User).filter(User.id == member_id).first().tier == UserTier.PREMIUM
+
+
+def test_seat_quantity_none_when_items_missing_or_malformed():
+    """`_seat_quantity` returns None (not 0 / not a raise) for the payload shapes a real event
+    can take when it carries no usable quantity — the guard the test above depends on."""
+    from src.org_billing import _seat_quantity
+
+    assert _seat_quantity({}) is None                       # no items key
+    assert _seat_quantity({"items": {}}) is None            # items present, no data
+    assert _seat_quantity({"items": {"data": []}}) is None  # empty data
+    assert _seat_quantity({"items": {"data": [{}]}}) is None  # item present, no quantity
+    assert _seat_quantity({"items": {"data": [{"quantity": 7}]}}) == 7  # the happy path still works
+
+
 # --------------------------------------------------------------------------- account-deletion purge
 def test_deleting_owner_purges_org_and_drops_members(client, monkeypatch, db_session):
     _, otoken = _register(client, "owner15@example.com")

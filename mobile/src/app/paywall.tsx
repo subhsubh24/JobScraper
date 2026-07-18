@@ -1,9 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { Button, Card } from '@/components/ui';
+import { api } from '@/services/api';
 import { useAuth } from '@/contexts/auth';
 import {
   PlanId,
@@ -23,6 +24,42 @@ const PRO_FEATURES = [
 ];
 // The Career+-exclusive (a real, additive feature — no tier ever lost it).
 const CAREERPLUS_FEATURE = 'AI salary-negotiation coaching';
+
+// Subscription legal footer. App Store guideline 3.1.2 requires a subscription screen to carry
+// FUNCTIONAL links to the Terms of Service and Privacy Policy — not just prose. These open the
+// hosted /terms and /privacy pages (the same documents the web app links from its footer).
+function LegalFooter({ text }: { text: string }) {
+  const webBase = process.env.EXPO_PUBLIC_WEB_URL ?? api.apiUrl;
+  const open = (path: string) => {
+    // Fire-and-forget: a browser open can reject offline / with no handler — surface nothing
+    // (the prose remains), never crash the paywall.
+    Linking.openURL(`${webBase}${path}`).catch(() => {});
+  };
+  return (
+    <View style={styles.legalWrap}>
+      <Text style={styles.legal}>{text}</Text>
+      <View style={styles.legalLinks}>
+        <Pressable
+          accessibilityRole="link"
+          accessibilityLabel="Terms of Service"
+          onPress={() => open('/terms')}
+          hitSlop={8}
+        >
+          <Text style={styles.legalLink}>Terms of Service</Text>
+        </Pressable>
+        <Text style={styles.legalDot}>·</Text>
+        <Pressable
+          accessibilityRole="link"
+          accessibilityLabel="Privacy Policy"
+          onPress={() => open('/privacy')}
+          hitSlop={8}
+        >
+          <Text style={styles.legalLink}>Privacy Policy</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
 
 function FeatureRow({ label }: { label: string }) {
   return (
@@ -137,9 +174,7 @@ export default function PaywallScreen() {
         </Card>
 
         <Button label="Back to app" onPress={() => router.back()} />
-        <Text style={styles.legal}>
-          Manage or cancel your subscription anytime in your app store account.
-        </Text>
+        <LegalFooter text="Manage or cancel your subscription anytime in your app store account." />
       </ScrollView>
     );
   }
@@ -170,9 +205,7 @@ export default function PaywallScreen() {
         </Card>
 
         <Button label="Back to app" onPress={() => router.back()} />
-        <Text style={styles.legal}>
-          Manage or cancel your subscription anytime in your app store account.
-        </Text>
+        <LegalFooter text="Manage or cancel your subscription anytime in your app store account." />
       </ScrollView>
     );
   }
@@ -219,9 +252,7 @@ export default function PaywallScreen() {
       <Button label="Start Pro" onPress={purchase} loading={busy} />
       <Button label="Restore purchases" variant="secondary" onPress={restore} disabled={busy} />
       <Button label="Maybe later" variant="secondary" onPress={() => router.back()} disabled={busy} />
-      <Text style={styles.legal}>
-        Subscriptions renew automatically until cancelled. Manage in your app store account.
-      </Text>
+      <LegalFooter text="Subscriptions renew automatically until cancelled. Manage in your app store account." />
     </ScrollView>
   );
 }
@@ -251,5 +282,9 @@ const styles = StyleSheet.create({
   planPrice: { color: colors.text, fontSize: 26, fontWeight: '800', marginVertical: 4 },
   per: { fontSize: 14, color: colors.textMuted, fontWeight: '600' },
   planNote: { color: colors.textMuted, fontSize: 12, textAlign: 'center' },
-  legal: { color: colors.textMuted, fontSize: 11, textAlign: 'center', marginTop: spacing.sm },
+  legalWrap: { alignItems: 'center', marginTop: spacing.sm, gap: 6 },
+  legal: { color: colors.textMuted, fontSize: 11, textAlign: 'center' },
+  legalLinks: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  legalLink: { color: colors.primary, fontSize: 12, fontWeight: '600' },
+  legalDot: { color: colors.textMuted, fontSize: 12 },
 });

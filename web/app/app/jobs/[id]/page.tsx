@@ -398,7 +398,7 @@ export default function JobDetailPage() {
               <Field
                 label="Your target salary (USD)"
                 type="number"
-                min={0}
+                min={1}
                 inputMode="numeric"
                 value={targetSalary}
                 onChange={(e) => setTargetSalary(e.target.value)}

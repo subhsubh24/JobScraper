@@ -7,6 +7,7 @@ import type {
   Competency,
   EnrichResult,
   Job,
+  Organization,
   PipelineStats,
   Readiness,
   ReferralStats,
@@ -379,6 +380,37 @@ export const api = {
       `/api/prep/mock-interviews?job_id=${encodeURIComponent(jobId)}`,
     );
     return r.interviews;
+  },
+
+  // Team / organization (seat tier). The mobile management COMPANION to the web /app/team
+  // surface: an owner can view seat usage and assign/free member seats from their phone.
+  // Creating a team and buying seats happen on the web dashboard — NOT in the app — because a
+  // seat purchase is external payment and steering to it would violate App Store guideline
+  // 3.1.1; this surface manages an already-active team (all account management, no purchase).
+  //
+  // Returns the caller's org (owned or a seat they hold) or null when they're on no team.
+  async getOrg(): Promise<Organization | null> {
+    const r = await request<{ organization: Organization | null }>('/api/org');
+    return r.organization;
+  },
+
+  // Assign a purchased seat to a teammate by email (org OWNER only). Awaits the real POST and
+  // returns the server-updated org (roster + seat count are the server's truth) — never an
+  // optimistic success. Throws ApiError(400) no free seats / not active, (404) no such account,
+  // (409) already in another org — the caller surfaces each honestly.
+  async addOrgMember(email: string): Promise<Organization> {
+    return request<Organization>('/api/org/members', {
+      method: 'POST',
+      body: { email },
+    });
+  },
+
+  // Free the seat held by a member (org OWNER only). Returns the server-updated org so the
+  // roster + seat count re-render from the server, never optimistically.
+  async removeOrgMember(userId: string): Promise<Organization> {
+    return request<Organization>(`/api/org/members/${encodeURIComponent(userId)}`, {
+      method: 'DELETE',
+    });
   },
 
   // Cross-pipeline skill-gap heatmap — FREE, computed locally on the server (no LLM). Ranked

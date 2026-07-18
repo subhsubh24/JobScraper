@@ -74,11 +74,13 @@ decorate. No rainbow accents, no decorative gradients/glows.
 - **Wordmark:** "Career Operator" set in Geist Sans, bold — used as the header brand on
   web (`web/app/app/layout.tsx`, landing, waitlist) and the auth header on mobile.
 - **App icon / splash:** `mobile/app.json` points at `mobile/assets/images/icon.png` +
-  adaptive-icon layers + `splash-icon.png`. **Honest status:** these are currently the Expo
-  **template** assets. A brand-aware icon + feature graphic are a **design task** (owner /
-  designer) — a programmatically generated icon would read as generic-AI slop and fails the
-  DESIGNER QUESTION, so the loop does not auto-generate them (tracked in
-  [ACCEPTANCE_AUDIT](../store/ACCEPTANCE_AUDIT.md) G7 / A3 + PENDING_OPS).
+  adaptive-icon layers + `splash-icon.png`. **Honest status:** the committed `icon.png` is a
+  **bespoke** brand mark — a chevron-"A" on a blueprint-grid field, NOT the Expo template
+  (independently rendered + confirmed by the Quality Auditor, `docs/quality/QUALITY_SCORECARD.md`
+  2026-07-16; reflected in [ACCEPTANCE_AUDIT](../store/ACCEPTANCE_AUDIT.md) G7). The feature
+  graphic is likewise committed (`docs/store/assets/feature-graphic.png`). The one remaining
+  store-listing artifact is **screenshots**, which require a signed native build (Human-Core,
+  not producible on the Linux host — tracked in ACCEPTANCE_AUDIT A3/G7 + PENDING_OPS).
 - **Iconography:** real icon sets only — `@expo/vector-icons` (Ionicons) on mobile, inline
   SVG on web. **No emoji as iconography** (VISION avoid-list).
 

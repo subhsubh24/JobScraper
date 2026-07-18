@@ -30,7 +30,8 @@ never a hand-edited binary blob, and it is regenerable via a committed script.
   app captured on a real device/simulator — not producible on the Linux factory host. Tracked in
   [`ACCEPTANCE_AUDIT.md`](../ACCEPTANCE_AUDIT.md) A3/G7 and PENDING_OPS. Web-app captures are **not**
   substituted here — a native store listing must show the native app (honesty).
-- **App icon:** `mobile/assets/images/icon.png` is still the Expo template; a bespoke brand mark is
-  owner/designer work (a programmatically generated icon would read as generic-AI slop and fails the
-  DESIGNER QUESTION — see BRAND_KIT). The feature graphic above is a typographic brand *banner* built
-  from the design system, a different artifact class from a bespoke illustrative icon.
+- **App icon:** `mobile/assets/images/icon.png` is a **bespoke** brand mark — a chevron-"A" on a
+  blueprint-grid field, NOT the Expo template (independently rendered + confirmed by the Quality
+  Auditor, `docs/quality/QUALITY_SCORECARD.md` 2026-07-16; reflected in `ACCEPTANCE_AUDIT.md` G7).
+  The feature graphic above is a typographic brand *banner* built from the design system, a
+  different artifact class from the illustrative icon.
