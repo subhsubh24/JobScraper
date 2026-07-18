@@ -339,6 +339,7 @@ def test_create_job_new_job_serialization_is_eager_not_lazy(db_session):
     assert res["job"]["status"] == ApplicationStatus.SAVED.value
     assert res["job"]["score"] is not None  # heuristic score present (no key needed)
     # Load-bearing bound: the fixed tail is ONE joinedload re-read (measured: 12 statements for the
-    # whole add path). The OLD tail (db.refresh + job_public lazy-loading application + score)
-    # issues 2 MORE after the commit — measured 14 on revert, which exceeds this bound and reddens.
-    assert n <= 12, f"create_job N+1 on the add path: {n} statements (a refresh()+lazy tail adds 2)"
+    # whole add path). The OLD tail (db.refresh + job_public lazy-loading application + score — the
+    # company path short-circuits on the truthy company_name) issues SEVERAL more after the commit
+    # (a refresh SELECT + one lazy load per read relationship), pushing n over this bound on revert.
+    assert n <= 12, f"create_job N+1 on the add path: {n} statements (a refresh()+lazy tail adds ≥2)"
