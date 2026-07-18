@@ -118,8 +118,14 @@ function GithubEnrichmentCard() {
     let active = true;
     api
       .getEnrichment()
+      // Honest degrade: a FAILED load must not masquerade as "no skills imported". Setting
+      // competencies to [] on error erases the user's imported skills from view — a user who
+      // had skills opens Settings, the fetch fails, and they silently vanish with no error.
+      // Keep competencies null (unknown) and surface the failure, mirroring the résumé card.
       .then((c) => active && setCompetencies(c))
-      .catch(() => active && setCompetencies([]));
+      .catch(
+        () => active && setError('Could not load your imported skills. Reopen Settings to try again.'),
+      );
     return () => {
       active = false;
     };
