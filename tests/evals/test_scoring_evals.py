@@ -39,8 +39,15 @@ def _job(db, user_id: str, description: str) -> JobPosting:
 def test_extract_skills_is_deterministic_and_correct(db_session):
     scorer = JobScorer(db_session)
     found = set(scorer.extract_skills("I work with Python, React and PostgreSQL daily."))
-    assert {"python", "react", "postgresql"} <= found
-    assert "java" not in found
+    # Pin the EXACT extracted set, not just a subset. A subset check (``expected <= found``)
+    # silently tolerates a false-positive regression — e.g. the extractor starting to claim
+    # "java"/"docker"/"go" from unrelated text — because extra skills don't break ``<=``. The
+    # skill vocabulary feeds BOTH the paid fit score and the public no-account demo, so a
+    # false-positive burst degrades the core value signal; this asserts nothing spurious appears.
+    # "sql" is present because extraction is substring-based and "sql" ⊂ "postgresql" (PostgreSQL
+    # implies SQL — reasonable); pinning it here means a future move to word-boundary matching
+    # reddens this test and gets reviewed, rather than silently changing scoring behavior.
+    assert found == {"python", "react", "sql", "postgresql"}, f"unexpected skill set: {sorted(found)}"
 
 
 @pytest.mark.parametrize(
