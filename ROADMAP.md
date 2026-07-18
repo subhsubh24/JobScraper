@@ -305,9 +305,17 @@ bootcamps / outplacement firms / employers buy a POOL of seats and assign them t
       Checkout, honest 503 refusal, no fake activation) → member roster (add/remove by email,
       seat-usage view), with the owner/member split mirroring the server's `_org_payload`. 5 web-E2E
       journeys against the REAL backend incl. the member-management critical path (org activated via
-      the signed synthetic webhook), + a "Team" nav link. Box stays `[ ]` until the MOBILE surface
-      also lands (mobile can't be validated on Linux; `/pricing` Team discoverability for net-new
-      buyers is a named follow-up).
+      the signed synthetic webhook), + a "Team" nav link. **MOBILE HALF BUILT (run 61):** a native
+      `/team` route (`mobile/src/app/team.tsx`) reached from a Settings "Team" card — an owner
+      views seat usage + manages the roster (assign/free a seat by email, real awaited POST/DELETE
+      re-rendering from the returned org payload, no optimistic success), and a member sees their
+      team status; honest loading/error/empty states. App-Store-3.1.1-safe by design: creating a
+      team and BUYING seats (external payment) are NOT in the app and it never steers to a purchase
+      — the mobile surface manages an already-active team (`mobile/src/services/api.ts` getOrg/
+      addOrgMember/removeOrgMember; no on-device checkout). Kept `tsc --noEmit` + `expo lint` green
+      locally. Box stays `[ ]` — mobile can't be runtime-validated on the Linux host (BUILDS ≠ WORKS;
+      device validation is Human-Core). `/pricing` Team discoverability for net-new buyers is a
+      named follow-up.
 
 ### D — Store readiness & compliance (Apple App Store + Google Play)
 - [x] Privacy policy (hosted + in-repo) and ToS — `/privacy` + `/terms` render real,

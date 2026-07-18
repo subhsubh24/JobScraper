@@ -98,6 +98,27 @@ export interface ReferralStats {
   bonus_prep_packs: number;
 }
 
+// A teammate holding a seat on the org (present only in the OWNER's org payload).
+export interface OrgMember {
+  user_id: string;
+  email: string | null;
+  role: string; // "owner" | "member"
+}
+
+// Team / organization (seat tier — B2B2C). Mirrors the API's `_org_payload` (asgi.py). The
+// `members` roster is present ONLY in the owner's view; a member sees summary state without it.
+export interface Organization {
+  id: string;
+  name: string;
+  plan: string;
+  active: boolean;
+  seats_purchased: number;
+  seats_used: number;
+  is_owner: boolean;
+  role: string; // "owner" | "member"
+  members?: OrgMember[];
+}
+
 // A competency discovered from a linked public source (Track A profile enrichment).
 export interface Competency {
   skill: string;
