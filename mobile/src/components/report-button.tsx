@@ -38,8 +38,12 @@ export function ReportButton({
   const [done, setDone] = useState(false);
 
   if (done) {
+    // Announce success to screen readers (alert + polite live region), matching the error path
+    // below. Without it, a VoiceOver/TalkBack user who submits a report of harmful AI content
+    // gets NO confirmation that it worked (the control simply vanishes) while a sighted user sees
+    // this text — an inequitable outcome on a store-required (Apple/Google GenAI) safety affordance.
     return (
-      <Text style={styles.doneText} accessibilityRole="text">
+      <Text style={styles.doneText} accessibilityRole="alert" accessibilityLiveRegion="polite">
         Flagged for review — thank you.
       </Text>
     );
