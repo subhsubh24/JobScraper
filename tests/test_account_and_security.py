@@ -19,7 +19,18 @@ def _hdr(token):
 # Account deletion (Apple/Google requirement) — a REAL delete, not a stub.
 # ---------------------------------------------------------------------------
 def test_delete_account_removes_user_and_data(client, db_session):
-    from src.db.models import Application, ChatMessage, JobPosting, JobScore, PrepArtifact, User
+    from src.db.models import (
+        Application,
+        ChatMessage,
+        ContentReport,
+        EnrichedCompetency,
+        JobPosting,
+        JobScore,
+        MockInterview,
+        PrepArtifact,
+        Subscription,
+        User,
+    )
 
     reg = _reg(client, "del@example.com")
     h = _hdr(reg["token"])
@@ -30,13 +41,38 @@ def test_delete_account_removes_user_and_data(client, db_session):
     assert r.status_code == 200, r.text
     job_id = r.json()["job"]["id"]
 
-    # Seed a prep artifact + chat message directly (the API paths are LLM-gated/premium),
-    # so we can prove they too are cascade-deleted — not just the easy rows.
+    # Seed the rows whose API paths are LLM-gated / premium / provider-webhook-only, directly,
+    # so we prove EVERY user-owned table is cascade-deleted — not just the easy rows. This is the
+    # Apple 5.1.1(v) / Google / GDPR "account deletion leaves ZERO user data" guarantee, and each
+    # table below reaches deletion via a DISTINCT cascade edge, so a regression that drops any one
+    # of them (e.g. removing cascade="all, delete-orphan" from a User/JobPosting relationship, or
+    # re-parenting MockInterview off the job graph) would silently orphan real user data — this
+    # test is the tripwire that fails LOUD on exactly that.
     db_session.add(PrepArtifact(job_id=job_id, artifact_type="prep_pack", title="P", content="x"))
     db_session.add(ChatMessage(user_id=user_id, role="user", content="hi"))
+    # MockInterview: cascade reaches it via User -> jobs -> mock_interviews (job-owned graph).
+    db_session.add(
+        MockInterview(
+            user_id=user_id,
+            job_id=job_id,
+            questions=[{"question": "Why this role?", "category": "behavioral"}],
+        )
+    )
+    # ContentReport / EnrichedCompetency / Subscription: cascade via a DIRECT User relationship.
+    db_session.add(ContentReport(user_id=user_id, content_type="coach", reason="inaccurate"))
+    db_session.add(
+        EnrichedCompetency(
+            user_id=user_id, skill="python", source_type="github", source_url="https://github.com/u"
+        )
+    )
+    db_session.add(Subscription(user_id=user_id, plan="pro_monthly", status="active"))
     db_session.commit()
     assert db_session.query(PrepArtifact).count() == 1
     assert db_session.query(ChatMessage).count() == 1
+    assert db_session.query(MockInterview).count() == 1
+    assert db_session.query(ContentReport).count() == 1
+    assert db_session.query(EnrichedCompetency).count() == 1
+    assert db_session.query(Subscription).count() == 1
 
     # Delete the account.
     d = client.delete("/api/auth/me", headers=h)
@@ -53,6 +89,11 @@ def test_delete_account_removes_user_and_data(client, db_session):
     assert db_session.query(Application).count() == 0
     assert db_session.query(PrepArtifact).count() == 0
     assert db_session.query(ChatMessage).count() == 0
+    # Compliance-critical: the LLM/premium/webhook-seeded tables are ALSO gone (zero orphans).
+    assert db_session.query(MockInterview).count() == 0
+    assert db_session.query(ContentReport).count() == 0
+    assert db_session.query(EnrichedCompetency).count() == 0
+    assert db_session.query(Subscription).count() == 0
     # Re-registering the same email succeeds (no leftover unique-email row).
     again = client.post("/api/auth/register", json={"email": "del@example.com", "password": "supersecret123"})
     assert again.status_code == 200, again.text
