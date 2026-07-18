@@ -159,6 +159,17 @@ describe('SettingsScreen', () => {
     expect(screen.queryByText('Résumé saved.')).toBeNull();
   });
 
+  it('a failed résumé LOAD surfaces the retry error instead of hanging on "Loading…" forever', async () => {
+    // Regression: before the load resolves `resume` is null (= "Loading your résumé…"). If the
+    // initial GET fails, the error must be reachable — otherwise the card is stuck on the loading
+    // placeholder forever and the retry message never renders (a dead end on the core input).
+    (api.getResume as jest.Mock).mockRejectedValueOnce(new Error('network'));
+    render(<SettingsScreen />);
+    await screen.findByText(/could not load your résumé/i);
+    expect(screen.queryByText('Loading your résumé…')).toBeNull();
+    await screen.findByText('Share invite link'); // settle the referral card's async load
+  });
+
   it('delete account is HONEST: calls the real DELETE then clears the session', async () => {
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     render(<SettingsScreen />);

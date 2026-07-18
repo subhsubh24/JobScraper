@@ -62,7 +62,16 @@ function ResumeCard() {
         skill-gap heatmap — the more complete it is, the sharper they get.
       </Text>
       {resume === null ? (
-        <Text style={styles.referStats}>Loading your résumé…</Text>
+        // Before the résumé loads, `resume` is null. If the initial GET fails we must surface
+        // the error HERE — otherwise the card stays stuck on "Loading…" forever and the error
+        // text below (only rendered once `resume` is non-null) is unreachable: a dead end on the
+        // core résumé input. On failure we keep the editor hidden (don't present an empty field
+        // that could overwrite a résumé that merely failed to load) and show the retry message.
+        error ? (
+          <Text style={styles.errorText}>{error}</Text>
+        ) : (
+          <Text style={styles.referStats}>Loading your résumé…</Text>
+        )
       ) : (
         <>
           <Field
