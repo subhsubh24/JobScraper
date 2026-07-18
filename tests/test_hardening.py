@@ -59,3 +59,38 @@ def test_e2e_rate_limit_bypass_inactive_by_default():
     import asgi
 
     assert asgi._RATE_LIMIT_DISABLED is False
+
+
+def test_db_connect_has_subbudget_timeout(monkeypatch):
+    # Rule (a): the DB engine must carry a sub-budget CONNECT timeout so a stalled Postgres
+    # connection (network partition / exhausted pooler) fails inside the serverless window
+    # instead of riding to Vercel's 60s hard limit. psycopg2 connect_timeout is a client-side
+    # libpq wait (not a server startup param), so it is pooler-safe.
+    import src.db as db
+
+    args = db._build_connect_args("postgresql://user:pw@host/db")
+    assert "connect_timeout" in args
+    assert 1 <= args["connect_timeout"] <= 30  # bounded, well under the 60s budget
+
+
+def test_db_connect_timeout_env_tunable_and_clamped(monkeypatch):
+    import src.db as db
+
+    monkeypatch.setenv("DB_CONNECT_TIMEOUT_SECONDS", "5")
+    assert db._db_connect_timeout() == 5.0
+    # Out-of-range / non-finite / malformed values fall back to the clamped safe range,
+    # never leaving the connect unbounded.
+    monkeypatch.setenv("DB_CONNECT_TIMEOUT_SECONDS", "9999")
+    assert db._db_connect_timeout() == 30.0
+    monkeypatch.setenv("DB_CONNECT_TIMEOUT_SECONDS", "inf")
+    assert db._db_connect_timeout() == 10.0
+    monkeypatch.setenv("DB_CONNECT_TIMEOUT_SECONDS", "not-a-number")
+    assert db._db_connect_timeout() == 10.0
+
+
+def test_db_connect_args_empty_for_sqlite():
+    # SQLite (local dev / tests) rejects the psycopg2 connect_timeout keyword — it must not be
+    # passed, or the engine would fail to construct.
+    import src.db as db
+
+    assert db._build_connect_args("sqlite:///data/jobscraper.db") == {}
