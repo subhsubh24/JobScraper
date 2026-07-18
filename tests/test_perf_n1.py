@@ -259,3 +259,30 @@ def test_pipeline_stats_empty_user_is_zeroed_not_errored(db_session):
     assert stats["status_breakdown"] == {}
     assert stats["average_score"] == 0.0
     assert stats["top_jobs"] == []
+
+
+def test_update_job_status_does_not_n_plus_one_on_serialization(db_session):
+    """``PATCH /api/jobs/{id}`` re-serializes the updated job via ``job_public`` (application +
+    score + company). ``commit`` expires those relationships, so without an eager re-read the
+    response lazy-loads all three — 3 extra round-trips on the hot pipeline-tracking write path.
+    The fix re-reads the row with ``joinedload`` (one LEFT JOIN). This pins the endpoint's total
+    query count well below the OLD lazy-load path so the N+1 cannot silently return."""
+    user = _seed_user_with_jobs(db_session, 1, "perf-patch@example.com")
+    job_id = db_session.query(JobPosting).filter(JobPosting.user_id == user.id).first().id
+    data = asgi.JobUpdate(status=ApplicationStatus.INTERVIEW.value)
+    db_session.expire_all()  # force fresh loads so the count reflects real fetches
+    _ = user.id  # reload the user OUTSIDE the measured region (the auth dependency already
+    #              loaded it in prod) so the count reflects only the PATCH's own round-trips
+    n, res = _count_queries(
+        db_session,
+        lambda: asgi.update_job_status(job_id=job_id, data=data, user=user, db=db_session),
+    )
+
+    # Correct outcome: the new status persisted and the eager-loaded relationships are real.
+    assert res["job"]["status"] == ApplicationStatus.INTERVIEW.value
+    assert res["job"]["score"] is not None
+    assert res["job"]["company"] == "Acme 0"  # company_name is None → dereferences the relationship
+    # fetch job + load its application + the UPDATE + ONE joinedload re-read = 4. The OLD path
+    # added refresh() + a lazy application/score/company load each (~7). A regression to a
+    # non-eager re-read (or db.refresh + job_public) pushes this back over the bar.
+    assert n <= 4, f"PATCH /api/jobs/{{id}} N+1 on job_public serialization: {n} queries"

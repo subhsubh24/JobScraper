@@ -1608,6 +1608,19 @@ def create_job(
     analytics.record_event(db, "job_added")
     if scored:
         analytics.record_event(db, "fit_score_generated")
+    # Re-read with the three ``job_public`` relationships eager-loaded: the commits above (and the
+    # analytics/refund helpers, which commit) expired ``job``, so serializing it would otherwise
+    # lazy-load application/score/company as 3 extra round-trips on the core job-add path.
+    job = (
+        db.query(JobPosting)
+        .options(
+            joinedload(JobPosting.application),
+            joinedload(JobPosting.score),
+            joinedload(JobPosting.company),
+        )
+        .filter(JobPosting.id == job.id)
+        .first()
+    )
     return {"success": True, "job": job_public(job)}
 
 
@@ -1747,16 +1760,40 @@ def update_job_status(
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
 
-    application = job.application
-    if not application:
-        application = Application(user_id=user.id, job_id=job.id)
-        db.add(application)
-    application.status = ApplicationStatus(data.status)
-    application.last_activity_at = datetime.utcnow()
-    if data.status == ApplicationStatus.APPLIED.value and not application.applied_at:
-        application.applied_at = datetime.utcnow()
-    db.commit()
-    db.refresh(job)
+    def _apply_status(application: Optional[Application]) -> None:
+        if not application:
+            application = Application(user_id=user.id, job_id=job.id)
+            db.add(application)
+        application.status = ApplicationStatus(data.status)
+        application.last_activity_at = datetime.utcnow()
+        if data.status == ApplicationStatus.APPLIED.value and not application.applied_at:
+            application.applied_at = datetime.utcnow()
+
+    _apply_status(job.application)
+    try:
+        db.commit()
+    except IntegrityError:
+        # Two concurrent PATCHes on a job with no Application row yet both take the "create"
+        # branch; the loser trips the ``Application.job_id`` UNIQUE constraint. Roll back and
+        # re-apply onto the row the winner just created — the status update must still land,
+        # never surface a 500 (same race-as-update pattern as join_waitlist / billing_webhook).
+        db.rollback()
+        existing = db.query(Application).filter(Application.job_id == job.id).first()
+        _apply_status(existing)
+        db.commit()
+    # Re-read with the three ``job_public`` relationships eager-loaded so serialization does not
+    # lazy-load application/score/company (3 extra round-trips) on this hot write path — the
+    # commit above expired them. joinedload = one LEFT JOIN for a single row (get_job pattern).
+    job = (
+        db.query(JobPosting)
+        .options(
+            joinedload(JobPosting.application),
+            joinedload(JobPosting.score),
+            joinedload(JobPosting.company),
+        )
+        .filter(JobPosting.id == job.id)
+        .first()
+    )
     return {"success": True, "job": job_public(job)}
 
 

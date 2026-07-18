@@ -7,7 +7,10 @@ they prove user B can neither read nor mutate user A's job, and that the refusal
 an indistinguishable 404 (no existence leak).
 """
 
-from src.db.models import ApplicationStatus
+from sqlalchemy.exc import IntegrityError
+
+import asgi
+from src.db.models import Application, ApplicationStatus, JobPosting, User, UserTier
 
 
 def _register(client, email, password="hunter2pw"):
@@ -84,3 +87,52 @@ def test_jobs_list_is_scoped_to_the_caller(client):
     r = client.get("/api/jobs", headers=_auth(token_b))
     assert r.status_code == 200
     assert r.json()["jobs"] == []
+
+
+def test_patch_survives_concurrent_application_insert_race(db_session, monkeypatch):
+    """Two concurrent PATCHes on a job that has no Application row yet both take the "create"
+    branch; the loser trips ``Application.job_id``'s UNIQUE constraint on commit. The endpoint
+    must NOT 500 — it rolls back and re-applies the status onto the row the winner created.
+
+    We drive the race deterministically: the first ``commit`` simulates the winning request by
+    persisting a competing Application row (via a real commit) and then raising the same
+    ``IntegrityError`` the DB would. The endpoint's except-branch must recover and the status
+    must still land. Reverting the fix (dropping the try/except) makes this raise a 500."""
+    user = User(email="patch-race@example.com", password_hash="x", tier=UserTier.FREE)
+    db_session.add(user)
+    db_session.flush()
+    job = JobPosting(user_id=user.id, title="Engineer", company_name="Acme")
+    db_session.add(job)
+    db_session.commit()  # persist the job with NO Application row yet
+    job_id = job.id
+
+    real_commit = db_session.commit
+    state = {"raised": False}
+
+    def flaky_commit():
+        if not state["raised"]:
+            state["raised"] = True
+            # Simulate the concurrent winner: drop our own pending insert (as a rolled-back
+            # IntegrityError would), persist the competing row, then raise like the DB did.
+            db_session.rollback()
+            db_session.add(
+                Application(user_id=user.id, job_id=job_id, status=ApplicationStatus.SAVED)
+            )
+            real_commit()
+            raise IntegrityError("INSERT application", {}, Exception("UNIQUE job_id"))
+        real_commit()
+
+    monkeypatch.setattr(db_session, "commit", flaky_commit)
+
+    res = asgi.update_job_status(
+        job_id=job_id,
+        data=asgi.JobUpdate(status=ApplicationStatus.APPLIED.value),
+        user=user,
+        db=db_session,
+    )
+
+    # No 500: the update landed on the winner's row and the response is honest.
+    assert state["raised"] is True, "the race path was not exercised"
+    assert res["job"]["status"] == ApplicationStatus.APPLIED.value
+    # And exactly one Application row exists for the job (no duplicate, constraint held).
+    assert db_session.query(Application).filter(Application.job_id == job_id).count() == 1
