@@ -170,6 +170,18 @@ describe('SettingsScreen', () => {
     await screen.findByText('Share invite link'); // settle the referral card's async load
   });
 
+  it('a failed enrichment LOAD surfaces an honest error, not a silent "no skills" empty state', async () => {
+    // Regression: on a getEnrichment() failure the card used to setCompetencies([]) — which is
+    // indistinguishable from "no skills imported". A Pro user who HAD imported skills would open
+    // Settings, the fetch fails, and their skills silently vanish with no error. The load failure
+    // must now surface honestly (competencies stays unknown), mirroring the résumé card.
+    mockUser = { ...mockUser, tier: 'premium' };
+    (api.getEnrichment as jest.Mock).mockRejectedValueOnce(new Error('network'));
+    render(<SettingsScreen />);
+    await screen.findByText(/could not load your imported skills/i);
+    await screen.findByText('Share invite link'); // settle the referral card's async load
+  });
+
   it('delete account is HONEST: calls the real DELETE then clears the session', async () => {
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     render(<SettingsScreen />);
