@@ -1555,6 +1555,10 @@ def create_job(
     )
     db.add(job)
     db.flush()
+    # Capture the PK now (stable after flush) so the post-commit serialization re-read can filter
+    # on a plain string instead of the expired ``job.id`` attribute (which would force a refresh
+    # SELECT just to read it back).
+    new_job_id = job.id
 
     # Score (heuristic fallback when no Gemini key — never crashes). Over the ceiling the job
     # is still created, just UNSCORED (the same graceful outcome as a scoring error) — never a
@@ -1587,7 +1591,6 @@ def create_job(
     db.add(Application(user_id=user.id, job_id=job.id, status=ApplicationStatus.SAVED))
     auth.increment_job_usage(user)
     db.commit()
-    db.refresh(job)
     # Refund the up-front per-day scoring slot when the paid embedding call OUTAGED (degraded to
     # the neutral baseline with no billable spend). Done post-commit so ``_refund_counter``'s own
     # commit only persists the decrement — the job/Application/usage rows are already durable, so
@@ -1600,7 +1603,7 @@ def create_job(
             logger.warning(
                 "score_daily refund failed for user %s after embedding outage on job %s",
                 user.id,
-                job.id,
+                new_job_id,
                 exc_info=True,
             )
     # Privacy-safe aggregate metrics (best-effort, post-commit; counts only, no PII). The
@@ -1608,9 +1611,11 @@ def create_job(
     analytics.record_event(db, "job_added")
     if scored:
         analytics.record_event(db, "fit_score_generated")
-    # Re-read with the three ``job_public`` relationships eager-loaded: the commits above (and the
-    # analytics/refund helpers, which commit) expired ``job``, so serializing it would otherwise
-    # lazy-load application/score/company as 3 extra round-trips on the core job-add path.
+    # Re-read for serialization with the three ``job_public`` relationships eager-loaded: the
+    # commits above (and the analytics/refund helpers, which commit) expired ``job``, so lazy
+    # loading application/score/company would cost 3 extra round-trips on the core job-add path.
+    # Filter on the captured ``new_job_id`` (not the expired ``job.id``) so the joinedload is a
+    # single LEFT JOIN with no preceding refresh SELECT. Replaces the old refresh()+lazy pattern.
     job = (
         db.query(JobPosting)
         .options(
@@ -1618,7 +1623,7 @@ def create_job(
             joinedload(JobPosting.score),
             joinedload(JobPosting.company),
         )
-        .filter(JobPosting.id == job.id)
+        .filter(JobPosting.id == new_job_id)
         .first()
     )
     return {"success": True, "job": job_public(job)}
@@ -1773,17 +1778,22 @@ def update_job_status(
     try:
         db.commit()
     except IntegrityError:
-        # Two concurrent PATCHes on a job with no Application row yet both take the "create"
-        # branch; the loser trips the ``Application.job_id`` UNIQUE constraint. Roll back and
-        # re-apply onto the row the winner just created — the status update must still land,
-        # never surface a 500 (same race-as-update pattern as join_waitlist / billing_webhook).
+        # DEFENSIVE (schema-level), not an observed production race: today every JobPosting is
+        # created with its Application in the SAME transaction (create_job), so a committed job
+        # with no Application row does not arise from normal flow. But the schema permits it
+        # (Application is optional) and the create branch above exists, so if two writers ever
+        # both take it, the loser trips ``Application.job_id``'s UNIQUE constraint. Recover the
+        # same way join_waitlist / billing_webhook do rather than surfacing a 500: roll back and
+        # re-apply onto the row the winner created.
         db.rollback()
-        existing = db.query(Application).filter(Application.job_id == job.id).first()
+        existing = db.query(Application).filter(Application.job_id == job_id).first()
         _apply_status(existing)
         db.commit()
-    # Re-read with the three ``job_public`` relationships eager-loaded so serialization does not
-    # lazy-load application/score/company (3 extra round-trips) on this hot write path — the
-    # commit above expired them. joinedload = one LEFT JOIN for a single row (get_job pattern).
+    # Re-read for serialization with the three ``job_public`` relationships eager-loaded: the
+    # commit above expired ``job``, so lazy-loading application/score/company would cost 3 extra
+    # round-trips on this hot pipeline-write path. Filter on the ``job_id`` PATH PARAM (never
+    # expired) so we don't first issue a refresh SELECT just to read an expired ``job.id`` — the
+    # joinedload is then a single LEFT JOIN (the get_job pattern).
     job = (
         db.query(JobPosting)
         .options(
@@ -1791,7 +1801,7 @@ def update_job_status(
             joinedload(JobPosting.score),
             joinedload(JobPosting.company),
         )
-        .filter(JobPosting.id == job.id)
+        .filter(JobPosting.id == job_id)
         .first()
     )
     return {"success": True, "job": job_public(job)}
