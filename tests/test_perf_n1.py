@@ -67,6 +67,28 @@ def _count_queries(db, fn):
     return count["n"], result
 
 
+def _count_engine_queries(db, fn):
+    """Count DB statements across the WHOLE call, INCLUDING after an internal ``commit``.
+
+    ``_count_queries`` binds its listener to a single ``Connection`` captured up front. An endpoint
+    that commits mid-call (e.g. ``update_job_status`` / ``create_job``) checks out a NEW connection
+    for its subsequent statements, which that listener never sees — so it silently under-counts and
+    a POST-COMMIT N+1 (exactly what the re-read fixes) slips past. Listen on the ENGINE instead so
+    every statement is counted regardless of which connection issues it."""
+    engine = db.get_bind()
+    count = {"n": 0}
+
+    def _on_exec(*_args, **_kwargs):
+        count["n"] += 1
+
+    event.listen(engine, "after_cursor_execute", _on_exec)
+    try:
+        result = fn()
+    finally:
+        event.remove(engine, "after_cursor_execute", _on_exec)
+    return count["n"], result
+
+
 def test_list_jobs_is_not_n_plus_one(db_session):
     user2 = _seed_user_with_jobs(db_session, 2, "perf-jobs-a@example.com")
     db_session.expire_all()  # force fresh loads so the count reflects real fetches
@@ -259,3 +281,65 @@ def test_pipeline_stats_empty_user_is_zeroed_not_errored(db_session):
     assert stats["status_breakdown"] == {}
     assert stats["average_score"] == 0.0
     assert stats["top_jobs"] == []
+
+
+def test_update_job_status_does_not_n_plus_one_on_serialization(db_session):
+    """``PATCH /api/jobs/{id}`` re-serializes the updated job via ``job_public`` (application +
+    score + company). ``commit`` expires those relationships, so without an eager re-read the
+    response lazy-loads all three — 3 extra round-trips on the hot pipeline-tracking write path.
+    The fix re-reads the row with ``joinedload`` (one LEFT JOIN). This pins the endpoint's total
+    query count well below the OLD lazy-load path so the N+1 cannot silently return."""
+    user = _seed_user_with_jobs(db_session, 1, "perf-patch@example.com")
+    job_id = db_session.query(JobPosting).filter(JobPosting.user_id == user.id).first().id
+    data = asgi.JobUpdate(status=ApplicationStatus.INTERVIEW.value)
+    db_session.expire_all()  # force fresh loads so the count reflects real fetches
+    _ = user.id  # reload the user OUTSIDE the measured region (the auth dependency already
+    #              loaded it in prod) so the count reflects only the PATCH's own round-trips
+    # ENGINE-level count: the endpoint commits mid-call, so a connection-scoped listener would
+    # stop seeing statements right where the N+1 lives (post-commit serialization). This spans it.
+    n, res = _count_engine_queries(
+        db_session,
+        lambda: asgi.update_job_status(job_id=job_id, data=data, user=user, db=db_session),
+    )
+
+    # Correct outcome: the new status persisted and the eager-loaded relationships are real.
+    assert res["job"]["status"] == ApplicationStatus.INTERVIEW.value
+    assert res["job"]["score"] is not None
+    assert res["job"]["company"] == "Acme 0"  # company_name is None → dereferences the relationship
+    # fetch job + load its application + the UPDATE + ONE joinedload re-read = 4. The OLD
+    # refresh()+lazy path issued a refresh SELECT plus a lazy application/score/company load each
+    # (7). Reverting to db.refresh + lazy job_public (or filtering the re-read on the expired
+    # job.id, which adds a refresh SELECT) pushes n back over 4 and reddens this.
+    assert n <= 4, f"PATCH /api/jobs/{{id}} N+1 on job_public serialization: {n} queries"
+
+
+def test_create_job_new_job_serialization_is_eager_not_lazy(db_session):
+    """``POST /api/jobs`` (the NEW-job path, not the dedup early-return) commits, then serializes
+    the created job via ``job_public``. The old tail was ``db.refresh(job)`` + lazy ``job_public``
+    — a wasted refresh SELECT plus a lazy load per read relationship AFTER the commit. The fix
+    captures the PK before committing and re-reads once with ``joinedload``. The engine-level count
+    (which spans the internal commit — a connection-scoped counter would miss the tail entirely)
+    pins the total so reverting to the refresh()+lazy tail reddens it."""
+    user = User(
+        email="perf-create@example.com", password_hash="x", tier=UserTier.PREMIUM,
+        resume_text="python react",
+    )
+    db_session.add(user)
+    db_session.flush()
+    data = asgi.JobCreate(title="Engineer", description="python and react role", company_name="Acme")
+    db_session.expire_all()  # force fresh loads so the count reflects real fetches
+    _ = user.id  # reload the user OUTSIDE the measured region (auth dependency loads it in prod)
+
+    n, res = _count_engine_queries(
+        db_session, lambda: asgi.create_job(data=data, user=user, db=db_session)
+    )
+
+    # The created job is returned with real data from the eager re-read (SAVED application + score).
+    assert res.get("duplicate") is not True
+    assert res["job"]["status"] == ApplicationStatus.SAVED.value
+    assert res["job"]["score"] is not None  # heuristic score present (no key needed)
+    # Load-bearing bound: the fixed tail is ONE joinedload re-read (measured: 12 statements for the
+    # whole add path). The OLD tail (db.refresh + job_public lazy-loading application + score — the
+    # company path short-circuits on the truthy company_name) issues SEVERAL more after the commit
+    # (a refresh SELECT + one lazy load per read relationship), pushing n over this bound on revert.
+    assert n <= 12, f"create_job N+1 on the add path: {n} statements (a refresh()+lazy tail adds ≥2)"
