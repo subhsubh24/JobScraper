@@ -44,10 +44,14 @@ src/
 ## Status (honest)
 - ✅ Typecheck-clean, lint-clean. Auth + pipeline + job detail + coach + paywall UI
   wired to the real API with real loading/empty/error states.
-- ⏳ In-app purchase (RevenueCat/StoreKit/Play Billing) — Track C, needs owner store
-  accounts + product IDs.
+- ⏳ In-app purchase — the RevenueCat/StoreKit/Play-Billing **client is built** (`react-native-purchases`,
+  `services/purchases.ts`, wired into `paywall.tsx` with a Restore control; PR #412) and inert when
+  unkeyed; entitlement flips server-side only via the signature-verified webhook. Remaining (Human-Core,
+  Track C): owner RevenueCat keys + store product IDs + a signed-build sandbox-charge round-trip.
 - ✅ Account deletion — `DELETE /api/auth/me` cascade-deletes the account + all owned data
   (PR #36; ACCEPTANCE_AUDIT A8 = PASS); mobile Settings "Delete account" calls it for real.
 - ✅ Component/integration test suite (jest-expo — API client + Pipeline/Job-detail/paywall
   screens + prep markdown). ⏳ Native signed device runs remain Track E / human-CI.
-- ⏳ Real rendered store assets (icon/screenshots/feature graphic) — Track D.
+- ⏳ Store assets — a **bespoke app icon** (`assets/images/icon.png`) and the 1024×500 **feature
+  graphic** are committed (done); the remaining gap is rendered **screenshots**, which need a signed
+  native build (Track D).
