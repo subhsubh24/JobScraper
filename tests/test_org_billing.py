@@ -408,6 +408,51 @@ def test_org_seat_removal_does_not_strip_mobile_subscriber(client, monkeypatch, 
     assert db_session.query(User).filter(User.id == member_id).first().tier == UserTier.FREE
 
 
+def test_member_removal_preserves_individual_subscription(client, monkeypatch, db_session):
+    """A member who ALSO holds their own individual Stripe sub keeps PREMIUM when the owner
+    removes them from the org seat. This is the REMOVAL path with an individual sub — distinct
+    from the org-CANCEL + individual regression (above) and the seat-removal + MOBILE regression
+    (above). Guards recompute_user_tier on the DELETE /api/org/members endpoint so a refactor
+    can't silently strip a paying individual subscriber when their org seat changes."""
+    monkeypatch.setenv("STRIPE_WEBHOOK_SECRET", WHSEC)
+    _, otoken = _register(client, "owner-rm-ind@example.com")
+    member_id, _ = _register(client, "member-rm-ind@example.com")
+    org = client.post("/api/org", json={"name": "Team RmInd"}, headers=_auth(otoken)).json()
+    _activate_org(client, monkeypatch, org["id"], seats=2)
+    client.post("/api/org/members", json={"email": "member-rm-ind@example.com"}, headers=_auth(otoken))
+
+    # The member also buys their OWN individual subscription.
+    ind = _event(
+        "checkout.session.completed",
+        {"id": "cs_rmind", "client_reference_id": member_id, "customer": "cus_rmind",
+         "subscription": "sub_rmind", "payment_status": "paid",
+         "metadata": {"user_id": member_id, "plan": "pro_annual"}},
+    )
+    assert _post_event(client, ind).status_code == 200
+    db_session.expire_all()
+    assert db_session.query(User).filter(User.id == member_id).first().tier == UserTier.PREMIUM
+
+    # Owner removes them from the org seat.
+    assert client.delete(f"/api/org/members/{member_id}", headers=_auth(otoken)).status_code == 200
+
+    db_session.expire_all()
+    # Seat gone, but the individual sub still grants PREMIUM (not stripped to FREE).
+    assert db_session.query(User).filter(User.id == member_id).first().tier == UserTier.PREMIUM
+
+
+def test_remove_nonmember_returns_404(client, monkeypatch):
+    """Removing a user who is not an active member of the owner's org returns a truthful 404 —
+    the remove_member() -> False -> 404 branch, previously exercised only on the success path.
+    Pins the honest error so a refactor of the None check can't silently 200 a no-op removal."""
+    _, otoken = _register(client, "owner-rm-404@example.com")
+    nonmember_id, _ = _register(client, "nonmember-rm-404@example.com")
+    org = client.post("/api/org", json={"name": "Team Rm404"}, headers=_auth(otoken)).json()
+    _activate_org(client, monkeypatch, org["id"], seats=2)
+    r = client.delete(f"/api/org/members/{nonmember_id}", headers=_auth(otoken))
+    assert r.status_code == 404
+    assert "isn't an active member" in r.json()["detail"]
+
+
 def test_canceling_individual_sub_does_not_strip_mobile_subscriber(client, monkeypatch, db_session):
     """Regression: the {individual Stripe sub + mobile RevenueCat} pair, NO org.
 
