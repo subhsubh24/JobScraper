@@ -17,7 +17,9 @@ It ships as three surfaces over one backend:
   the same `/api`. Not deployed to Vercel; ships through the App Store / Google Play.
 
 > **Status:** pre-launch. The product is built and deployed; monetization code is wired
-> (Stripe for web; mobile billing is in progress). It is **not** yet store-submitted. See
+> (Stripe for web; mobile in-app purchases via RevenueCat/`react-native-purchases`, inert
+> pending owner RevenueCat keys + a signed build). It is **not** yet
+> store-submitted. See
 > [ROADMAP.md](./ROADMAP.md) for what's done and what's left, and
 > [docs/BUSINESS_CASE.md](./docs/BUSINESS_CASE.md) for honest revenue math.
 
