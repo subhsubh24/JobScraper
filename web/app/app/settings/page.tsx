@@ -96,7 +96,13 @@ function ResumeCard() {
         your skill-gap heatmap — the more complete it is, the sharper they get.
       </p>
 
-      {resume === null ? (
+      {resume === null && error ? (
+        // Load failed: surface the error + recovery path instead of a skeleton that spins forever
+        // (the textarea/error below only render once resume is a string). Quiet/gray, no alert
+        // role — matching the on-mount load-failure convention (team, referral, enrichment cards);
+        // the red ErrorText below is reserved for the user-initiated SAVE action.
+        <p className="mt-4 text-sm text-slate-500">{error}</p>
+      ) : resume === null ? (
         <div className="mt-4 h-40 animate-pulse rounded-lg bg-slate-800/60" aria-hidden="true" />
       ) : (
         <>
@@ -137,6 +143,7 @@ function GithubEnrichmentCard() {
   const [importing, setImporting] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
 
   useEffect(() => {
     if (!isPro) return;
@@ -144,7 +151,9 @@ function GithubEnrichmentCard() {
     api
       .getEnrichment()
       .then((c) => active && setCompetencies(c))
-      .catch(() => active && setCompetencies([]));
+      // Distinguish a load FAILURE from a genuinely empty result: setting competencies to []
+      // here would render "No skills imported yet", masking the error as an empty state.
+      .catch(() => active && setLoadFailed(true));
     return () => {
       active = false;
     };
@@ -217,7 +226,11 @@ function GithubEnrichmentCard() {
           {notice && <p className="mt-3 text-sm text-slate-400">{notice}</p>}
           <ErrorText>{error}</ErrorText>
 
-          {competencies === null ? (
+          {competencies === null && loadFailed ? (
+            <p className="mt-4 text-sm text-slate-500">
+              Could not load your imported skills. Reload to try again.
+            </p>
+          ) : competencies === null ? (
             <div className="mt-4 h-8 animate-pulse rounded-lg bg-slate-800/60" aria-hidden="true" />
           ) : competencies.length > 0 ? (
             <>
