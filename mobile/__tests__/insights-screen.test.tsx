@@ -5,7 +5,7 @@
 // the auth context, and the API are mocked so the screen renders headlessly (native can't compile
 // on CI/Linux). (Factory vars are `mock`-prefixed per jest's hoisting rule.)
 
-import { render, screen } from '@testing-library/react-native';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 
 jest.mock('react-native-safe-area-context', () => {
   const { View } = require('react-native');
@@ -113,6 +113,32 @@ describe('InsightsScreen', () => {
 
     render(<InsightsScreen />);
     expect(await screen.findByText('Track a few jobs first')).toBeTruthy();
+  });
+
+  it('preserves the existing plan when a REGENERATE fails (no silent data loss)', async () => {
+    const { ApiError } = require('@/services/api');
+    mockUser = { id: 'u1', tier: 'premium', ai_consent: true };
+    mockSkillGaps.mockResolvedValue(ANALYSIS);
+    // First generate succeeds, then the regenerate hits a transient 5xx.
+    mockGenerateLearningPlan
+      .mockResolvedValueOnce({ title: 'Learning plan', content: '# Learn kubernetes' })
+      .mockRejectedValueOnce(new ApiError(500, 'Could not generate a learning plan — try again.'));
+
+    render(<InsightsScreen />);
+
+    // Generate → the button flips to "Regenerate plan" (the observable that the plan is present).
+    fireEvent.press(await screen.findByText('Generate learning plan'));
+    await waitFor(() => expect(screen.getByText('Regenerate plan')).toBeTruthy());
+
+    // Regenerate fails: the honest error shows AND the prior plan SURVIVES (button stays
+    // "Regenerate plan"). On the old `setPlan(null)` code the button would revert to
+    // "Generate learning plan" — the session-only plan silently destroyed.
+    fireEvent.press(screen.getByText('Regenerate plan'));
+    await waitFor(() =>
+      expect(screen.getByText('Could not generate a learning plan — try again.')).toBeTruthy(),
+    );
+    expect(screen.getByText('Regenerate plan')).toBeTruthy();
+    expect(screen.queryByText('Generate learning plan')).toBeNull();
   });
 
   it('surfaces an honest error state when the API fails (no stuck spinner)', async () => {

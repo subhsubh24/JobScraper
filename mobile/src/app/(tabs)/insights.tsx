@@ -46,7 +46,11 @@ export default function InsightsScreen() {
   async function generatePlan() {
     setPlanLoading(true);
     setPlanMsg(null);
-    setPlan(null);
+    // Do NOT clear the existing plan up front: a transient failure (5xx / rate limit) would
+    // otherwise silently DESTROY the user's already-generated plan, which is session-only
+    // (never persisted server-side). The render already hides it while `planLoading` is true,
+    // so keeping it means a failed REGENERATE leaves the prior plan intact — matching the
+    // house pattern in job/[id].tsx generateStudyPlan (which never pre-clears its result).
     try {
       setPlan(await api.generateLearningPlan());
     } catch (e) {

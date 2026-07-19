@@ -343,3 +343,75 @@ def test_create_job_new_job_serialization_is_eager_not_lazy(db_session):
     # company path short-circuits on the truthy company_name) issues SEVERAL more after the commit
     # (a refresh SELECT + one lazy load per read relationship), pushing n over this bound on revert.
     assert n <= 12, f"create_job N+1 on the add path: {n} statements (a refresh()+lazy tail adds ≥2)"
+
+
+def _capture_user_selects(db, fn):
+    """Run ``fn`` and return (count of ``SELECT ... FROM users`` statements, result).
+
+    ``recompute_user_tier`` reads a user's entitlement from the SUBSCRIPTIONS and
+    ORGANIZATION_MEMBERS tables — never the ``users`` table — so the ONLY ``FROM users`` reads
+    during ``_recompute_all_member_tiers`` are the member-user loads. Counting them isolates
+    the exact N+1 the bulk load fixes, independent of recompute's own per-user query cost."""
+    engine = db.get_bind()
+    selects = {"n": 0}
+
+    def _on_exec(_conn, _cur, statement, *_a, **_k):
+        s = statement.lower()
+        if s.startswith("select") and "from users" in s:
+            selects["n"] += 1
+
+    event.listen(engine, "after_cursor_execute", _on_exec)
+    try:
+        result = fn()
+    finally:
+        event.remove(engine, "after_cursor_execute", _on_exec)
+    return selects["n"], result
+
+
+def _seed_org_with_members(db, n: int, label: str):
+    """An ACTIVE org (enough seats) with an owner + ``n`` active members, each a distinct user."""
+    from src.db.models import Organization, OrganizationMember
+
+    owner = User(email=f"org-owner-{label}@example.com", password_hash="x", tier=UserTier.FREE)
+    db.add(owner)
+    db.flush()
+    org = Organization(
+        name=f"Acme {label}", owner_id=owner.id, plan="team_annual",
+        status="active", seats_purchased=n + 1,
+    )
+    db.add(org)
+    db.flush()
+    for i in range(n):
+        m = User(email=f"org-member-{label}-{i}@example.com", password_hash="x", tier=UserTier.FREE)
+        db.add(m)
+        db.flush()
+        db.add(OrganizationMember(org_id=org.id, user_id=m.id, role="member", active=True))
+    db.flush()
+    return org
+
+
+def test_recompute_all_member_tiers_bulk_loads_users_not_n_plus_one(db_session):
+    """The org-webhook tier reconciliation must load its member users in ONE query, not one per
+    member. It runs on the synchronous Stripe org-webhook path (seat created/updated/deleted), so a
+    per-member ``SELECT ... FROM users`` is an N+1 that scales with the org (up to MAX_SEATS) against
+    the serverless budget. Counting ONLY ``FROM users`` statements isolates the member-user load
+    (``recompute_user_tier`` reads subscriptions/org_members, never users), so this reddens the moment
+    the bulk ``User.id.in_(...)`` load reverts to a per-member ``User.id == m.user_id`` query."""
+    import src.org_billing as org_billing
+
+    org2 = _seed_org_with_members(db_session, 2, "a")
+    db_session.expire_all()
+    u2, _ = _capture_user_selects(
+        db_session, lambda: org_billing._recompute_all_member_tiers(db_session, org2)
+    )
+
+    org5 = _seed_org_with_members(db_session, 5, "b")
+    db_session.expire_all()
+    u5, _ = _capture_user_selects(
+        db_session, lambda: org_billing._recompute_all_member_tiers(db_session, org5)
+    )
+
+    # CONSTANT: exactly one bulk user load regardless of member count. The OLD per-member query
+    # made this equal the member count (2 then 5), so reverting the bulk load reddens both asserts.
+    assert u2 == 1, f"expected 1 bulk user load for 2 members, got {u2} (per-member N+1?)"
+    assert u5 == 1, f"expected 1 bulk user load for 5 members, got {u5} (per-member N+1?)"
