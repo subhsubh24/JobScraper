@@ -111,6 +111,52 @@ def test_consent_endpoints_require_auth(client):
     assert client.delete("/api/ai-consent").status_code == 401
 
 
+def test_consent_revocation_re_blocks_ai_and_makes_no_llm_call(client, db_session, monkeypatch):
+    """Apple 5.1.2(i) requires consent be *revocable* — revoking it must actually RE-BLOCK the
+    generative paths, not just flip a flag. ``test_consent_state_round_trip`` proves the flag
+    toggles; the *enforcement-after-revoke* transition was untested, so a regression that read
+    consent from a login-time cache (instead of re-checking ``ai_consent_at`` per request) would
+    keep AI usable after revocation while every existing consent test stayed green — a silent
+    compliance break. This pins the real behaviour: grant → generate works → revoke → the SAME
+    endpoint 403s AND makes NO LLM call. LOAD-BEARING: removing the ``require_ai_consent`` gate
+    (or caching consent at login) reddens this while the flag-toggle test stays green."""
+    token = _register(client)
+    job = _add_job(client, token)
+    # Premium so the free prep-pack quota is never the blocker — the consent gate is the ONLY
+    # thing that can 403 the second (post-revoke) call, isolating exactly what this test asserts.
+    _make_premium(db_session)
+    monkeypatch.setattr(asgi, "llm_available", lambda: True)
+
+    # Grant consent, then prove the prep-pack generator IS reached (consent unlocked it).
+    assert client.post("/api/ai-consent", headers=_auth(token)).status_code == 200
+    calls = {"n": 0}
+
+    def _fake_prep(self, job, user):  # noqa: ANN001
+        calls["n"] += 1
+        return types.SimpleNamespace(id="art1", title="Prep for Acme", content="# Prep\n...")
+
+    monkeypatch.setattr(asgi.LLMWorkflows, "generate_prep_pack", _fake_prep)
+    r = client.post("/api/prep-packs/generate", headers=_auth(token), json={"job_id": job["id"]})
+    assert r.status_code == 200, r.text
+    assert calls["n"] == 1  # generator ran while consent was granted
+
+    # Revoke consent. The generator must now be UNREACHABLE — if it runs, that's a data leak.
+    assert client.delete("/api/ai-consent", headers=_auth(token)).status_code == 200
+
+    # Bump the SAME counter before raising, so "no generation fired after revoke" is asserted
+    # independently of the status code: if the gate regressed and the generator ran, calls["n"]
+    # would reach 2 even though _boom also raises.
+    def _boom(self, job, user):  # noqa: ANN001
+        calls["n"] += 1
+        raise AssertionError("generate_prep_pack must not run after consent is revoked")
+
+    monkeypatch.setattr(asgi.LLMWorkflows, "generate_prep_pack", _boom)
+    r2 = client.post("/api/prep-packs/generate", headers=_auth(token), json={"job_id": job["id"]})
+    assert r2.status_code == 403, r2.text
+    assert r2.json()["detail"]["code"] == "ai_consent_required"
+    assert calls["n"] == 1  # still 1 — the post-revoke call never reached the generator
+
+
 # --------------------------------------------------------------------------- #
 # Prep pack: blocked (no LLM call) without consent; unlocked after consent
 # --------------------------------------------------------------------------- #

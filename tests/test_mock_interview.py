@@ -281,6 +281,48 @@ def test_get_and_list_interviews(client, db_session, _llm_on):
     assert iv["id"] in ids
 
 
+def test_list_interviews_is_bounded_and_most_recent_first(client, db_session, monkeypatch):
+    """The list endpoint must BOUND its query (like every other list endpoint) — an unbounded
+    ``.all()`` would load every session (each carrying its questions + per-answer scores as JSON)
+    into memory on a hot authed read, inflating serverless p99 / risking OOM for a heavy user.
+    Seed more sessions than a (patched-small) cap and assert only the cap's worth come back, most
+    recent first. LOAD-BEARING: dropping the ``.limit(_MOCK_INTERVIEWS_LIST_CAP)`` on the query
+    returns all seeded rows and reddens this test."""
+    import datetime as _dt
+
+    uid, token = _register(client)
+    job_id = _add_job(client, token)
+    _make_pro(db_session, uid)
+
+    # Seed 5 sessions with strictly increasing created_at so "most recent first" is unambiguous.
+    base = _dt.datetime(2026, 1, 1, 12, 0, 0)
+    seeded = []
+    for n in range(5):
+        row = MockInterview(
+            user_id=uid,
+            job_id=job_id,
+            questions=[{"question": f"Q{n}", "category": "technical"}],
+            answers=[],
+            status="in_progress",
+            created_at=base + _dt.timedelta(minutes=n),
+        )
+        db_session.add(row)
+        db_session.flush()
+        seeded.append(row.id)
+    db_session.commit()
+
+    # Patch the module-level cap small so the test stays light while still exercising the bound.
+    monkeypatch.setattr(asgi, "_MOCK_INTERVIEWS_LIST_CAP", 3)
+
+    lst = client.get(
+        "/api/prep/mock-interviews", headers=_auth(token), params={"job_id": job_id}
+    )
+    assert lst.status_code == 200
+    ids = [i["id"] for i in lst.json()["interviews"]]
+    # Exactly the cap's worth, and they are the 3 MOST RECENT (seeded[4], [3], [2]) in desc order.
+    assert ids == [seeded[4], seeded[3], seeded[2]]
+
+
 # --------------------------------------------------------------------------- moderation / §6
 def test_moderated_questions_return_422_and_persist_nothing(client, db_session, _llm_moderated):
     uid, token = _register(client)
