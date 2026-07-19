@@ -97,6 +97,8 @@ without visual clutter.*
 
 The primary **accent is now converged**: mobile `primary` was changed from `#5B8CFF` to
 `#6366F1` (`mobile/src/theme.ts`) to match the web `indigo-500`, so both platforms use the
-one canonical accent above. The remaining cross-platform gap is the **app icon/splash**,
-which are still the Expo template assets — a bespoke brand mark is owner/designer work (the
-loop must not auto-generate one, which would read as generic-AI slop).
+one canonical accent above. The app **icon/splash** are the committed **bespoke** chevron-"A"
+mark (`mobile/assets/images/icon.png`), NOT the Expo template — see the "App icon / splash"
+row above and [ACCEPTANCE_AUDIT](../store/ACCEPTANCE_AUDIT.md) G7. The one remaining
+store-listing artifact gap is **screenshots**, which need a signed native build (Human-Core,
+not producible on the Linux host — tracked in ACCEPTANCE_AUDIT A3/G7 + PENDING_OPS).

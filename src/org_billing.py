@@ -262,10 +262,18 @@ def list_members(db: Session, org: Organization) -> List[OrganizationMember]:
 def _recompute_all_member_tiers(db: Session, org: Organization) -> None:
     """Reconcile ``users.tier`` for every member of the org (entitlement source may have changed)."""
     members = db.query(OrganizationMember).filter(OrganizationMember.org_id == org.id).all()
-    for m in members:
-        user = db.query(User).filter(User.id == m.user_id).first()
-        if user is not None:
-            billing.recompute_user_tier(db, user)
+    if not members:
+        return
+    # Bulk-load the member users in ONE query instead of a per-member SELECT: this runs on the
+    # synchronous Stripe org-webhook path (created/updated/deleted seat events), so a large org
+    # (up to MAX_SEATS) would otherwise fire 1 + N round-trips against the serverless 60s budget.
+    users = (
+        db.query(User)
+        .filter(User.id.in_([m.user_id for m in members]))
+        .all()
+    )
+    for user in users:
+        billing.recompute_user_tier(db, user)
 
 
 def _enforce_seat_cap(db: Session, org: Organization) -> None:
