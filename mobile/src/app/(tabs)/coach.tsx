@@ -76,6 +76,11 @@ export default function CoachScreen() {
     [sending, sessionId],
   );
 
+  // Send is a no-op on empty/whitespace input, so reflect that in the control rather than
+  // presenting an enabled button that silently does nothing — matching the other native surfaces
+  // (team.tsx's Add member, settings.tsx) that disable their submit buttons until there is real input.
+  const canSend = input.trim().length > 0 && !sending;
+
   if (!isPremium) {
     return (
       <SafeAreaView style={styles.center} edges={['top']}>
@@ -152,12 +157,12 @@ export default function CoachScreen() {
             multiline
           />
           <Pressable
-            style={styles.sendBtn}
+            style={[styles.sendBtn, !canSend && styles.sendBtnDisabled]}
             onPress={() => send(input)}
-            disabled={sending}
+            disabled={!canSend}
             accessibilityRole="button"
             accessibilityLabel="Send message"
-            accessibilityState={{ disabled: sending }}
+            accessibilityState={{ disabled: !canSend }}
           >
             <Text style={styles.sendText}>Send</Text>
           </Pressable>
@@ -199,5 +204,6 @@ const styles = StyleSheet.create({
     maxHeight: 120,
   },
   sendBtn: { backgroundColor: colors.primary, borderRadius: radius.md, paddingHorizontal: spacing.md, justifyContent: 'center' },
+  sendBtnDisabled: { opacity: 0.5 },
   sendText: { color: colors.primaryText, fontWeight: '700' },
 });
