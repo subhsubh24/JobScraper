@@ -149,7 +149,9 @@ export default function CoachPage() {
           placeholder="Type a message…"
           className="flex-1 rounded-lg border border-slate-700 bg-slate-800/60 px-3 py-2.5 outline-none focus:border-indigo-500 disabled:opacity-50"
         />
-        <Button type="submit" disabled={sending}>{sending ? 'Sending…' : 'Send'}</Button>
+        {/* Disable on empty input too: submitting whitespace is a no-op in send() (early-return),
+            so an enabled Send would silently do nothing — mirror the résumé/enrichment/team buttons. */}
+        <Button type="submit" disabled={sending || !input.trim()}>{sending ? 'Sending…' : 'Send'}</Button>
       </form>
     </div>
   );
