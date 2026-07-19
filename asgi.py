@@ -2419,6 +2419,14 @@ def get_mock_interview(
     return {"success": True, "interview": _mock_interview_public(interview)}
 
 
+# Bound the mock-interviews list like every other list endpoint (_JOBS_LIST_DEFAULT_LIMIT /
+# _SKILL_GAP_JOB_CAP): each MockInterview row carries its questions + per-answer scores as JSON,
+# so an unbounded ``.all()`` for a heavy user (many sessions on one job) would load all of them
+# into memory + serialize them on a hot authed read — on the fixed serverless memory budget that
+# inflates p99 and risks OOM. 200 most-recent sessions is far above any realistic per-job usage.
+_MOCK_INTERVIEWS_LIST_CAP = 200
+
+
 @app.get(
     "/api/prep/mock-interviews",
     dependencies=[Depends(rate_limit_user("user_read", 120))],
@@ -2433,6 +2441,7 @@ def list_mock_interviews(
         db.query(MockInterview)
         .filter(MockInterview.user_id == user.id, MockInterview.job_id == job_id)
         .order_by(MockInterview.created_at.desc())
+        .limit(_MOCK_INTERVIEWS_LIST_CAP)
         .all()
     )
     return {
