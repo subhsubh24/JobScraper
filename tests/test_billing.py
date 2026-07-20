@@ -429,6 +429,72 @@ def test_webhook_unpaid_async_checkout_grants_nothing(client, monkeypatch, db_se
     assert db_session.query(User).filter(User.id == user_id).first().tier == UserTier.FREE
 
 
+def test_webhook_unpaid_async_checkout_persists_ids_and_activates_without_metadata(
+    client, monkeypatch, db_session
+):
+    """An UNPAID async checkout (bank transfer / ACH / SEPA) must GRANT NOTHING yet, but it must
+    PERSIST the customer/subscription ids so the later activation event can map back — even if
+    Stripe drops the ``metadata.user_id`` on that event.
+
+    Regression net for the individual path's parity with the org path
+    (``test_org_billing.py::test_async_payment_persists_ids_and_activates_even_if_later_metadata_is_dropped``):
+    before the fix, ``apply_event`` returned ``None`` on the unpaid checkout WITHOUT writing a
+    Subscription row, so ``_user_for_subscription`` had no customer/subscription id to fall back on.
+    A real ``customer.subscription.created`` that arrives with EMPTY metadata (Stripe lifecycle
+    events routinely omit the app metadata) would then resolve to no user → a PAYING customer stuck
+    FREE forever. Revert-proven load-bearing: drop the unpaid-branch ``_upsert_subscription`` and the
+    activation below can't find the user → the final PREMIUM assertion fails.
+    """
+    monkeypatch.setenv("STRIPE_WEBHOOK_SECRET", WHSEC)
+    user_id, _ = _register(client)
+
+    # 1) Unpaid async checkout completes: grant nothing, but record the ids for the later map-back.
+    unpaid = _event(
+        "checkout.session.completed",
+        {
+            "id": "cs_async",
+            "client_reference_id": user_id,
+            "customer": "cus_async",
+            "subscription": "sub_async",
+            "payment_status": "unpaid",
+            "metadata": {"user_id": user_id, "plan": "pro_annual"},
+        },
+    )
+    r = client.post(
+        "/api/billing/webhook", content=unpaid, headers={"stripe-signature": _sign(unpaid)}
+    )
+    assert r.status_code == 200
+    db_session.expire_all()
+    # Still FREE (money hasn't cleared) ...
+    assert db_session.query(User).filter(User.id == user_id).first().tier == UserTier.FREE
+    # ... but the ids are now on the (inactive) Subscription row — the fallback anchor.
+    sub = db_session.query(Subscription).filter(Subscription.user_id == user_id).first()
+    assert sub is not None
+    assert sub.stripe_customer_id == "cus_async"
+    assert sub.stripe_subscription_id == "sub_async"
+    assert sub.status not in ("active", "trialing")
+
+    # 2) The payment clears. Stripe sends subscription.created with NO app metadata — the only way
+    #    back to the user is the customer id we stored above.
+    activated = _event(
+        "customer.subscription.created",
+        {
+            "id": "sub_async",
+            "customer": "cus_async",
+            "status": "active",
+            "metadata": {},
+            "items": {"data": [{"price": {"id": "price_x"}}]},
+        },
+    )
+    r = client.post(
+        "/api/billing/webhook", content=activated, headers={"stripe-signature": _sign(activated)}
+    )
+    assert r.status_code == 200
+    db_session.expire_all()
+    # The paying customer is now PREMIUM — the map-back succeeded despite the dropped metadata.
+    assert db_session.query(User).filter(User.id == user_id).first().tier == UserTier.PREMIUM
+
+
 def test_webhook_rejects_forged_signature_and_grants_nothing(client, monkeypatch, db_session):
     monkeypatch.setenv("STRIPE_WEBHOOK_SECRET", WHSEC)
     user_id, _ = _register(client)

@@ -110,6 +110,7 @@ function GithubEnrichmentCard() {
   const [competencies, setCompetencies] = useState<Competency[] | null>(null);
   const [handle, setHandle] = useState('');
   const [importing, setImporting] = useState(false);
+  const [clearing, setClearing] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -149,13 +150,21 @@ function GithubEnrichmentCard() {
   }
 
   async function clearAll() {
+    // Loading/disabled affordance so a slow network can't read as a dead tap → double-tap →
+    // duplicate clearEnrichment calls, matching the Import button above (every other async
+    // action in this app shows a pending state). Clearing is idempotent, so the harm is UX,
+    // not data — but an interactive control that silently does nothing is the defect.
+    if (clearing) return;
+    setClearing(true);
+    setError(null);
     try {
       await api.clearEnrichment();
       setCompetencies([]);
       setNotice(null);
-      setError(null);
     } catch {
       setError('Could not clear your imported skills. Try again.');
+    } finally {
+      setClearing(false);
     }
   }
 
@@ -200,8 +209,16 @@ function GithubEnrichmentCard() {
                   </View>
                 ))}
               </View>
-              <Pressable accessibilityRole="button" onPress={clearAll} style={styles.clearBtn}>
-                <Text style={styles.clearText}>Clear imported skills</Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ disabled: clearing, busy: clearing }}
+                onPress={clearAll}
+                disabled={clearing}
+                style={[styles.clearBtn, clearing && styles.clearBtnDisabled]}
+              >
+                <Text style={styles.clearText}>
+                  {clearing ? 'Clearing…' : 'Clear imported skills'}
+                </Text>
               </Pressable>
             </>
           ) : null}
@@ -404,6 +421,7 @@ const styles = StyleSheet.create({
   savedText: { color: colors.success, marginTop: spacing.sm, fontSize: 13 },
   errorText: { color: colors.danger, marginTop: spacing.sm, fontSize: 13 },
   clearBtn: { paddingVertical: 8, marginTop: spacing.xs },
+  clearBtnDisabled: { opacity: 0.5 },
   clearText: { color: colors.textMuted, fontSize: 12 },
   meta: { alignItems: 'center' },
   metaText: { color: colors.textMuted, fontSize: 12 },
