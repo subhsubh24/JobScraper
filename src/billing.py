@@ -362,14 +362,27 @@ def apply_event(event, db: Session) -> Optional[str]:
         user_id = obj.get("client_reference_id") or meta.get("user_id")
         if not user_id:
             return None
-        # Async payment methods (bank transfer, ACH, SEPA) complete the session with
-        # payment_status="unpaid" — money has NOT cleared. Granting Premium here would hand
-        # out ~a billing cycle of free access until the payment fails. Wait for the
-        # subscription to go active (customer.subscription.created/updated) instead.
-        if obj.get("payment_status") not in (None, "paid", "no_payment_required"):
-            return None
         user = db.query(User).filter(User.id == user_id).first()
         if not user:
+            return None
+        # Async payment methods (bank transfer, ACH, SEPA) complete the session with
+        # payment_status="unpaid" — money has NOT cleared. Granting Premium here would hand
+        # out ~a billing cycle of free access until the payment fails, so grant NOTHING yet and
+        # wait for the subscription to go active (customer.subscription.created/updated).
+        # But STILL persist the customer/subscription ids now — defense in depth mirroring the
+        # org path (org_billing.apply_event): the primary map back to this user is the user_id we
+        # stamp into subscription metadata, but if Stripe ever drops that metadata on the later
+        # activation event the ONLY fallback is a customer/subscription id we already stored
+        # (_user_for_subscription). Without this, an async-payment individual could pay and never
+        # activate (paid customer, still FREE). We record ids WITHOUT a status, so the row stays
+        # inactive (_has_active_individual_sub requires status in _ACTIVE_STATUSES) — no premium.
+        if obj.get("payment_status") not in (None, "paid", "no_payment_required"):
+            _upsert_subscription(
+                db,
+                user,
+                stripe_customer_id=obj.get("customer"),
+                stripe_subscription_id=obj.get("subscription"),
+            )
             return None
         _upsert_subscription(
             db,

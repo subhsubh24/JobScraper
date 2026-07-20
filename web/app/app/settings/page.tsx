@@ -141,6 +141,7 @@ function GithubEnrichmentCard() {
   const [competencies, setCompetencies] = useState<Competency[] | null>(null);
   const [handle, setHandle] = useState('');
   const [importing, setImporting] = useState(false);
+  const [clearing, setClearing] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
@@ -191,6 +192,13 @@ function GithubEnrichmentCard() {
   }
 
   async function clearAll() {
+    // Guard + loading affordance so a slow network can't read as a dead tap → double-submit,
+    // matching the import/delete controls in this view (every other async mutation here shows
+    // a disabled/pending state). Clearing is idempotent, so the harm is UX (no feedback →
+    // repeated calls), not data — but a control that silently does nothing is the defect.
+    if (clearing) return;
+    setClearing(true);
+    setError(null);
     try {
       await api.clearEnrichment();
       userMutatedRef.current = true; // a stale initial load must not re-populate cleared skills
@@ -198,6 +206,8 @@ function GithubEnrichmentCard() {
       setNotice(null);
     } catch {
       setError('Could not clear your imported skills. Try again.');
+    } finally {
+      setClearing(false);
     }
   }
 
@@ -260,9 +270,10 @@ function GithubEnrichmentCard() {
               </ul>
               <button
                 onClick={clearAll}
-                className="mt-3 rounded text-xs text-slate-500 hover:text-slate-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400"
+                disabled={clearing}
+                className="mt-3 rounded text-xs text-slate-500 hover:text-slate-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:text-slate-500"
               >
-                Clear imported skills
+                {clearing ? 'Clearing…' : 'Clear imported skills'}
               </button>
             </>
           ) : (
