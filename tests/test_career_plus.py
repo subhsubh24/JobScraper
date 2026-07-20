@@ -292,3 +292,62 @@ def test_verified_webhook_grants_career_plus_level(client, db_session):
     me = client.get("/api/auth/me", headers=_auth(token)).json()["user"]
     assert me["plan_level"] == "career_plus"
     assert me["career_plus"] is True
+
+
+def test_renewal_without_metadata_preserves_career_plus_level(client, db_session):
+    """A real Stripe RENEWAL preserves the Career+ level even when it carries no metadata.plan.
+
+    Stripe's own lifecycle events (``customer.subscription.updated`` on renewal/dunning/portal)
+    routinely omit our ``metadata.plan`` — so ``apply_event`` passes ``plan=None`` into
+    ``_upsert_subscription``, and it is the ``if plan:`` guard (billing.py) that keeps the
+    previously-verified ``careerplus_*`` id on the row. Every other webhook test either starts
+    with no plan (the customer-id fallback nets) or echoes plan in metadata (the trialing/past_due
+    nets), so this exact preservation branch was UNTESTED: a regression to an unconditional
+    ``sub.plan = meta.get("plan")`` would blank the plan to NULL on the first renewal and silently
+    drop a paying Career+ subscriber to ``pro`` (losing salary-negotiation coaching) mid-lifecycle,
+    with NO existing test going red. This pins it: preservation is asserted at BOTH the row level
+    and the /me entitlement level."""
+    uid, token = _register(client, "renew-cp@example.com")
+    grant = {
+        "type": "checkout.session.completed",
+        "data": {
+            "object": {
+                "client_reference_id": uid,
+                "payment_status": "paid",
+                "customer": "cus_renew",
+                "subscription": "sub_renew",
+                "metadata": {"user_id": uid, "plan": "careerplus_annual"},
+            }
+        },
+    }
+    assert billing.apply_event(grant, db_session) == uid
+    db_session.commit()
+    assert (
+        db_session.query(Subscription).filter(Subscription.user_id == uid).first().plan
+        == "careerplus_annual"
+    )
+
+    # A renewal fired by Stripe itself: SAME subscription, still active, but NO metadata at all.
+    renewal = {
+        "type": "customer.subscription.updated",
+        "data": {
+            "object": {
+                "id": "sub_renew",
+                "customer": "cus_renew",
+                "status": "active",
+                "metadata": {},
+            }
+        },
+    }
+    assert billing.apply_event(renewal, db_session) == uid
+    db_session.commit()  # expire_on_commit=True refreshes the row below
+
+    sub = db_session.query(Subscription).filter(Subscription.user_id == uid).first()
+    assert sub.plan == "careerplus_annual", (
+        "renewal without metadata.plan blanked the plan — Career+ subscriber silently downgraded"
+    )
+    user = db_session.query(User).filter(User.id == uid).first()
+    assert billing.current_plan_level(user, sub) == "career_plus"
+    me = client.get("/api/auth/me", headers=_auth(token)).json()["user"]
+    assert me["plan_level"] == "career_plus"
+    assert me["career_plus"] is True
