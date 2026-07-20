@@ -36,6 +36,10 @@ export default function MockInterviewScreen() {
   const [numQuestions, setNumQuestions] = useState(5);
   const [starting, setStarting] = useState(false);
   const [startMsg, setStartMsg] = useState<string | null>(null);
+  // Which past session is currently being opened, so the tapped row shows a spinner and every
+  // row disables — without this the fetch has NO visual feedback, so on a slow network the tap
+  // reads as unresponsive and a user double-taps, firing duplicate getMockInterview requests.
+  const [openingId, setOpeningId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setError(null);
@@ -73,7 +77,9 @@ export default function MockInterviewScreen() {
   }
 
   async function openSession(interviewId: string) {
+    if (openingId) return; // guard against a double-tap while a fetch is already in flight
     setStartMsg(null);
+    setOpeningId(interviewId);
     try {
       const iv = await api.getMockInterview(interviewId);
       setInterview(iv);
@@ -86,6 +92,8 @@ export default function MockInterviewScreen() {
         return;
       }
       setStartMsg(e instanceof ApiError ? e.message : 'Could not open that session.');
+    } finally {
+      setOpeningId(null);
     }
   }
 
@@ -126,6 +134,7 @@ export default function MockInterviewScreen() {
               onSetNumQuestions={setNumQuestions}
               onStart={start}
               onOpen={openSession}
+              openingId={openingId}
             />
           )}
         </ScrollView>
@@ -144,6 +153,7 @@ function StartScreen({
   onSetNumQuestions,
   onStart,
   onOpen,
+  openingId,
 }: {
   isPaid: boolean;
   consented: boolean;
@@ -154,6 +164,7 @@ function StartScreen({
   onSetNumQuestions: (n: number) => void;
   onStart: () => void;
   onOpen: (id: string) => void;
+  openingId: string | null;
 }) {
   return (
     <View style={styles.stack}>
@@ -211,28 +222,40 @@ function StartScreen({
       {sessions.length > 0 ? (
         <Card style={styles.section}>
           <Text style={styles.pickerLabel}>YOUR PAST SESSIONS</Text>
-          {sessions.map((s) => (
-            <Pressable
-              key={s.id}
-              accessibilityRole="button"
-              // Explicit label so a screen reader announces ONE complete, meaningful row —
-              // status + progress + the action — instead of a bare "button" or two fragmented
-              // Text nodes (child-text aggregation on a Pressable is platform-dependent).
-              accessibilityLabel={`${
-                s.status === 'completed' ? 'Completed' : 'In progress'
-              } interview, ${s.answered_count} of ${s.total} answered. ${
-                s.status === 'completed' ? 'Review' : 'Resume'
-              }.`}
-              onPress={() => onOpen(s.id)}
-              style={styles.sessionRow}
-            >
-              <Text style={styles.sessionText}>
-                {s.status === 'completed' ? 'Completed' : 'In progress'} · {s.answered_count}/
-                {s.total} answered
-              </Text>
-              <Text style={styles.sessionCta}>{s.status === 'completed' ? 'Review' : 'Resume'}</Text>
-            </Pressable>
-          ))}
+          {sessions.map((s) => {
+            const isOpening = openingId === s.id;
+            const cta = s.status === 'completed' ? 'Review' : 'Resume';
+            return (
+              <Pressable
+                key={s.id}
+                accessibilityRole="button"
+                // Explicit label so a screen reader announces ONE complete, meaningful row —
+                // status + progress + the action — instead of a bare "button" or two fragmented
+                // Text nodes (child-text aggregation on a Pressable is platform-dependent).
+                accessibilityLabel={`${
+                  s.status === 'completed' ? 'Completed' : 'In progress'
+                } interview, ${s.answered_count} of ${s.total} answered. ${
+                  isOpening ? 'Opening' : cta
+                }.`}
+                // Disable EVERY row while any session is opening so a slow fetch can't be
+                // double-tapped into duplicate requests; the tapped row shows a spinner.
+                accessibilityState={{ disabled: openingId !== null, busy: isOpening }}
+                disabled={openingId !== null}
+                onPress={() => onOpen(s.id)}
+                style={[styles.sessionRow, openingId !== null && styles.sessionRowDisabled]}
+              >
+                <Text style={styles.sessionText}>
+                  {s.status === 'completed' ? 'Completed' : 'In progress'} · {s.answered_count}/
+                  {s.total} answered
+                </Text>
+                {isOpening ? (
+                  <ActivityIndicator color={colors.primary} />
+                ) : (
+                  <Text style={styles.sessionCta}>{cta}</Text>
+                )}
+              </Pressable>
+            );
+          })}
         </Card>
       ) : null}
     </View>
@@ -489,6 +512,7 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     backgroundColor: colors.surfaceAlt,
   },
+  sessionRowDisabled: { opacity: 0.5 },
   sessionText: { color: colors.text, flexShrink: 1 },
   sessionCta: { color: colors.primary, fontWeight: '600' },
   progressWrap: { gap: spacing.xs },
