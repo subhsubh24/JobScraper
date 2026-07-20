@@ -1834,7 +1834,14 @@ def import_jobs_preview(
     try:
         ats_type, identifier = detector.detect_from_careers_page(data.careers_url)
     except Exception:
-        logger.exception("ATS detection raised for %s", data.careers_url)
+        # Log-injection defense-in-depth (CWE-117): careers_url is user-supplied free text (a
+        # plain str, min/max-length only) and urlparse().strip() does NOT remove INTERNAL
+        # newlines, so a value like "http://x/\n2026-... CRITICAL ..." carries an embedded CR/LF.
+        # The prod JSON formatter (logging_config) already escapes control chars inside the
+        # message field, but the plain-text log path (LOG_FORMAT=plain, local/pytest) and any
+        # consumer that re-decodes and prints the message raw would otherwise show a forged second
+        # line. repr() escapes CR/LF/control chars so the whole URL stays on one honest record.
+        logger.exception("ATS detection raised for %s", repr(data.careers_url))
         ats_type, identifier = ATSType.UNKNOWN, None
 
     supported = {ATSType.GREENHOUSE, ATSType.LEVER}

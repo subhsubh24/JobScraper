@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button, Card, ErrorText, LinkButton } from '@/components/ui';
 import { AiConsentSetting } from '@/components/ai-consent';
 import { api, ApiError, type Competency, type ReferralStats } from '@/lib/api';
@@ -144,13 +144,24 @@ function GithubEnrichmentCard() {
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
+  // Latch: once the user has taken over the skills list (imported or cleared), a SLOW initial
+  // load that resolves afterwards must NOT clobber that action. Without this, a 3s getEnrichment
+  // that lands after a fast clear silently re-populates the just-cleared skills — reversing an
+  // explicit user action with no feedback. A ref (not state) so the load's stale closure reads
+  // the live value, and setting it never triggers a re-render.
+  const userMutatedRef = useRef(false);
 
   useEffect(() => {
     if (!isPro) return;
+    // Reset the latch per load cycle: this effect re-fires on an isPro transition (e.g. a tier
+    // lapses then renews in the same session), and that fresh getEnrichment SHOULD win. Resetting
+    // here — synchronously, before any user mutation can occur — scopes the latch to THIS load
+    // and still guards the in-flight race, without permanently suppressing later legitimate loads.
+    userMutatedRef.current = false;
     let active = true;
     api
       .getEnrichment()
-      .then((c) => active && setCompetencies(c))
+      .then((c) => active && !userMutatedRef.current && setCompetencies(c))
       // Distinguish a load FAILURE from a genuinely empty result: setting competencies to []
       // here would render "No skills imported yet", masking the error as an empty state.
       .catch(() => active && setLoadFailed(true));
@@ -169,6 +180,7 @@ function GithubEnrichmentCard() {
       // Await the real result and report it honestly — the message reflects what was actually
       // imported (or that nothing was found), never an optimistic "done".
       const result = await api.enrichGithub(value);
+      userMutatedRef.current = true; // a stale initial load must not overwrite a fresh import
       setCompetencies(result.competencies);
       setNotice(result.message);
     } catch (e) {
@@ -181,6 +193,7 @@ function GithubEnrichmentCard() {
   async function clearAll() {
     try {
       await api.clearEnrichment();
+      userMutatedRef.current = true; // a stale initial load must not re-populate cleared skills
       setCompetencies([]);
       setNotice(null);
     } catch {
