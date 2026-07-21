@@ -6,6 +6,52 @@ pre-launch.
 
 ---
 
+### 2026-07-21 — Daily GTM review (quiet run; both scorecards unchanged; site-gate circuit-breaker now 7 reads)
+- **Observed:** Phase still `pre_launch`. Re-verified `ListConnectors` — Gmail (connected,
+  enabledInChat:true), Google Drive (connected, enabledInChat:false), Google Calendar
+  (installState unknown, enabledInChat:false), Mobbin (connected, enabledInChat:true), Vercel
+  (connected at org level, enabledInChat:false, zero `mcp__Vercel__*` tools per a fresh
+  `ToolSearch`) — unchanged, `channels_connected: []` stays honest. Shell env: `GEMINI_API_KEY` +
+  both `BROWSERBASE_*` vars present (validator infra, not a GTM source), no `PROD_URL`/
+  `ANALYTICS_READ_TOKEN`/`STRIPE_*`/`SMTP_*`/`DATABASE_URL`. Re-ran `analysis/gtm_engine_pct.py`
+  (unchanged, 50) and `node scripts/validate-computation.mjs` (4/4 PASS, none changed). Both
+  independent scorecards read **UNCHANGED** since the 2026-07-16 grades — now the 2nd
+  consecutive GTM read without a fresh grade on either (the 1st was noted 07-19):
+  **QUALITY_SCORECARD** still the 8th audit (`as_of: 2026-07-16`, overall B, `ship_gate_met:
+  false`, same two ship-critical gaps — store-readiness B, business-case-strength B).
+  **GTM_SCORECARD** still the 3rd grade (`as_of: 2026-07-16`, overall A, `ship_gate_met: true`).
+- **Concluded:** No real funnel/PMF data justifies a ROADMAP/BUSINESS_CASE ARR/VISION steer this
+  run (same reasoning as every prior pre-launch read — 0 users, 0 funnel data). Nothing
+  scorecard- or channel-side changed enough to warrant a new asset or steer.
+- **Did (verification, not a new fix):** Re-read the actual repository files — not just the
+  prior `GROWTH_MEMORY` entry's claims — to confirm the two real fixes from the 2026-07-17 run
+  are still intact in the live code: `scripts/validate_gtm.py:29`'s `METRIC_SECTIONS` still lists
+  `funnel, acquisition, pmf, channels, outreach, email, content`, and `docs/store/ASO_COPY.md:76-77`
+  still carries the reworded RevenueCat language ("has landed in code but stays inert pending
+  owner RevenueCat keys/product mapping and a signed store build"). Checked GitHub issue #417
+  (the GTM_SCORECARD `metric_integrity` A→A+ top_gap): still open, correctly left untouched — the
+  underlying code fix already landed on 2026-07-17, and per maker≠checker discipline this loop
+  does not close the independent auditor's own issue; that is the auditor's call to make on its
+  next re-grade. **Circuit-breaker escalation, now 7 consecutive quiet GTM reads:** the site-gate
+  owner DECISION (`PENDING_OPS.md` `site-gate`, `ROADMAP.md:421-435`) has gone 7 straight GTM
+  reads (2026-07-09 reframe, 07-11, 07-13, 07-15, 07-17, 07-19, 07-21) with zero owner movement —
+  re-verified `PENDING_OPS.md` still shows `as_of: 2026-07-04`, `status: open`, unchanged. This is
+  now the longest-running circuit-breaker instance in this loop's history.
+- **Recommended (to factory):** Unchanged priority — store-readiness (store screenshots, needs a
+  signed native build) and business-case-strength (a live per-seat price + real B2B adoption
+  data) remain the two ship-critical gaps, both product-factory/owner work. Zero outreach drafts
+  this run (correct): `QUALITY_SCORECARD.ship_gate_met` is still false. Demand_signal cadence
+  checked: last run 2026-07-03 (18 days), ~quarterly refresh not due until ~October.
+- **Meta / operational note:** This was a routine dashboard-bookkeeping refresh (dates +
+  validation reconciliation + a file-level verification that made no copy edit, consistent with
+  the 2026-07-07/07-15/07-19 precedent) — no maker≠checker review was run since no
+  ROADMAP/BUSINESS_CASE/VISION/asset/copy change was made this run. The site-gate ask is now
+  confirmed live and unresolved for 7 consecutive reads — this is the single highest-leverage
+  item to surface prominently to the owner; no new angle to add beyond restating it clearly,
+  since re-arguing an already-clear binary decision each run would itself be a form of padding.
+
+---
+
 ### 2026-07-19 — Daily GTM review (quiet run; both scorecards unchanged; site-gate circuit-breaker now 6 reads)
 - **Observed:** Phase still `pre_launch`. Re-verified `ListConnectors` — Gmail (connected,
   enabledInChat:true), Google Drive (connected, enabledInChat:false), Google Calendar
