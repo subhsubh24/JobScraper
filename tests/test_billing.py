@@ -835,6 +835,37 @@ def test_webhook_updated_falls_back_to_metadata_plan_when_no_known_price(
     assert sub.plan == "careerplus_monthly"
 
 
+def test_webhook_updated_finds_plan_price_even_when_not_first_item(
+    client, monkeypatch, db_session
+):
+    """Stripe does not guarantee line-item order. If a metered add-on ever precedes the base plan
+    in items.data, the plan derivation must still find the recognized plan price (scan, not a fixed
+    index-0 read) — else it would miss the plan and fall back to stale metadata."""
+    monkeypatch.setenv("STRIPE_WEBHOOK_SECRET", WHSEC)
+    monkeypatch.setenv("STRIPE_PRICE_CAREERPLUS_ANNUAL", "price_cplus_annual_id")
+    user_id, _ = _register(client, email="multiitem@example.com")
+    payload = _event(
+        "customer.subscription.updated",
+        {
+            "id": "sub_mi", "customer": "cus_mi", "status": "active",
+            "metadata": {"user_id": user_id, "plan": "pro_monthly"},  # stale/unrelated
+            "items": {
+                "data": [
+                    {"price": {"id": "price_unknown_addon"}},   # add-on first, not a known plan
+                    {"price": {"id": "price_cplus_annual_id"}},  # the real plan, second
+                ]
+            },
+        },
+    )
+    r = client.post(
+        "/api/billing/webhook", content=payload, headers={"stripe-signature": _sign(payload)}
+    )
+    assert r.status_code == 200, r.text
+    db_session.expire_all()
+    sub = db_session.query(Subscription).filter(Subscription.user_id == user_id).first()
+    assert sub.plan == "careerplus_annual"  # found by scanning past the unknown add-on item
+
+
 def test_webhook_no_payment_required_checkout_grants_premium(client, monkeypatch, db_session):
     """A trial/$0 checkout completes with payment_status="no_payment_required" — money was
     never owed, so it MUST grant (it's in the checkout allow-list), unlike "unpaid"."""

@@ -112,9 +112,15 @@ def _plan_for_subscription_obj(obj) -> Optional[str]:
     """
     try:
         items = (obj.get("items") or {}).get("data") or []
-        if items:
-            price = items[0].get("price") or {}
-            return _plan_for_price_id(price.get("id"))
+        # Today every subscription carries exactly ONE price (one plan per sub), so item 0 is the
+        # plan. Scan ALL items for the first RECOGNIZED price anyway, so that if a metered add-on
+        # is ever bundled alongside the base plan (Stripe does not guarantee item order) the plan
+        # item is still found rather than missed by a fixed index-0 read. An unknown price yields
+        # None and the caller falls back to metadata.
+        for item in items:
+            plan = _plan_for_price_id((item.get("price") or {}).get("id"))
+            if plan:
+                return plan
     except (AttributeError, TypeError):
         pass
     return None
