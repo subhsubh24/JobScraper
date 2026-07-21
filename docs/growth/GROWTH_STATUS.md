@@ -19,7 +19,7 @@ state. Nothing is fabricated.
 ```yaml
 GROWTH_STATUS:
   project: jobscraper
-  as_of: 2026-07-19
+  as_of: 2026-07-21
   phase: pre_launch
   engine_built: false      # engine_built iff engine_pct==100 (scripts/check_blocks.py invariant)
   engine_pct: 50           # COMPUTED (FACTORY_STANDARD s22): analysis/gtm_engine_pct.py parses
@@ -183,7 +183,7 @@ GROWTH_STATUS:
     published: 0
     last_published: null
   validation:               # GTM_STANDARD s4 self-validation -- fail closed, never claim an unverified source
-    checked_as_of: 2026-07-19
+    checked_as_of: 2026-07-21
     sources:
       - name: product_analytics
         status: unavailable   # no PROD_URL/ANALYTICS_READ_TOKEN present in this run's env; no
@@ -217,25 +217,54 @@ GROWTH_STATUS:
            enabledInChat:true) + Google Drive (connected, enabledInChat:false) + Google Calendar
            (installState unknown, enabledInChat:false) + Mobbin (connected, enabledInChat:true) +
            Vercel (connected at org level, enabledInChat:false, zero mcp__Vercel__* tools per a
-           fresh ToolSearch) -- still no analytics/billing/ESP MCP usable from this session;
-           (2) shell env -- GEMINI_API_KEY and BOTH BROWSERBASE_* vars present (validator infra,
-           not a GTM source), no PROD_URL/ANALYTICS_READ_TOKEN/STRIPE_*/SMTP_*/DATABASE_URL. Both
-           checks confirm channels_connected=[] honestly (fail-closed, no invented metric). Both
-           independent scorecards are UNCHANGED since the last GTM read (2026-07-17) -- neither
-           has re-graded: QUALITY_SCORECARD stays the 8th audit (as_of 2026-07-16, overall B,
-           ship_gate_met false, same two ship-critical gaps: store-readiness B, business-case-
-           strength B); GTM_SCORECARD stays the 3rd grade (as_of 2026-07-16, overall A,
-           ship_gate_met true) -- this is the 1st consecutive GTM read without a fresh grade on
-           either, not yet a staleness pattern worth naming. Re-ran analysis/gtm_engine_pct.py
+           fresh ToolSearch) -- unchanged from every prior read, still no analytics/billing/ESP
+           MCP usable from this session; (2) shell env -- GEMINI_API_KEY and BOTH BROWSERBASE_*
+           vars present (validator infra, not a GTM source), no PROD_URL/ANALYTICS_READ_TOKEN/
+           STRIPE_*/SMTP_*/DATABASE_URL. Both checks confirm channels_connected=[] honestly
+           (fail-closed, no invented metric). Both independent scorecards remain UNCHANGED since
+           the 2026-07-16 grades (now the 2nd consecutive GTM read without a fresh grade on
+           either, after the 1st noted on 07-19): QUALITY_SCORECARD stays the 8th audit
+           (as_of 2026-07-16, overall B, ship_gate_met false, same two ship-critical gaps:
+           store-readiness B, business-case-strength B); GTM_SCORECARD stays the 3rd grade
+           (as_of 2026-07-16, overall A, ship_gate_met true). Re-ran analysis/gtm_engine_pct.py
            (unchanged, 50) and node scripts/validate-computation.mjs (4/4 figures PASS, none
-           changed). Re-verified the two prior-run fixes are intact in the live repo (not just
+           changed). Re-verified the two 07-17 fixes are still intact in the live repo (not just
            claimed): scripts/validate_gtm.py:29 METRIC_SECTIONS still lists
-           funnel/acquisition/pmf/channels/outreach/email/content (the 07-17 fix survived), and
-           docs/store/ASO_COPY.md:76-77 still reads 'has landed in code but stays inert pending
-           owner RevenueCat keys/product mapping and a signed store build' (the 07-17 reword
-           survived) -- confirming this run's honesty claims against the actual files, not
-           assuming the prior run's memory entry is still true."
+           funnel/acquisition/pmf/channels/outreach/email/content, and docs/store/ASO_COPY.md:76-77
+           still reads 'has landed in code but stays inert pending owner RevenueCat keys/product
+           mapping and a signed store build'. Checked GitHub issue #417 (GTM_SCORECARD's
+           metric_integrity A->A+ top_gap): still open, correctly untouched -- the underlying fix
+           already landed 2026-07-17 and per maker!=checker discipline this loop does not close the
+           independent auditor's own issue; that is the auditor's call on its next re-grade."
   learnings:
+    - "2026-07-21 (GTM run): Quiet run, no ROADMAP/BUSINESS_CASE ARR/VISION steer -- still 0
+       users/0 funnel, phase=pre_launch. Re-verified ListConnectors (Gmail/Drive/Calendar/
+       Mobbin/Vercel, same set + same enabledInChat states as every prior run, no fresh
+       mcp__Vercel__* tools per ToolSearch) and shell env (GEMINI_API_KEY + BROWSERBASE_* only)
+       -- channels_connected=[] confirmed honestly. Re-ran analysis/gtm_engine_pct.py (unchanged,
+       50) and node scripts/validate-computation.mjs (4/4 PASS, none changed). Both independent
+       scorecards UNCHANGED since the 07-16 grades -- now the 2nd consecutive GTM read without a
+       fresh grade on either (after the 1st noted 07-19): QUALITY_SCORECARD still the 8th audit
+       (as_of 2026-07-16, overall B, ship_gate_met false, same two ship-critical gaps --
+       store-readiness B, business-case-strength B); GTM_SCORECARD still the 3rd grade
+       (as_of 2026-07-16, overall A, ship_gate_met true). **Did (verification, not a new fix):**
+       re-read the actual files (not just the prior memory entry) to confirm the two 07-17 fixes
+       are still live: scripts/validate_gtm.py:29's METRIC_SECTIONS still includes
+       outreach/email/content, and docs/store/ASO_COPY.md:76-77 still carries the reworded
+       RevenueCat-inert-pending-owner-keys language. GitHub issue #417 (GTM_SCORECARD's
+       metric_integrity A->A+ top_gap) is still open -- correctly left untouched, same reasoning
+       as every prior read since the fix landed. **Circuit-breaker escalation, now 7 consecutive
+       quiet GTM reads:** the site-gate owner DECISION (PENDING_OPS `site-gate`, ROADMAP.md:421-435)
+       has now gone 7 straight GTM reads (2026-07-09 reframe, 07-11, 07-13, 07-15, 07-17, 07-19,
+       07-21) with zero owner movement -- re-verified PENDING_OPS.md still `as_of: 2026-07-04`,
+       `status: open`, unchanged. This remains the single highest-leverage owner action
+       outstanding, now the longest-running circuit-breaker instance in this loop's history.
+       Demand_signal cadence checked: last run 2026-07-03 (18 days), ~quarterly refresh not due
+       until ~October. Zero outreach drafts (correct, unchanged reason): QUALITY_SCORECARD.
+       ship_gate_met is still false. This is a routine dashboard-bookkeeping refresh (dates +
+       validation reconciliation + a file-level verification that made no copy edit, consistent
+       with the 2026-07-07/07-15/07-19 precedent) -- no maker!=checker review was run since no
+       ROADMAP/BUSINESS_CASE/VISION/asset/copy change was made this run."
     - "2026-07-19 (GTM run): Quiet run, no ROADMAP/BUSINESS_CASE ARR/VISION steer -- still 0
        users/0 funnel, phase=pre_launch. Re-verified ListConnectors (Gmail/Drive/Calendar/
        Mobbin/Vercel, same set as every prior run, no analytics/billing/ESP MCP) and shell env
@@ -587,14 +616,14 @@ GROWTH_STATUS:
        cross the floor on honest math). Watching for the next independent audit to confirm the
        correctness A+->A embedding-refund finding is closed by its same-day follow-up commit."
     - "Owner DECISION NEEDED, ESCALATING (site-gate, PENDING_OPS `site-gate`, ROADMAP.md:421-435)
-       -- now 6 CONSECUTIVE GTM reads (2026-07-09 reframe, 07-11, 07-13, 07-15, 07-17, 07-19) with
-       zero owner movement (PENDING_OPS.md still `as_of: 2026-07-04`, `status: open`). Choose (A)
-       reinstate a real gate -- the loop can then REBUILD the middleware + the §34 gated-beta
-       invite mechanism, then flip site_gate_up once applied -- or (B) keep the app public and
-       formally drop the §34 gated-beta half from ROADMAP. This is the single highest-leverage
-       owner decision outstanding: it hard-blocks ALL pre-launch execute-mode outreach
-       regardless of channel connection or ship-gate status. Per the GTM_STANDARD brakes, this
-       is now the longest-running circuit-breaker pattern in this loop's history -- proposing
+       -- now 7 CONSECUTIVE GTM reads (2026-07-09 reframe, 07-11, 07-13, 07-15, 07-17, 07-19,
+       07-21) with zero owner movement (PENDING_OPS.md still `as_of: 2026-07-04`, `status: open`).
+       Choose (A) reinstate a real gate -- the loop can then REBUILD the middleware + the §34
+       gated-beta invite mechanism, then flip site_gate_up once applied -- or (B) keep the app
+       public and formally drop the §34 gated-beta half from ROADMAP. This is the single
+       highest-leverage owner decision outstanding: it hard-blocks ALL pre-launch execute-mode
+       outreach regardless of channel connection or ship-gate status. Per the GTM_STANDARD brakes,
+       this is now the longest-running circuit-breaker pattern in this loop's history -- proposing
        this as the SINGLE highest-leverage next owner action, above the other open PENDING_OPS
        items, since it uniquely gates outreach regardless of what else gets connected."
     - "Owner: connect an email provider + analytics (see CONNECT.md) -- engine_pct is honestly
@@ -616,15 +645,15 @@ GROWTH_STATUS:
        2026-07-03, not due until ~Oct), watch whether the owner enables the Vercel connector
        in-chat (could unlock real deployment/traffic data for product_analytics) or a
        PROD_URL/ANALYTICS_READ_TOKEN appears in env, watch for the owner's site-gate decision
-       (A/B) landing in PENDING_OPS + reconcile ROADMAP/GROWTH_STATUS accordingly (now 5
+       (A/B) landing in PENDING_OPS + reconcile ROADMAP/GROWTH_STATUS accordingly (now 7
        consecutive quiet reads -- keep escalating each additional quiet read), and watch whether
        the correctness A+->A embedding-refund finding is confirmed closed by the NEXT independent
        QUALITY_SCORECARD audit (a same-day follow-up commit claims to fix it but is not yet
        independently re-graded)."
   owner_blockers:
-    - "SITE-GATE OWNER DECISION -- CIRCUIT-BREAKER ESCALATION, NOW 6 CONSECUTIVE QUIET GTM READS
-       (2026-07-09 reframe, 07-11, 07-13, 07-15, 07-17, 07-19; PENDING_OPS.md `site-gate` still
-       `as_of: 2026-07-04`, `status: open`, zero owner movement). This is the single highest-leverage
+    - "SITE-GATE OWNER DECISION -- CIRCUIT-BREAKER ESCALATION, NOW 7 CONSECUTIVE QUIET GTM READS
+       (2026-07-09 reframe, 07-11, 07-13, 07-15, 07-17, 07-19, 07-21; PENDING_OPS.md `site-gate`
+       still `as_of: 2026-07-04`, `status: open`, zero owner movement). This is the single highest-leverage
        owner action outstanding: it hard-blocks ALL pre-launch execute-mode outreach regardless
        of channel connection or QUALITY_SCORECARD status. Choose (A) reinstate a real pre-launch
        gate, or (B) keep the app public and formally drop the §34 gated-beta half -- see
