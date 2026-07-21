@@ -21,6 +21,8 @@ import json
 import time
 from types import SimpleNamespace
 
+import pytest
+
 from src.db.models import Organization, OrganizationMember, User, UserTier
 
 WHSEC = "whsec_test_secret"
@@ -309,6 +311,57 @@ def test_member_cannot_belong_to_two_orgs(client, monkeypatch):
     ).status_code == 200
     r = client.post("/api/org/members", json={"email": "shared@example.com"}, headers=_auth(ob))
     assert r.status_code == 409
+
+
+def test_add_member_recovers_from_concurrent_seat_insert_race(client, monkeypatch, db_session):
+    """CONCURRENT first assignment of the SAME user to a seat (distinct from the SEQUENTIAL
+    two-orgs case above): two instances both SELECT no OrganizationMember row for the user and both
+    INSERT; the loser's flush trips the ``organization_members.user_id`` UNIQUE constraint ->
+    IntegrityError. ``add_member`` must ROLL BACK and surface the clean ``AlreadyInAnotherOrg``
+    (the endpoint maps it to 409), NOT an uncaught IntegrityError that 500s POST /api/org/members
+    under load. Deterministic simulation (mirrors tests/test_billing.py's concurrent-insert-race
+    test): inject the IntegrityError at the member-insert flush. LOAD-BEARING: remove add_member's
+    ``except IntegrityError`` recovery (or narrow its ``try`` off the flush) and this raises a bare
+    IntegrityError instead of AlreadyInAnotherOrg."""
+    from sqlalchemy.exc import IntegrityError
+
+    from src import org_billing
+
+    _, otoken = _register(client, "raceowner@example.com")
+    target_id, _ = _register(client, "racetarget@example.com")
+    org_dict = client.post("/api/org", json={"name": "Race Team"}, headers=_auth(otoken)).json()
+    _activate_org(client, monkeypatch, org_dict["id"], seats=2)
+    org = db_session.query(Organization).filter(Organization.id == org_dict["id"]).first()
+
+    real_flush = db_session.flush
+    state = {"armed": True}
+
+    def flaky_flush(*a, **k):
+        # Trip exactly once, on the member-insert flush: roll back our losing INSERT (as the DB
+        # would) and raise the IntegrityError the duplicate would have raised.
+        if state["armed"]:
+            state["armed"] = False
+            db_session.rollback()
+            raise IntegrityError(
+                "dup", {}, Exception("UNIQUE constraint failed: organization_members.user_id")
+            )
+        return real_flush(*a, **k)
+
+    db_session.flush = flaky_flush
+    try:
+        with pytest.raises(org_billing.AlreadyInAnotherOrg):
+            org_billing.add_member(db_session, org, "racetarget@example.com")
+    finally:
+        db_session.flush = real_flush
+
+    # Clean rollback: the losing INSERT left NO OrganizationMember row for the target user.
+    db_session.rollback()
+    assert (
+        db_session.query(OrganizationMember)
+        .filter(OrganizationMember.user_id == target_id)
+        .first()
+        is None
+    )
 
 
 def test_only_owner_can_manage_seats(client, monkeypatch):

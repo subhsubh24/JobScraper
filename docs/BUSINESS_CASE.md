@@ -50,7 +50,7 @@ These are *named, buildable* items (the only valid weak-case loop-back triggers)
    "entirely unbuilt":** `Organization`/`OrganizationMember` models + a REAL quantity-based
    Stripe seat checkout + signature-verified org webhook + seat-entitlement reconciliation
    (`billing.recompute_user_tier` ORs an org seat alongside the individual + mobile sources) +
-   owner-only seat management, all gate-verified (`tests/test_org_billing.py`, 23). **Web
+   owner-only seat management, all gate-verified (`tests/test_org_billing.py`, 31). **Web
    management surface also BUILT (run 42, PR #356):** `/app/team` create-team → buy-seats →
    member-roster flow against the real backend. The mobile half of the surface + live
    per-seat pricing remain (ROADMAP Track C). **No ARR is

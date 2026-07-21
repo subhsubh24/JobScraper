@@ -17,7 +17,7 @@ from types import SimpleNamespace
 import pytest
 from fastapi.testclient import TestClient
 
-from src.billing import _period_end, _user_for_subscription
+from src.billing import _period_end, _user_for_subscription, current_plan_level
 from src.db.models import Subscription, User, UserTier
 
 WHSEC = "whsec_test_secret"
@@ -760,6 +760,79 @@ def test_webhook_inactive_status_revokes_premium(client, monkeypatch, db_session
     assert r.status_code == 200, r.text
     db_session.expire_all()
     assert db_session.query(User).filter(User.id == user_id).first().tier == UserTier.FREE
+
+
+# ---------------------------------------------------------- authoritative plan on portal changes
+# Stripe stamps metadata.plan only at CHECKOUT-session creation and NEVER refreshes it on a plan
+# change made through the hosted billing portal (/api/billing/portal). So a portal upgrade/downgrade
+# fires customer.subscription.updated with the NEW price in items.data[0].price but STALE metadata.
+# The webhook must re-derive the plan from the authoritative price, else the entitlement LEVEL goes
+# stale — a Career+->Pro downgrade would keep Career+ access (a real entitlement bypass). These pin
+# that the price wins over metadata, and that metadata-only events (no line items) are unaffected.
+
+
+def test_webhook_updated_uses_authoritative_price_over_stale_plan_metadata(
+    client, monkeypatch, db_session
+):
+    """Portal DOWNGRADE Career+ -> Pro: the .updated event carries the new Pro price but stale
+    careerplus metadata. The webhook must record ``pro_annual`` (from the price), dropping the user
+    to Pro-level entitlement. LOAD-BEARING: trust metadata here and the bypass reopens — the user
+    keeps Career+ they no longer pay for. Fails on the pre-fix code (plan stays careerplus)."""
+    monkeypatch.setenv("STRIPE_WEBHOOK_SECRET", WHSEC)
+    monkeypatch.setenv("STRIPE_PRICE_PRO_ANNUAL", "price_pro_annual_id")
+    monkeypatch.setenv("STRIPE_PRICE_CAREERPLUS_ANNUAL", "price_cplus_annual_id")
+    user_id, _ = _register(client, email="downgrade@example.com")
+    # Seed an active Career+ subscription + PREMIUM tier, exactly as an app checkout would leave it.
+    db_session.add(
+        Subscription(
+            user_id=user_id, stripe_customer_id="cus_dg", stripe_subscription_id="sub_dg",
+            plan="careerplus_annual", status="active",
+        )
+    )
+    db_session.query(User).filter(User.id == user_id).first().tier = UserTier.PREMIUM
+    db_session.commit()
+
+    payload = _event(
+        "customer.subscription.updated",
+        {
+            "id": "sub_dg", "customer": "cus_dg", "status": "active",
+            "metadata": {"user_id": user_id, "plan": "careerplus_annual"},  # STALE — Stripe kept it
+            "items": {"data": [{"price": {"id": "price_pro_annual_id"}}]},   # AUTHORITATIVE new plan
+        },
+    )
+    r = client.post(
+        "/api/billing/webhook", content=payload, headers={"stripe-signature": _sign(payload)}
+    )
+    assert r.status_code == 200, r.text
+    db_session.expire_all()
+    sub = db_session.query(Subscription).filter(Subscription.user_id == user_id).first()
+    assert sub.plan == "pro_annual"  # authoritative price won over the stale careerplus metadata
+    user = db_session.query(User).filter(User.id == user_id).first()
+    assert current_plan_level(user, sub) == "pro"  # not career_plus -> the bypass is closed
+
+
+def test_webhook_updated_falls_back_to_metadata_plan_when_no_known_price(
+    client, monkeypatch, db_session
+):
+    """A renewal-style .updated with NO line items (or an unknown price) still records the plan from
+    metadata — the authoritative derivation returns None and defers to metadata, so existing
+    metadata-only events are unaffected (backward-compat)."""
+    monkeypatch.setenv("STRIPE_WEBHOOK_SECRET", WHSEC)
+    user_id, _ = _register(client, email="renew@example.com")
+    payload = _event(
+        "customer.subscription.updated",
+        {
+            "id": "sub_rn", "customer": "cus_rn", "status": "active",
+            "metadata": {"user_id": user_id, "plan": "careerplus_monthly"},
+        },
+    )
+    r = client.post(
+        "/api/billing/webhook", content=payload, headers={"stripe-signature": _sign(payload)}
+    )
+    assert r.status_code == 200, r.text
+    db_session.expire_all()
+    sub = db_session.query(Subscription).filter(Subscription.user_id == user_id).first()
+    assert sub.plan == "careerplus_monthly"
 
 
 def test_webhook_no_payment_required_checkout_grants_premium(client, monkeypatch, db_session):

@@ -82,6 +82,44 @@ def plan_level_for_plan(plan: Optional[str]) -> str:
     return "pro"
 
 
+def _plan_for_price_id(price_id: Optional[str]) -> Optional[str]:
+    """Reverse-map a Stripe Price ID back to its public plan id, or ``None`` if unknown.
+
+    The forward map (``price_id_for_plan``) reads the owner-set ``STRIPE_PRICE_*`` env vars; this
+    inverts it by scanning the same four vars. Returns ``None`` when the price is unset/unknown so
+    the caller can fall back to metadata rather than mis-classifying the plan.
+    """
+    if not price_id:
+        return None
+    for plan, env_var in _PLAN_PRICE_ENV.items():
+        if os.getenv(env_var) == price_id:
+            return plan
+    return None
+
+
+def _plan_for_subscription_obj(obj) -> Optional[str]:
+    """Derive the plan id AUTHORITATIVELY from a Stripe subscription object's active price.
+
+    Stripe stamps ``metadata.plan`` only at CHECKOUT-session creation and never refreshes it on a
+    later plan change made through the hosted billing portal — so a portal upgrade/downgrade fires
+    ``customer.subscription.updated`` carrying the NEW price in ``items.data[0].price`` while the
+    metadata still names the OLD plan (or none). Trusting metadata there would leave
+    ``Subscription.plan`` stale and mis-grade the entitlement level (e.g. a Career+→Pro portal
+    downgrade would keep Career+ access). The subscription's own price is the source of truth, so
+    prefer it — mirroring how the org path reads seat COUNT from the item, not metadata
+    (``org_billing._seat_quantity``). Returns ``None`` when no known price is present so the caller
+    falls back to metadata (unknown-price rows degrade to ``pro`` via ``plan_level_for_plan``).
+    """
+    try:
+        items = (obj.get("items") or {}).get("data") or []
+        if items:
+            price = items[0].get("price") or {}
+            return _plan_for_price_id(price.get("id"))
+    except (AttributeError, TypeError):
+        pass
+    return None
+
+
 def current_plan_level(user: User, subscription: Optional[Subscription]) -> str:
     """A user's effective entitlement level: ``free`` | ``pro`` | ``career_plus``.
 
@@ -401,12 +439,17 @@ def apply_event(event, db: Session) -> Optional[str]:
             return None
         status = obj.get("status")
         meta = obj.get("metadata") or {}
+        # AUTHORITATIVE plan: prefer the subscription's own active price over metadata, which
+        # Stripe never refreshes on a hosted-portal plan change (see _plan_for_subscription_obj).
+        # Fall back to metadata (app-initiated checkouts stamp it), then to preserving the existing
+        # plan (_upsert_subscription only writes plan when truthy) on a metadata-less renewal.
+        plan = _plan_for_subscription_obj(obj) or meta.get("plan")
         _upsert_subscription(
             db,
             user,
             stripe_customer_id=obj.get("customer"),
             stripe_subscription_id=obj.get("id"),
-            plan=meta.get("plan"),
+            plan=plan,
             status=status,
             current_period_end=_period_end(obj),
         )
