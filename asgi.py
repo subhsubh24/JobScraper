@@ -1564,7 +1564,8 @@ def create_job(
     # is still created, just UNSCORED (the same graceful outcome as a scoring error) — never a
     # blocked add. A False ``may_score`` here always means "key present but over the ceiling".
     scored = False
-    embedding_outage = False
+    refund_score_slot = False
+    scorer = None
     if may_score:
         try:
             scorer = JobScorer(db)
@@ -1577,9 +1578,19 @@ def create_job(
             # would db.commit() the still-pending JobPosting insert into its own transaction,
             # orphaning it from the Application/usage rows — the exact hazard the consume-first
             # comment above guards against).
-            embedding_outage = use_embeddings and getattr(scorer, "embedding_failed", False)
+            refund_score_slot = use_embeddings and getattr(scorer, "embedding_failed", False)
         except Exception:
             logger.exception("Scoring failed for job %s; continuing unscored", job.id)
+            # score_job swallows embedding failures itself (degrade branch above), so a THROW
+            # here is a NON-embedding fault (e.g. a DB/write error mid-scoring). The up-front
+            # score_daily slot is still consumed — refund it too, but ONLY when NO billable
+            # embedding actually fired (nothing was charged), matching the graceful-degrade
+            # refund and the project's refund principle (count calls that cost money, not
+            # failures that didn't). If a paid embedding already succeeded before the throw
+            # (``_billable_embeddings`` > 0) the spend is real, so the slot correctly stays
+            # burned; if the scorer never even constructed, zero embeddings fired → refund.
+            billable = getattr(scorer, "_billable_embeddings", 0) if scorer is not None else 0
+            refund_score_slot = use_embeddings and billable == 0
     else:
         logger.warning(
             "Per-day scoring ceiling reached for user %s; job %s created unscored",
@@ -1591,17 +1602,18 @@ def create_job(
     db.add(Application(user_id=user.id, job_id=job.id, status=ApplicationStatus.SAVED))
     auth.increment_job_usage(user)
     db.commit()
-    # Refund the up-front per-day scoring slot when the paid embedding call OUTAGED (degraded to
-    # the neutral baseline with no billable spend). Done post-commit so ``_refund_counter``'s own
-    # commit only persists the decrement — the job/Application/usage rows are already durable, so
-    # there is nothing pending to split. Best-effort (§32): a refund failure must NEVER abort the
-    # already-succeeded job add — swallow + log so the core action stands.
-    if embedding_outage:
+    # Refund the up-front per-day scoring slot when NO billable embedding actually fired — the
+    # paid call OUTAGED (degraded to the neutral baseline) OR score_job threw before any paid
+    # embedding succeeded. Done post-commit so ``_refund_counter``'s own commit only persists the
+    # decrement — the job/Application/usage rows are already durable, so there is nothing pending
+    # to split. Best-effort (§32): a refund failure must NEVER abort the already-succeeded job
+    # add — swallow + log so the core action stands.
+    if refund_score_slot:
         try:
             _refund_counter(db, user.id, "score_daily", 86400)
         except Exception:
             logger.warning(
-                "score_daily refund failed for user %s after embedding outage on job %s",
+                "score_daily refund failed for user %s after a no-spend scoring failure on job %s",
                 user.id,
                 new_job_id,
                 exc_info=True,

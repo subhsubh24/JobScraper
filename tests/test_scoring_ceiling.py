@@ -53,6 +53,41 @@ class _OutagingScorer:
         return None
 
 
+class _RaisingScorer:
+    """Stand-in whose ``score_job`` THROWS a non-embedding fault (a DB/write error) AFTER firing
+    ZERO billable embeddings. score_job swallows embedding failures itself, so a throw reaching
+    create_job's except path is never an embedding outage — but the up-front score_daily slot is
+    still consumed. create_job must REFUND it, since no paid embedding call succeeded (nothing was
+    charged), matching the graceful-degrade refund and the refund principle."""
+
+    calls = 0
+
+    def __init__(self, db):  # noqa: D401 - matches JobScorer(db) construction
+        self._billable_embeddings = 0
+        self.embedding_failed = False
+
+    def score_job(self, job, user, use_embeddings=True):
+        _RaisingScorer.calls += 1
+        raise RuntimeError("simulated scoring fault (no billable embedding fired)")
+
+
+class _RaisingAfterSpendScorer:
+    """Stand-in whose ``score_job`` THROWS *after* a paid embedding already fired
+    (``_billable_embeddings`` == 1). Real spend occurred, so the up-front score_daily slot must
+    NOT be refunded — otherwise a mid-scoring fault after a billed call would hand back a free
+    slot, defeating the wallet-drain ceiling."""
+
+    calls = 0
+
+    def __init__(self, db):  # noqa: D401 - matches JobScorer(db) construction
+        self._billable_embeddings = 1  # a paid embedding already succeeded before the throw
+        self.embedding_failed = False
+
+    def score_job(self, job, user, use_embeddings=True):
+        _RaisingAfterSpendScorer.calls += 1
+        raise RuntimeError("fault AFTER a billable embedding fired")
+
+
 def _register(client, email):
     r = client.post("/api/auth/register", json={"email": email, "password": OK_PW})
     assert r.status_code == 200, r.text
@@ -167,6 +202,73 @@ def test_embedding_outage_refunds_the_scoring_slot(client, db_session, monkeypat
     )
     # Every consume was matched by a refund → floor 0 (or no surviving positive count).
     assert row is None or row.count == 0
+
+
+def test_scoring_raise_with_no_spend_refunds_the_scoring_slot(client, db_session, monkeypatch):
+    """A score_job THROW that fired NO billable embedding refunds the up-front score_daily slot.
+
+    The graceful-degrade path (``embedding_failed``) already refunds, but score_job can also
+    THROW a non-embedding fault (a DB/write error) — caught by create_job's except, which leaves
+    the job unscored. Without extending the refund to that path, a scoring error that cost the
+    user nothing would still silently burn a paid-ceiling slot. This pins the refund: ceiling 2 +
+    an always-raising (zero-spend) scorer, 4 adds all still ATTEMPT scoring because each consumed
+    slot is returned. Load-bearing: drop the raise-path refund and adds 3+ are created unscored
+    (calls stays 2) and the counter climbs — this reddens.
+    """
+    _RaisingScorer.calls = 0
+    monkeypatch.setattr(asgi, "llm_available", lambda: True)
+    monkeypatch.setattr(asgi, "JobScorer", _RaisingScorer)
+    monkeypatch.setattr(asgi, "SCORE_DAILY_CEILING", 2)
+
+    token = _register(client, "raise-refund@example.com")
+    # Consent so the embedding (paid, metered) path is chosen — else scoring stays free+local.
+    assert client.post("/api/ai-consent", headers=_auth(token)).status_code == 200
+    # 4 adds > ceiling 2, all within the free-tier 5-job cap. The score_job throw is caught, so
+    # each add still returns 200 (job created, just unscored) — and each slot is refunded.
+    for i in range(4):
+        assert _add_job(client, token, i).status_code == 200
+
+    assert _RaisingScorer.calls == 4  # all 4 attempted scoring — the refund kept the ceiling clear
+
+    import time
+
+    from src.db.models import RateCounter, User
+
+    user = db_session.query(User).filter(User.email == "raise-refund@example.com").one()
+    window_key = int(time.time() // 86400)
+    row = (
+        db_session.query(RateCounter)
+        .filter(
+            RateCounter.subject == str(user.id),
+            RateCounter.bucket == "score_daily",
+            RateCounter.window_key == window_key,
+        )
+        .first()
+    )
+    # Every consume was matched by a refund → floor 0 (or no surviving positive count).
+    assert row is None or row.count == 0
+
+
+def test_scoring_raise_after_real_spend_does_not_refund(client, monkeypatch):
+    """A score_job THROW *after* a billable embedding already fired must NOT refund the slot.
+
+    Real spend occurred, so the ceiling must correctly stay burned — refunding here would let a
+    fault after a billed call hand back a free slot and defeat the wallet-drain brake. Ceiling 2 +
+    an always-raising scorer that reports one billed embedding: only the first 2 adds fire a
+    scoring call (each burns its slot, no refund), and the 3rd is created UNSCORED. Load-bearing:
+    wrongly refund on real spend and the 3rd add would score too (calls==3)."""
+    _RaisingAfterSpendScorer.calls = 0
+    monkeypatch.setattr(asgi, "llm_available", lambda: True)
+    monkeypatch.setattr(asgi, "JobScorer", _RaisingAfterSpendScorer)
+    monkeypatch.setattr(asgi, "SCORE_DAILY_CEILING", 2)
+
+    token = _register(client, "raise-nospend-refund@example.com")
+    assert client.post("/api/ai-consent", headers=_auth(token)).status_code == 200
+    for i in range(3):
+        assert _add_job(client, token, i).status_code == 200
+
+    # Only the first 2 fired a scoring call; the 3rd was created unscored (slot not refunded).
+    assert _RaisingAfterSpendScorer.calls == 2
 
 
 def test_scoring_not_metered_without_a_key(client, monkeypatch):
