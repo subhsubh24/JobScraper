@@ -18,6 +18,12 @@ export default function PipelinePage() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [stats, setStats] = useState<PipelineStats | null>(null);
   const [loading, setLoading] = useState(true);
+  // `reloading` covers every RE-fetch after the first mount (Retry, or the post-add refresh) so
+  // the content region can show an honest pending state instead of the "No jobs yet." false-empty
+  // while jobs is still stale. It is deliberately NOT `loading`: the `loading` early-return below
+  // unmounts the whole page (header, quota, an open Add form), which would silently discard typed
+  // input mid-retry — `reloading` keeps all page chrome mounted.
+  const [reloading, setReloading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showAdd, setShowAdd] = useState(false);
 
@@ -30,15 +36,20 @@ export default function PipelinePage() {
   const atJobLimit = jobsRemaining === 0;
 
   const load = useCallback(async () => {
-    setError(null);
+    setReloading(true);
     try {
       const [j, s] = await Promise.all([api.listJobs(), api.pipeline()]);
       setJobs(j);
       setStats(s);
+      // Clear the error only on SUCCESS (mirrors insights `load()`): a failed→Retry cycle then
+      // keeps the error card on screen until the refetch actually succeeds, instead of unmounting
+      // it up front and flashing the "No jobs yet." false-empty during the in-flight fetch.
+      setError(null);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Could not load your pipeline.');
     } finally {
       setLoading(false);
+      setReloading(false);
     }
   }, []);
 
@@ -113,8 +124,20 @@ export default function PipelinePage() {
         <Card>
           <ErrorText>{error}</ErrorText>
           <div className="mt-4">
-            <Button onClick={() => void load()}>Retry</Button>
+            {/* error stays visible while retrying (load() clears it only on success), so the
+                Retry button carries the pending state rather than the page flashing a false-empty. */}
+            <Button onClick={() => void load()} disabled={reloading}>
+              {reloading ? 'Retrying…' : 'Retry'}
+            </Button>
           </div>
+        </Card>
+      ) : jobs.length === 0 && reloading ? (
+        // A reload in flight with no jobs yet (most visibly right after the user adds their FIRST
+        // job, when `jobs` is still the stale empty array) must not render "No jobs yet." — that's
+        // the same load-as-empty masquerade, one code path over. Show a pending affordance instead.
+        <Card aria-busy="true" aria-label="Loading your pipeline">
+          <Skeleton className="h-6 w-40" />
+          <Skeleton className="mt-3 h-6 w-56" />
         </Card>
       ) : jobs.length === 0 ? (
         <Card>
