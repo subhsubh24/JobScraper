@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Button, Card, ErrorText } from '@/components/ui';
 import { api, ApiError, type Organization } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
@@ -317,16 +317,25 @@ export default function TeamPage() {
     return null;
   });
 
-  useEffect(() => {
-    let active = true;
-    api
-      .getOrg()
-      .then((o) => active && setOrg(o))
-      .catch(() => active && setLoadError(true));
-    return () => {
-      active = false;
-    };
+  const load = useCallback(async () => {
+    setLoadError(false);
+    setOrg(undefined);
+    try {
+      setOrg(await api.getOrg());
+    } catch {
+      setLoadError(true);
+    }
   }, []);
+
+  useEffect(() => {
+    // load() setStates asynchronously after the fetch resolves, not synchronously.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    load();
+  }, [load]);
+
+  function retry() {
+    void load();
+  }
 
   // The app layout guards for an authenticated user; render nothing during the brief restore.
   if (!user) return null;
@@ -342,9 +351,10 @@ export default function TeamPage() {
 
       {loadError ? (
         <Card>
-          <p className="text-sm text-slate-400">
-            Could not load your team right now. Reload to try again.
-          </p>
+          <p className="text-sm text-slate-400">Could not load your team right now.</p>
+          <div className="mt-4">
+            <Button onClick={retry}>Retry</Button>
+          </div>
         </Card>
       ) : org === undefined ? (
         <div className="h-40 animate-pulse rounded-lg bg-slate-800/60" aria-hidden="true" />

@@ -106,9 +106,17 @@ export default function PipelinePage() {
           }}
         />
       )}
-      <ErrorText>{error}</ErrorText>
-
-      {jobs.length === 0 ? (
+      {error ? (
+        // A load failure must not masquerade as an empty pipeline ("No jobs yet"): surface the
+        // real error with a Retry so a transient failure is recoverable in place, not a dead end
+        // that needs a full page reload.
+        <Card>
+          <ErrorText>{error}</ErrorText>
+          <div className="mt-4">
+            <Button onClick={() => void load()}>Retry</Button>
+          </div>
+        </Card>
+      ) : jobs.length === 0 ? (
         <Card>
           <p className="text-slate-300">No jobs yet.</p>
           <p className="text-slate-500">Add a role you&apos;re chasing and we&apos;ll score how well it fits you.</p>
