@@ -4,6 +4,60 @@
 > and the standing gaps. Read this FIRST each run and diff vs the last grade. Owned by the
 > Quality Auditor only.
 
+## 2026-07-23 — 9th independent audit
+
+**Overall: B (=) · ship_gate_met: false.** No overall change, but real evidence-backed internal
+movement. Per-dimension (Δ vs 2026-07-16): functional-reality **A+** (=), correctness **A** (=),
+security **A** (=), design-taste **A** (=), store-readiness **B** (=), artifact-integrity **A+**
+(▲ from A), business-case-strength **B** (=), tests-evals **A** (=), performance **A** (=).
+
+Method: 9 fresh independent adversarial grader subagents (maker ≠ checker), each ran its own
+mechanical signal + cited file/line. Auditor pre-ran the shared gate at HEAD `ff11b84`: flake8
+baseline clean, asgi imports, **787 backend pass @ 92.48% cov** (floor 88), 15 journeys, 19-test
+billing round-trip; **live AI-output evals 10/10** in 188s with a real GEMINI_API_KEY; no tracked
+secrets; `check_quality parse` OK / `readiness` FAIL (self-referential off store-readiness B);
+`check_blocks` OK (`floor_met_year1=false`, `engine_pct=50`); `arr_base`→57500. Per-dimension
+targeted suites: correctness 144, security 149/11-skip, performance 156, scoring-evals 19,
+route-inventory 2, store-assets 2.
+
+**What moved UP (artifact-integrity A→A+):** the single item that held it at A last cycle — the
+STALE `docs/store/ACCEPTANCE_AUDIT.md` (A4/G4 "NOT integrated", G7 "still the Expo template", both
+false after #412) — was corrected by #419 (`2f5b4ad`). Grep for those phrases over the audit doc now
+returns 0 hits; A4/G4 read OPEN (`:33,49`), G7 corrected to "bespoke … NOT the Expo template" (`:52`).
+The old phrases survive only inside this scorecard's / this memory's own historical record. No new
+fabricated tick found; spot-checked ticks (#465, #463, IAP) all back to real artifacts → A+.
+
+**8th-audit correctness finding RESOLVED (but correctness holds A on a NEW finding):** the burned
+`score_daily` embedding slot never refunded on a Gemini embedding OUTAGE is CLOSED — #419 added
+`JobScorer.embedding_failed` (`scorer.py:243`) + a post-commit `_refund_counter` (`asgi.py:1611-1613`),
+and #458 extended it to the THROW path (refund only when `_billable_embeddings==0`, `asgi.py:1592-1593`),
+with revert-provable regression tests netting the `RateCounter` to 0 on outage/no-spend-throw and
+keeping it burned on real spend (`test_scoring_ceiling.py:160,210,250`). That alone would earn A+.
+Held at **A** on a NEW adversarially-surfaced, non-blocking finding: the `create_job` dedup guard is a
+read-then-write TOCTOU (`asgi.py:1497-1512`) with NO backing DB unique constraint —
+`JobPosting.__table_args__` declares only a non-unique `Index("ix_job_user_company")`
+(`models.py:344-346`), no `UniqueConstraint`. Truly-simultaneous identical POSTs both INSERT, unlike
+the `FOR UPDATE`-safe ceiling. Non-blocking (client-side serialization #463 + sequential retries catch
+the common cases).
+
+**store-readiness stays B — internal improvement, unchanged grade:** ground (2) of last cycle (the
+stale audit doc) is RESOLVED by #419; ground (1) genuinely persists — store SCREENSHOTS are absent
+(`docs/store/assets/` = feature-graphic.png + README only), so A3 (`ACCEPTANCE_AUDIT.md:32`) and G7
+(`:52`) stay real open FAILs, "Submission readiness: NO" (`:80`). Screenshots need a SIGNED native
+build (Human-Core, not producible on Linux; tracked `PENDING_OPS.md:47-64`). The rubric requires ZERO
+open FAILs for A; the Human-Core carve-out does not erase a real, honestly-carried FAIL. The whole
+loop-buildable half is done.
+
+**business-case B (=, honestly unmet):** `arr_base`→57500 (< $100K, un-gamed 500 subs × $115 blended
+ARPA); `floor_met_year1=false`. Seat lever user-reachable but un-monetizable (`STRIPE_PRICE_TEAM_ANNUAL`
+owner-unset → 503) with un-validated demand → ZERO ARR credited. #452–#467 billing commits are
+test-nets/hardening, not a floor-lever. Nothing gamed or regressed.
+
+**Ship gate stays NO** on store-readiness B + business-case B — both blocked on non-loop-buildable
+inputs (a Human-Core signed build; validated B2B demand + an owner-set seat price). Issues #93 / #92
+updated. Standing A→A+ items unchanged: correctness (NEW dedup TOCTOU), performance (sync telemetry),
+design-taste (native captures), tests-evals (nightly-only live detection), security (CAPTCHA no-op).
+
 ## 2026-07-16 — 8th independent audit
 
 **Overall: B (=) · ship_gate_met: false.** No overall change, but real evidence-backed movement
