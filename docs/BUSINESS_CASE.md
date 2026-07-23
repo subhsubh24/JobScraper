@@ -52,8 +52,15 @@ These are *named, buildable* items (the only valid weak-case loop-back triggers)
    (`billing.recompute_user_tier` ORs an org seat alongside the individual + mobile sources) +
    owner-only seat management, all gate-verified (`tests/test_org_billing.py`, 31). **Web
    management surface also BUILT (run 42, PR #356):** `/app/team` create-team → buy-seats →
-   member-roster flow against the real backend. The mobile half of the surface + live
-   per-seat pricing remain (ROADMAP Track C). **No ARR is
+   member-roster flow against the real backend. **Mobile management surface also BUILT
+   (run 61, PR #429):** a native `/team` route (`mobile/src/app/team.tsx`, 293 lines) lets an
+   owner view seat usage and manage the roster; App-Store-3.1.1-safe (no on-device checkout —
+   buying seats stays web-only). Both surfaces are landed IN CODE; the ROADMAP box for the
+   mobile half stays `[ ]` only because it cannot be runtime-validated on the Linux build host
+   (device validation is Human-Core, `ROADMAP.md:316`), not because the code is missing. The
+   genuine remaining gap is **live per-seat pricing** (`STRIPE_PRICE_TEAM_ANNUAL`, owner-only,
+   `PENDING_OPS.md` `stripe-account`) — until it is set, `POST /api/org/checkout` refuses
+   honestly (503, no charge). **No ARR is
    credited and `floor_met_year1` stays false** (anti-gaming, FACTORY_STANDARD §9): there is no
    product live and B2B adoption is un-validated (see `demand_signal.disconfirming`), so
    crediting a pre-launch adoption number would be gaming. Building the lever REMOVES the
@@ -121,9 +128,10 @@ These are *named, buildable* items (the only valid weak-case loop-back triggers)
    and on any defensible mix it is a modest diversifier, **not** a floor-flip.
 
 **Floor still not met.** With Career+ + referral + now the **team/B2B2C seat-tier BACKEND**
-(run 39, PR #348) **and its WEB management surface** (run 42, PR #356) built, the last
-remaining *build* work on the primary floor-lever is the MOBILE half of the admin surface +
-live per-seat pricing (owner). The floor stays honestly unmet
+(run 39, PR #348), its **WEB management surface** (run 42, PR #356), AND its **MOBILE
+management surface** (run 61, PR #429) all built, there is no remaining *build* work on the
+primary floor-lever's user-reachability — the only gap left is the owner-only **live
+per-seat price** (`STRIPE_PRICE_TEAM_ANNUAL`). The floor stays honestly unmet
 (`floor_met_year1=false`) because no ARR can be credited pre-launch (0 users; B2B adoption
 un-validated) — crossing $100K now depends on REAL adoption data, not more building
 (annual-first/founder pricing is the one remaining unbuilt pricing lever). Revenue lift from
@@ -159,5 +167,5 @@ BUSINESS_CASE_SUMMARY:
   floor_usd: 100000
   floor_met_year1: false
   time_to_floor: unknown_pre_launch
-  as_of: 2026-07-13
+  as_of: 2026-07-23
 ```

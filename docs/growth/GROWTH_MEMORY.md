@@ -6,6 +6,72 @@ pre-launch.
 
 ---
 
+### 2026-07-23 — Daily GTM review (both scorecards fresh; closed both GTM_SCORECARD top_gaps; site-gate circuit-breaker now 8 reads)
+- **Observed:** Phase still `pre_launch`. Fresh `ListConnectors`: Gmail (connected, enabled —
+  outreach lane) + Mobbin (connected, enabled — design reference) + Vercel (connected at org
+  level, `enabledInChat:false`, zero `mcp__Vercel__*` tools) + Google Drive/Calendar (both
+  connected, `enabledInChat:false` on THIS session's call — notably the 2026-07-23
+  `GTM_SCORECARD` claims a fresh call on the same date showed both `true`; two independent
+  calls on the same day disagreeing is itself the proof that this flag is session-volatile and
+  should not be pinned as committed fact, see "Did" below). `channels_connected: []` stays
+  honest. Shell env: `GEMINI_API_KEY` + both `BROWSERBASE_*` present (validator infra), no
+  `PROD_URL`/`ANALYTICS_READ_TOKEN`/`STRIPE_*`/`SMTP_*`/`DATABASE_URL`. Re-ran
+  `analysis/gtm_engine_pct.py` (unchanged, 50) and `node scripts/validate-computation.mjs` (4/4
+  PASS, none changed). Both independent scorecards read **FRESH, same `as_of` (2026-07-23) as
+  each other**: **QUALITY_SCORECARD** (9th audit): overall B (=), `ship_gate_met: false`, same
+  two ship-critical gaps (store-readiness B, business-case-strength B), but real internal
+  movement — artifact-integrity **A→A+** (the stale `ACCEPTANCE_AUDIT.md` doc-lag closed, #419)
+  and the prior correctness finding **CONFIRMED CLOSED** (#419/#458, revert-provable regression
+  tests). **GTM_SCORECARD** (4th grade): overall **A** (=), `ship_gate_met: true`;
+  `metric_integrity` **A→A+** (issue #417 closed — `validate_gtm.py`'s `METRIC_SECTIONS` now
+  walks `outreach`/`email`/`content`, injection-verified this run: adding `email.list_size: 999`
+  makes the gate FAIL exit 1). The scorecard named exactly two top_gaps, both addressed this run
+  (see Did).
+- **Concluded:** No real funnel/PMF data justifies a ROADMAP/BUSINESS_CASE ARR/VISION steer this
+  run (same reasoning as every prior pre-launch read). Both fixes below close real,
+  independently-identified gaps this loop owns — not a steer, not padding.
+- **Did (real, in-repo, maker≠checker reviewed):**
+  1. **Fixed `self_validation_honesty`'s RECURRING drift structurally, not by re-syncing.** The
+     validation note had repeatedly pinned Google Drive/Calendar's per-session `enabledInChat`
+     value as committed narrative fact, and that value keeps flipping between reads with no
+     underlying change — confirmed again this run (my own fresh call showed both `false`, while
+     the scorecard's own same-day call claimed both `true`). Since neither connector is EVER a
+     candidate GTM source (no analytics/billing/ESP capability either could provide), the fix
+     removes the specific volatile claim from the note entirely rather than updating it to
+     today's snapshot (which would just drift again next session) — this is the root-cause fix,
+     not a band-aid re-sync.
+  2. **Fixed `artifact_freshness`'s watch-nit.** `docs/BUSINESS_CASE.md` lever 2 said "the mobile
+     half of the surface... remain[s]" unbuilt, but commit `2099b57` (run 61, PR #429) landed
+     `mobile/src/app/team.tsx` (293 lines — verified present + verified via `git log` this run).
+     Reworded lever 2 + the "Floor still not met" paragraph to credit BOTH the web (#356) and
+     mobile (#429) management surfaces as landed IN CODE, naming the live per-seat price
+     (`STRIPE_PRICE_TEAM_ANNUAL`, owner-only) as the sole genuine remaining gap — matching
+     `ROADMAP.md:308-318`'s own precise framing (the mobile ROADMAP box stays `[ ]` only because
+     device validation can't run on the Linux host, not because code is missing). Re-verified all
+     3 ARR figures unchanged (`validate-computation.mjs` 4/4 PASS) before bumping the stale
+     `BUSINESS_CASE_SUMMARY as_of` (2026-07-13 → 2026-07-23). No ARR number or `floor_met_year1`
+     changed by either fix (anti-gaming). Independent reviewer (maker≠checker, fresh subagent)
+     reviewed both fixes + this `GROWTH_STATUS`/`GROWTH_MEMORY` update together: see PR.
+  **Circuit-breaker escalation, now 8 consecutive quiet GTM reads:** the site-gate owner DECISION
+  (`PENDING_OPS.md` `site-gate`, `ROADMAP.md:421-435`) has gone 8 straight GTM reads (2026-07-09
+  reframe through 07-23) with zero owner movement — re-verified `PENDING_OPS.md` still shows
+  `as_of: 2026-07-04`, `status: open`, unchanged.
+- **Recommended (to factory):** store-readiness (store screenshots, needs a signed native build)
+  and business-case-strength (a live per-seat price — now the ONLY remaining gap on that
+  lever — plus real B2B adoption data) remain the two ship-critical gaps, both product-
+  factory/owner work. Zero outreach drafts this run (correct): `QUALITY_SCORECARD.ship_gate_met`
+  is still false. Demand_signal cadence checked: last run 2026-07-03 (20 days), ~quarterly
+  refresh not due until ~October.
+- **Meta / operational note:** Worth generalizing beyond this one flag: a per-session connector
+  capability (`enabledInChat`) is NOT stable committed state — it can differ between two calls on
+  the SAME day by two different routines. The lesson from the 2026-07-17 entry ("an auditor's
+  claimed drift is a hypothesis to verify against this run's own fresh tool calls") extends one
+  step further here: even when verified fresh, a volatile flag should not be narrated as fact for
+  a connector that is never a source candidate anyway — the fix is to stop reporting it, not to
+  keep re-reporting whichever value happened to come back this time.
+
+---
+
 ### 2026-07-21 — Daily GTM review (quiet run; both scorecards unchanged; site-gate circuit-breaker now 7 reads)
 - **Observed:** Phase still `pre_launch`. Re-verified `ListConnectors` — Gmail (connected,
   enabledInChat:true), Google Drive (connected, enabledInChat:false), Google Calendar

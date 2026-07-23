@@ -19,7 +19,7 @@ state. Nothing is fabricated.
 ```yaml
 GROWTH_STATUS:
   project: jobscraper
-  as_of: 2026-07-21
+  as_of: 2026-07-23
   phase: pre_launch
   engine_built: false      # engine_built iff engine_pct==100 (scripts/check_blocks.py invariant)
   engine_pct: 50           # COMPUTED (FACTORY_STANDARD s22): analysis/gtm_engine_pct.py parses
@@ -183,7 +183,7 @@ GROWTH_STATUS:
     published: 0
     last_published: null
   validation:               # GTM_STANDARD s4 self-validation -- fail closed, never claim an unverified source
-    checked_as_of: 2026-07-21
+    checked_as_of: 2026-07-23
     sources:
       - name: product_analytics
         status: unavailable   # no PROD_URL/ANALYTICS_READ_TOKEN present in this run's env; no
@@ -198,45 +198,93 @@ GROWTH_STATUS:
                                # enabledInChat: false -- ToolSearch for Vercel-project/deploy
                                # keywords returned zero mcp__Vercel__* tools, so nothing is
                                # callable; still not used as a source (fail-closed). Unchanged
-                               # for the 3rd consecutive GTM read since it first appeared 07-15.
+                               # for the 4th consecutive GTM read since it first appeared 07-15.
       - name: gtm_scorecard
-        status: available     # docs/growth/GTM_SCORECARD.md -- UNCHANGED this run: still the
-                               # 3rd grade, as_of 2026-07-16 (same as the 07-17 read). Overall A,
-                               # ship_gate_met true. Read as a DATA signal, consumed not
+        status: available     # docs/growth/GTM_SCORECARD.md -- FRESH this run: as_of 2026-07-23.
+                               # Overall A, ship_gate_met true. Read as a DATA signal, consumed not
                                # authored.
       - name: quality_scorecard
-        status: available     # docs/quality/QUALITY_SCORECARD.md -- UNCHANGED this run: still
-                               # the 8th independent audit, as_of 2026-07-16 (same as the 07-17
-                               # read). Overall B (=), ship_gate_met still false. Consumed not
-                               # authored; NOT the GTM scorecard (distinct gate).
+        status: available     # docs/quality/QUALITY_SCORECARD.md -- FRESH this run: 9th
+                               # independent audit, as_of 2026-07-23. Overall B (=), ship_gate_met
+                               # still false. Consumed not authored; NOT the GTM scorecard
+                               # (distinct gate).
     note: "All funnel/acquisition/pmf/channels/outreach/email/content metrics above are 0/null
            because no analytics/billing/email source is connected -- this satisfies
            scripts/validate_gtm.py's honesty gate (a non-zero metric requires a connected
-           source; METRIC_SECTIONS covers outreach/email/content too, verified still landed --
-           see Did below). Re-checked this run: (1) ListConnectors -- Gmail (connected,
-           enabledInChat:true) + Google Drive (connected, enabledInChat:false) + Google Calendar
-           (installState unknown, enabledInChat:false) + Mobbin (connected, enabledInChat:true) +
-           Vercel (connected at org level, enabledInChat:false, zero mcp__Vercel__* tools per a
-           fresh ToolSearch) -- unchanged from every prior read, still no analytics/billing/ESP
-           MCP usable from this session; (2) shell env -- GEMINI_API_KEY and BOTH BROWSERBASE_*
-           vars present (validator infra, not a GTM source), no PROD_URL/ANALYTICS_READ_TOKEN/
-           STRIPE_*/SMTP_*/DATABASE_URL. Both checks confirm channels_connected=[] honestly
-           (fail-closed, no invented metric). Both independent scorecards remain UNCHANGED since
-           the 2026-07-16 grades (now the 2nd consecutive GTM read without a fresh grade on
-           either, after the 1st noted on 07-19): QUALITY_SCORECARD stays the 8th audit
-           (as_of 2026-07-16, overall B, ship_gate_met false, same two ship-critical gaps:
-           store-readiness B, business-case-strength B); GTM_SCORECARD stays the 3rd grade
-           (as_of 2026-07-16, overall A, ship_gate_met true). Re-ran analysis/gtm_engine_pct.py
-           (unchanged, 50) and node scripts/validate-computation.mjs (4/4 figures PASS, none
-           changed). Re-verified the two 07-17 fixes are still intact in the live repo (not just
-           claimed): scripts/validate_gtm.py:29 METRIC_SECTIONS still lists
-           funnel/acquisition/pmf/channels/outreach/email/content, and docs/store/ASO_COPY.md:76-77
-           still reads 'has landed in code but stays inert pending owner RevenueCat keys/product
-           mapping and a signed store build'. Checked GitHub issue #417 (GTM_SCORECARD's
-           metric_integrity A->A+ top_gap): still open, correctly untouched -- the underlying fix
-           already landed 2026-07-17 and per maker!=checker discipline this loop does not close the
-           independent auditor's own issue; that is the auditor's call on its next re-grade."
+           source; METRIC_SECTIONS covers outreach/email/content too). Re-checked this run: (1)
+           ListConnectors -- of the connectors that could ever plausibly BE a GTM source, only
+           Gmail is connected+enabled (used solely for the draft-only outreach lane, GTM_STANDARD
+           s6a) and Mobbin is connected+enabled (design-reference tool, not a funnel/billing/
+           email source). Vercel is connected at the org level but enabledInChat:false with zero
+           callable mcp__Vercel__* tools (see row above). Google Drive and Google Calendar also
+           show as connected this run, but neither is EVER a candidate GTM source (no analytics/
+           billing/ESP capability either could provide) -- their per-session enabledInChat flag is
+           immaterial to this validation block and genuinely volatile across sessions (the prior
+           three GTM reads and the 2026-07-23 GTM_SCORECARD both independently observed it
+           flipping between true/false with no code change), so this note deliberately stops
+           pinning that specific volatile value as committed narrative fact (the fix the
+           2026-07-23 GTM_SCORECARD's self_validation_honesty A top_gap asked for) -- doing so
+           only manufactured a recurring false 'drift' finding on an irrelevant connector. (2)
+           shell env -- GEMINI_API_KEY and BOTH BROWSERBASE_* vars present (validator infra, not a
+           GTM source), no PROD_URL/ANALYTICS_READ_TOKEN/STRIPE_*/SMTP_*/DATABASE_URL. Both checks
+           confirm channels_connected=[] honestly (fail-closed, no invented metric). Both
+           independent scorecards read FRESH this run, same as_of (2026-07-23) as each other:
+           QUALITY_SCORECARD is the 9th audit -- overall B (=), ship_gate_met false, same two
+           ship-critical gaps (store-readiness B, business-case-strength B), but real internal
+           movement (artifact-integrity A->A+, the correctness embedding-refund finding closed).
+           GTM_SCORECARD is the 4th grade -- overall A (=), ship_gate_met true;
+           metric_integrity A->A+ (issue #417 closed, injection-verified). Re-ran
+           analysis/gtm_engine_pct.py (unchanged, 50) and node scripts/validate-computation.mjs
+           (4/4 figures PASS, none changed). **Did (this run, real, in-repo, both GTM_SCORECARD
+           top_gaps addressed):** (1) this validation block's rewrite above, structurally removing
+           the recurring Drive/Calendar enabledInChat drift rather than re-syncing the same
+           snapshot that will just drift again next session (self_validation_honesty gap 1); (2)
+           reworded docs/BUSINESS_CASE.md lever 2 + its 'Floor still not met' paragraph to credit
+           the MOBILE seat-management surface (run 61, PR #429, verified present at
+           mobile/src/app/team.tsx, 293 lines) as landed IN CODE alongside the web half, naming the
+           genuine remaining gap as the owner-only live per-seat price
+           (STRIPE_PRICE_TEAM_ANNUAL) -- matching ROADMAP.md:308-318's own precise framing (box
+           stays [ ] only for Human-Core device validation, not missing code); bumped the stale
+           BUSINESS_CASE_SUMMARY as_of (2026-07-13 -> 2026-07-23) after re-verifying all 3 ARR
+           figures are unchanged (artifact_freshness gap 2). No ARR number or floor_met_year1
+           changed by either fix (anti-gaming)."
   learnings:
+    - "2026-07-23 (GTM run): Both independent scorecards read FRESH this run, same as_of
+       (2026-07-23) as each other -- QUALITY_SCORECARD (9th audit): overall B (=),
+       ship_gate_met false, same two ship-critical gaps (store-readiness B, business-case-
+       strength B), but real internal movement (artifact-integrity A->A+, the correctness
+       embedding-refund finding closed). GTM_SCORECARD (4th grade): overall A (=),
+       ship_gate_met true; metric_integrity A->A+ (issue #417 closed, injection-verified this
+       run: adding email.list_size:999 makes validate_gtm.py FAIL exit 1). GTM_SCORECARD named
+       two top_gaps, both real and both fixed this run (real, in-repo, maker!=checker
+       reviewed): (1) **self_validation_honesty A, RECURRING drift** -- the validation note had
+       repeatedly pinned Google Drive/Calendar's per-session enabledInChat state as committed
+       fact, but that flag is genuinely volatile across sessions (my own fresh ListConnectors
+       this run shows both false, contradicting the scorecard's own claim of 'both true' --
+       exactly the kind of transient mismatch that manufactured this recurring finding across
+       multiple prior reads). Fixed STRUCTURALLY, not by re-syncing the snapshot: the note now
+       states plainly that Drive/Calendar are never GTM-source candidates and stops asserting
+       their volatile enabledInChat value as narrative fact, which removes the root cause
+       rather than deferring the next drift. (2) **artifact_freshness watch-nit** --
+       docs/BUSINESS_CASE.md lever 2 said 'the mobile half of the surface... remain[s]' unbuilt,
+       but commit 2099b57 (run 61, PR #429) landed mobile/src/app/team.tsx (293 lines,
+       verified present + verified via git log this run) -- reworded lever 2 + the 'Floor still
+       not met' paragraph to credit BOTH web and mobile management surfaces as landed IN CODE,
+       naming the live per-seat price (STRIPE_PRICE_TEAM_ANNUAL, owner) as the sole genuine
+       remaining gap, matching ROADMAP.md:308-318's own precise framing (mobile's ROADMAP box
+       stays [ ] only for Human-Core device validation). Re-verified all 3 ARR figures unchanged
+       (validate-computation.mjs 4/4 PASS) before bumping the stale BUSINESS_CASE_SUMMARY as_of
+       (2026-07-13 -> 2026-07-23). No ARR number or floor_met_year1 changed by either fix
+       (anti-gaming). Re-verified ListConnectors + shell env: channels_connected=[] stays
+       honest (same as every prior run). Re-ran analysis/gtm_engine_pct.py (unchanged, 50).
+       **Circuit-breaker escalation, now 8 consecutive quiet GTM reads on the site-gate ask:**
+       the site-gate owner DECISION (PENDING_OPS `site-gate`, ROADMAP.md:421-435) has now gone
+       8 straight GTM reads (2026-07-09 reframe, 07-11, 07-13, 07-15, 07-17, 07-19, 07-21,
+       07-23) with zero owner movement -- re-verified PENDING_OPS.md still `as_of: 2026-07-04`,
+       `status: open`, unchanged. Demand_signal cadence checked: last run 2026-07-03 (20 days),
+       ~quarterly refresh not due until ~October. Zero outreach drafts (correct, unchanged
+       reason): QUALITY_SCORECARD.ship_gate_met is still false. Independent reviewer
+       (maker!=checker, fresh subagent) reviewed both fixes together: see PR."
     - "2026-07-21 (GTM run): Quiet run, no ROADMAP/BUSINESS_CASE ARR/VISION steer -- still 0
        users/0 funnel, phase=pre_launch. Re-verified ListConnectors (Gmail/Drive/Calendar/
        Mobbin/Vercel, same set + same enabledInChat states as every prior run, no fresh
@@ -608,18 +656,19 @@ GROWTH_STATUS:
        changed -- pure computation-integrity hardening, independently reviewed
        (maker!=checker, APPROVE)."
   next_actions:
-    - "Factory: QUALITY_SCORECARD unchanged since last read (8th audit, as_of 2026-07-16) -- two
-       ship-critical gaps remain: store-readiness B (the mobile IAP client + bespoke icon are
-       done; only store SCREENSHOTS remain, needing a signed native build, Human-Core) and
-       business-case-strength B (the seat tier is user-reachable end-to-end (#356/#363/#383) but
-       needs a LIVE per-seat price (STRIPE_PRICE_TEAM_ANNUAL, owner) + real B2B adoption data to
-       cross the floor on honest math). Watching for the next independent audit to confirm the
-       correctness A+->A embedding-refund finding is closed by its same-day follow-up commit."
+    - "Factory: QUALITY_SCORECARD refreshed today (9th audit, as_of 2026-07-23) -- two
+       ship-critical gaps remain: store-readiness B (artifact-integrity's stale-doc half is now
+       fixed; only store SCREENSHOTS remain, needing a signed native build, Human-Core) and
+       business-case-strength B (the seat tier is user-reachable end-to-end on BOTH web and
+       mobile (#356/#429) but needs a LIVE per-seat price (STRIPE_PRICE_TEAM_ANNUAL, owner) +
+       real B2B adoption data to cross the floor on honest math). The correctness A+->A
+       embedding-refund finding from the 8th audit is now CONFIRMED closed (#419/#458, with
+       revert-provable regression tests) -- artifact-integrity itself moved A->A+ this audit."
     - "Owner DECISION NEEDED, ESCALATING (site-gate, PENDING_OPS `site-gate`, ROADMAP.md:421-435)
-       -- now 7 CONSECUTIVE GTM reads (2026-07-09 reframe, 07-11, 07-13, 07-15, 07-17, 07-19,
-       07-21) with zero owner movement (PENDING_OPS.md still `as_of: 2026-07-04`, `status: open`).
-       Choose (A) reinstate a real gate -- the loop can then REBUILD the middleware + the §34
-       gated-beta invite mechanism, then flip site_gate_up once applied -- or (B) keep the app
+       -- now 8 CONSECUTIVE GTM reads (2026-07-09 reframe, 07-11, 07-13, 07-15, 07-17, 07-19,
+       07-21, 07-23) with zero owner movement (PENDING_OPS.md still `as_of: 2026-07-04`, `status:
+       open`). Choose (A) reinstate a real gate -- the loop can then REBUILD the middleware + the
+       §34 gated-beta invite mechanism, then flip site_gate_up once applied -- or (B) keep the app
        public and formally drop the §34 gated-beta half from ROADMAP. This is the single
        highest-leverage owner decision outstanding: it hard-blocks ALL pre-launch execute-mode
        outreach regardless of channel connection or ship-gate status. Per the GTM_STANDARD brakes,
@@ -629,49 +678,49 @@ GROWTH_STATUS:
     - "Owner: connect an email provider + analytics (see CONNECT.md) -- engine_pct is honestly
        50% built (Track G+H infra exists) but 0 channels are CONNECTED, which is the actual
        remaining gap, distinct from build completeness."
-    - "Owner: the team/B2B2C seat-tier backend + web surface are now both built and gate-
-       verified (#348, #356) but API-refuse honestly (503, no charge) until
-       STRIPE_PRICE_TEAM_ANNUAL is set (PENDING_OPS `stripe-account`) -- this is still the single
-       highest-leverage owner step to make the primary business-case floor-lever actually
-       sellable, distinct from the already-open Career+ test-price gap on the same item."
+    - "Owner: the team/B2B2C seat-tier backend + BOTH web and mobile management surfaces are now
+       all built and gate-verified (#348, #356, #429) but API-refuse honestly (503, no charge)
+       until STRIPE_PRICE_TEAM_ANNUAL is set (PENDING_OPS `stripe-account`) -- this is now the
+       ONLY remaining step to make the primary business-case floor-lever actually sellable,
+       distinct from the already-open Career+ test-price gap on the same item."
     - "Owner: once a signed native store build exists (needed anyway for #412's IAP), also
        capture the >=2 store screenshots QUALITY_SCORECARD names as the LAST purely-software
        store-readiness gap -- the loop cannot produce these on Linux without a signed build."
     - "No outreach drafts this run: GTM_STANDARD §6's readiness gate is a HARD block on both
        outbound lanes (incl. the bespoke 1:1 draft lane) until QUALITY_SCORECARD.ship_gate_met
-       is true -- it is still false (B, 8th audit), so zero drafts is the only compliant
+       is true -- it is still false (B, 9th audit), so zero drafts is the only compliant
        outcome regardless of target quality. Re-evaluate the moment ship_gate_met flips true."
     - "Next GTM run: re-check for demand-signal recency drift (~quarterly refresh, last run
        2026-07-03, not due until ~Oct), watch whether the owner enables the Vercel connector
        in-chat (could unlock real deployment/traffic data for product_analytics) or a
        PROD_URL/ANALYTICS_READ_TOKEN appears in env, watch for the owner's site-gate decision
-       (A/B) landing in PENDING_OPS + reconcile ROADMAP/GROWTH_STATUS accordingly (now 7
-       consecutive quiet reads -- keep escalating each additional quiet read), and watch whether
-       the correctness A+->A embedding-refund finding is confirmed closed by the NEXT independent
-       QUALITY_SCORECARD audit (a same-day follow-up commit claims to fix it but is not yet
-       independently re-graded)."
+       (A/B) landing in PENDING_OPS + reconcile ROADMAP/GROWTH_STATUS accordingly (now 8
+       consecutive quiet reads -- keep escalating each additional quiet read), and confirm the
+       validation-note structural fix (Drive/Calendar enabledInChat) actually stops the recurring
+       self_validation_honesty drift on the NEXT independent GTM_SCORECARD grade."
   owner_blockers:
-    - "SITE-GATE OWNER DECISION -- CIRCUIT-BREAKER ESCALATION, NOW 7 CONSECUTIVE QUIET GTM READS
-       (2026-07-09 reframe, 07-11, 07-13, 07-15, 07-17, 07-19, 07-21; PENDING_OPS.md `site-gate`
-       still `as_of: 2026-07-04`, `status: open`, zero owner movement). This is the single highest-leverage
-       owner action outstanding: it hard-blocks ALL pre-launch execute-mode outreach regardless
-       of channel connection or QUALITY_SCORECARD status. Choose (A) reinstate a real pre-launch
-       gate, or (B) keep the app public and formally drop the §34 gated-beta half -- see
-       next_actions."
-    - "QUALITY_SCORECARD B (8th audit, as_of 2026-07-16), ship gate still NOT met: 2 ship-critical
-       dims below A -- store-readiness B (up from C; only store screenshots remain, needing a
-       Human-Core signed native build) and business-case-strength B (seat tier user-reachable
-       end-to-end but no live per-seat price + no validated B2B adoption). Outreach (both lanes,
-       GTM_STANDARD s6) stays hard-blocked until ship_gate_met flips true."
+    - "SITE-GATE OWNER DECISION -- CIRCUIT-BREAKER ESCALATION, NOW 8 CONSECUTIVE QUIET GTM READS
+       (2026-07-09 reframe, 07-11, 07-13, 07-15, 07-17, 07-19, 07-21, 07-23; PENDING_OPS.md
+       `site-gate` still `as_of: 2026-07-04`, `status: open`, zero owner movement). This is the
+       single highest-leverage owner action outstanding: it hard-blocks ALL pre-launch
+       execute-mode outreach regardless of channel connection or QUALITY_SCORECARD status. Choose
+       (A) reinstate a real pre-launch gate, or (B) keep the app public and formally drop the §34
+       gated-beta half -- see next_actions."
+    - "QUALITY_SCORECARD B (9th audit, as_of 2026-07-23), ship gate still NOT met: 2 ship-critical
+       dims below A -- store-readiness B (artifact-integrity doc-lag now fixed; only store
+       screenshots remain, needing a Human-Core signed native build) and business-case-strength B
+       (seat tier user-reachable end-to-end on web AND mobile but no live per-seat price + no
+       validated B2B adoption). Outreach (both lanes, GTM_STANDARD s6) stays hard-blocked until
+       ship_gate_met flips true."
     - "No marketing channels connected -- Growth Agent stays in prepare-mode. engine_pct is
        honestly 50% (build completeness, computed) -- the gap is channel CONNECTION, not
        missing infra. The Vercel connector remains org-connected but not enabled-in-chat, and
        exposes zero usable tools this session -- not counted as a connection."
-    - "Team/B2B2C seat tier (backend #348 + web surface #356, both gate-verified) is fully
-       built but not sellable: STRIPE_PRICE_TEAM_ANNUAL is unset (PENDING_OPS `stripe-account`),
-       so POST /api/org/checkout refuses honestly (503, no charge). This is still the single
-       highest-leverage owner step on the business-case floor-lever, alongside the existing
-       Career+ test-price gap on the same PENDING_OPS item."
+    - "Team/B2B2C seat tier (backend #348 + web surface #356 + mobile surface #429, all
+       gate-verified) is fully built end-to-end but not sellable: STRIPE_PRICE_TEAM_ANNUAL is
+       unset (PENDING_OPS `stripe-account`), so POST /api/org/checkout refuses honestly (503, no
+       charge). This is now the ONLY remaining step on the business-case floor-lever, alongside
+       the existing Career+ test-price gap on the same PENDING_OPS item."
   links:
     connect_runbook: docs/growth/CONNECT.md
     playbook: docs/growth/ANALYSIS_PLAYBOOK.md
