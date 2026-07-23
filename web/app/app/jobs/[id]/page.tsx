@@ -48,6 +48,11 @@ export default function JobDetailPage() {
   const [prepLoading, setPrepLoading] = useState(false);
   const [prepMsg, setPrepMsg] = useState<string | null>(null);
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
+  // The status the user is committing right now, or null when idle. A single in-flight update at a
+  // time serializes the PATCHes so a slow earlier response can't land AFTER a faster later one and
+  // silently revert the user's most recent choice (out-of-order race), and it disables the row so a
+  // slow network can't read as a dead tap → double-submit.
+  const [statusUpdating, setStatusUpdating] = useState<ApplicationStatus | null>(null);
   const [neg, setNeg] = useState<{ id: string; title: string; content: string } | null>(null);
   const [negLoading, setNegLoading] = useState(false);
   const [negMsg, setNegMsg] = useState<string | null>(null);
@@ -90,12 +95,18 @@ export default function JobDetailPage() {
   }, [load]);
 
   async function setStatus(status: ApplicationStatus) {
+    // Serialize: ignore a new tap while one update is in flight (prevents the out-of-order race
+    // where a slower earlier response overwrites a faster later one, reverting the user's choice).
+    if (statusUpdating !== null) return;
     setStatusMsg(null);
+    setStatusUpdating(status);
     try {
       setJob(await api.updateJobStatus(id, status));
     } catch (e) {
       // Don't silently swallow: a status button that does nothing is a broken affordance.
       setStatusMsg(e instanceof ApiError ? e.message : "Couldn't update status — try again.");
+    } finally {
+      setStatusUpdating(null);
     }
   }
 
@@ -228,19 +239,29 @@ export default function JobDetailPage() {
       <div>
         <h2 className="mb-2 text-lg font-semibold">Pipeline status</h2>
         <div className="flex flex-wrap gap-2">
-          {STATUS_ORDER.map((s) => (
-            <button
-              key={s}
-              onClick={() => setStatus(s)}
-              className={`rounded-lg border px-3 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 ${
-                job.status === s
-                  ? 'border-indigo-500 bg-indigo-500 text-white'
-                  : 'border-slate-700 text-slate-300 hover:bg-slate-800'
-              }`}
-            >
-              {STATUS_LABELS[s]}
-            </button>
-          ))}
+          {STATUS_ORDER.map((s) => {
+            const pending = statusUpdating === s;
+            return (
+              <button
+                key={s}
+                onClick={() => setStatus(s)}
+                disabled={statusUpdating !== null}
+                aria-busy={pending}
+                className={`rounded-lg border px-3 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 disabled:cursor-not-allowed ${
+                  // Dim only the OTHER (locked) chips — keep the one being committed at full opacity
+                  // with a "…" affordance so the user can see WHICH status is saving, not just that
+                  // the whole row went inert (matches the team/interview "Removing…"/spinner idiom).
+                  statusUpdating !== null && !pending ? 'opacity-60' : ''
+                } ${
+                  job.status === s
+                    ? 'border-indigo-500 bg-indigo-500 text-white'
+                    : 'border-slate-700 text-slate-300 enabled:hover:bg-slate-800'
+                }`}
+              >
+                {pending ? `${STATUS_LABELS[s]}…` : STATUS_LABELS[s]}
+              </button>
+            );
+          })}
         </div>
         {statusMsg && <p role="alert" className="mt-2 text-sm text-amber-400">{statusMsg}</p>}
       </div>

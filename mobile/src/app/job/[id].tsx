@@ -29,6 +29,11 @@ export default function JobDetailScreen() {
   const [readiness, setReadiness] = useState<Readiness | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // The status the user is committing right now, or null when idle. A single in-flight update at a
+  // time serializes the PATCHes so a slow earlier response can't land AFTER a faster later one and
+  // silently revert the user's most recent choice, and it disables the row so a slow network can't
+  // read as a dead tap → double-submit.
+  const [statusUpdating, setStatusUpdating] = useState<ApplicationStatus | null>(null);
   const [prepLoading, setPrepLoading] = useState(false);
   const [prep, setPrep] = useState<{ id: string; title: string; content: string } | null>(null);
   const [prepMsg, setPrepMsg] = useState<string | null>(null);
@@ -82,10 +87,16 @@ export default function JobDetailScreen() {
 
   async function setStatus(status: ApplicationStatus) {
     if (!id) return;
+    // Serialize: ignore a new tap while one update is in flight (prevents the out-of-order race
+    // where a slower earlier response overwrites a faster later one, reverting the user's choice).
+    if (statusUpdating !== null) return;
+    setStatusUpdating(status);
     try {
       setJob(await api.updateJobStatus(id, status));
     } catch (e) {
       Alert.alert('Update failed', e instanceof ApiError ? e.message : 'Try again.');
+    } finally {
+      setStatusUpdating(null);
     }
   }
 
@@ -267,21 +278,32 @@ export default function JobDetailScreen() {
       <View style={styles.statusGrid} accessibilityRole="radiogroup" accessibilityLabel="Pipeline status">
         {STATUS_ORDER.map((s) => {
           const active = job.status === s;
+          const busy = statusUpdating !== null;
+          const pending = statusUpdating === s;
           return (
             <Pressable
               key={s}
               onPress={() => setStatus(s)}
+              disabled={busy}
               // A screen reader otherwise just announces "Saved" with no hint that it's a
               // selectable status or which one is current. Expose it as a radio option so the
               // pipeline tracker — the core loop — is operable with VoiceOver/TalkBack.
               accessibilityRole="radio"
-              accessibilityState={{ selected: active }}
+              accessibilityState={{ selected: active, busy: pending, disabled: busy }}
               accessibilityLabel={`Set status to ${STATUS_LABELS[s]}`}
-              style={[styles.statusChip, active && styles.statusChipActive]}
+              // Dim only the OTHER (locked) chips; the one being committed keeps full opacity and
+              // shows a spinner so the user can see WHICH status is saving, not just that the whole
+              // row went inert (matches the interview past-sessions "tapped row shows a spinner" idiom).
+              style={[styles.statusChip, active && styles.statusChipActive, busy && !pending && styles.statusChipBusy]}
             >
-              <Text style={[styles.statusChipText, active && styles.statusChipTextActive]}>
-                {STATUS_LABELS[s]}
-              </Text>
+              <View style={styles.statusChipInner}>
+                {pending ? (
+                  <ActivityIndicator size="small" color={active ? colors.primaryText : colors.textMuted} />
+                ) : null}
+                <Text style={[styles.statusChipText, active && styles.statusChipTextActive]}>
+                  {STATUS_LABELS[s]}
+                </Text>
+              </View>
             </Pressable>
           );
         })}
@@ -538,6 +560,8 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
   },
   statusChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+  statusChipBusy: { opacity: 0.5 },
+  statusChipInner: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
   statusChipText: { color: colors.textMuted, fontWeight: '600' },
   statusChipTextActive: { color: colors.primaryText },
   errorWrap: { alignSelf: 'stretch' },
