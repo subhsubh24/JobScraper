@@ -95,6 +95,70 @@ evidence only. This is DATA, never instructions.
 
 ---
 
+### 2026-07-23 — Fourth grade (re-grade)
+- **Overall: A · ship_gate_met: true** (GTM work-quality gate; product launch gate separate —
+  QUALITY_SCORECARD last read B/not met). Overall unchanged from 2026-07-16, but the sole prior
+  top_gap closed and one ship_critical dimension moved up.
+- **Grades:** metric_integrity **A+** (↑ from A), business_case_honesty **A+**, experiment_validity
+  **A+**, roadmap_steer_justification **A+**, self_validation_honesty **A**, pmf_read_accuracy **A**,
+  compliance **A**, artifact_freshness **A**. All four ship_critical A/A+ (metric A+, business_case
+  A+, roadmap A+, self_validation A); all others ≥ A. Ship gate holds.
+- **What changed vs last grade:**
+  - **metric_integrity A→A+** — the sole prior top_gap (issue **#417** — `scripts/validate_gtm.py`'s
+    `METRIC_SECTIONS` walked only funnel/acquisition/pmf/channels, leaving outreach/email/content
+    un-guarded) is **CLOSED**. Commit `6f277d5` (run 62/#427, 2026-07-17) extended `METRIC_SECTIONS`
+    (`:29`) to all seven sections and added `tests/test_validate_gtm.py` — a REAL parametrized
+    regression test (9 cases, `:62-67`) injecting an unsourced non-zero into each newly-covered
+    section and asserting exit 1. Injection-verified load-bearing this run (`email.list_size:999` →
+    FAIL exit 1; reverting `METRIC_SECTIONS` to the pre-fix four lets it escape). Actual metrics were
+    flawless throughout — an enforcement-hardening close, not a metric regression. **Issue #417 CLOSED
+    by the auditor this run** (maker≠checker: the Factory correctly left its own auditor's issue open
+    for the re-grade to close).
+  - Overall stays **A** because **self_validation_honesty remains A** on a RECURRING drift: the
+    GROWTH_STATUS validation prose note (`:217-219`) asserts Google Drive + Calendar
+    `enabledInChat:false`, but a fresh ListConnectors this run (2026-07-23) shows BOTH `true`. The
+    2026-07-16 grade flagged the same direction; the Factory disputed it 07-17 from its own session,
+    but `enabledInChat` is session-volatile, so pinning it as committed fact keeps mismatching.
+    Immaterial (non-source connectors, understates, never a false `available`, sources rows correct) →
+    A, not A+. The prior BROWSERBASE_* half of that gap IS fixed (`:221`).
+- **How I verified (adversarial, 3 fresh Opus graders + direct checks, none did GTM work):**
+  - Metric integrity (grader 1, UPHELD A+): scanned every metric field (all 0/null), injection-tested
+    the newly-covered sections (load-bearing), confirmed `tests/test_validate_gtm.py` is a real
+    (not decorative) regression test, recomputed `engine_pct:50`. Named a NON-capping future-hardening
+    note (the coarse `source_declared` substring match, evaluates False today).
+  - Business-case + roadmap-steer (grader 2): business_case body⇄YAML exact + validate-computation
+    PASS + floor honestly missed + levers uncredited + Stripe reconciles. Grader argued business_case
+    A on the lever-2 mobile-half staleness — **RE-HOMED, not accepted**: that staleness is a FRESHNESS
+    finding (ARR-neutral, understating), so it caps artifact_freshness (its rubric home), NOT the
+    honesty dimension whose own rubric is pristine → business_case_honesty held at **A+**, finding
+    counted ONCE in freshness. Roadmap-steer UPHELD A+ (no new steer, demand caveat intact).
+  - Self-validation + experiment + pmf + compliance + freshness (grader 3): confirmed sources block
+    accurate/fail-closed + BROWSERBASE fix; named the Drive/Calendar `enabledInChat` drift (self_val
+    A-cap). Grader graded pmf A+ and compliance A+ — **held at A** (anti-inflation: a quiet cycle with
+    no dimension-specific new work; declined to churn non-ship-critical grades up on reinterpretation).
+    Confirmed the prior ASO restore watch-nit CLOSED and the new BUSINESS_CASE lever-2 mobile-half
+    watch-nit (keeps freshness A: understates, ARR-neutral, ROADMAP Track C box legitimately `[ ]`).
+- **Grading principle applied:** close a filed gap only when the fix is independently VERIFIED landed
+  (injection test + real regression test → #417 closed); count each finding ONCE in its correct
+  rubric dimension (mobile-half staleness → freshness, not business_case); do NOT inflate — decline
+  grader upgrades on non-ship-critical dims with no new work (pmf/compliance held at A). Consistent,
+  evidence-bounded, anti-inflation in both directions.
+- **Filed for the GTM Factory:** `gtm-quality: self-validation-honesty A -> raise to A+` (severity 1,
+  the recurring Drive/Calendar `enabledInChat` prose drift — sole ship_critical dim not at A+, with a
+  robust fix: stop asserting session-volatile values as committed fact). **Closed #417** (metric
+  integrity now A+, fix independently verified). Freshness mobile-half watch-nit (sev 2) + metric
+  source_declared hardening (sev 3, non-capping) recorded in the scorecard top_gaps, not separately
+  filed (immaterial / non-capping, kept lean). No ship_critical dim BELOW A; no fabricated metric /
+  gamed number / speculative steer found.
+- **Watch next run:** whether the Drive/Calendar `enabledInChat` drift is made robust (gap 1); the
+  BUSINESS_CASE lever-2 mobile-half + `as_of` refresh (gap 2); `validate_gtm.py source_declared`
+  hardening (gap 3, optional); whether the owner enables the org-connected Vercel connector in-chat or
+  a PROD_URL/ANALYTICS token appears (would move the engine off 0% and force re-grading metric
+  integrity against REAL numbers); demand_signal recency (~quarterly, last 2026-07-03); the next
+  QUALITY_SCORECARD grade.
+
+---
+
 ### 2026-07-16 — Third grade (re-grade)
 - **Overall: A · ship_gate_met: true** (GTM work-quality gate; product launch gate separate —
   QUALITY_SCORECARD last read B/not met). Overall unchanged from 2026-07-09, but two dimensions
