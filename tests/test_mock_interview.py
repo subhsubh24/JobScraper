@@ -43,6 +43,11 @@ def _make_pro(db_session, user_id):
     db_session.commit()
 
 
+def _make_free(db_session, user_id):
+    db_session.query(User).filter(User.id == user_id).update({User.tier: UserTier.FREE})
+    db_session.commit()
+
+
 def _consent(client, token):
     assert client.post("/api/ai-consent", headers=_auth(token)).status_code == 200
 
@@ -260,6 +265,32 @@ def test_cannot_read_or_answer_another_users_interview(client, db_session, _llm_
         json={"question_index": 0, "answer": "not mine"},
     )
     assert r.status_code == 404
+
+
+def test_answer_blocked_for_free(client, db_session, _llm_on):
+    """A user who started a session while PRO but has since been DOWNGRADED to FREE cannot keep
+    answering it. The answer endpoint's tier gate is a DISTINCT entitlement boundary from the
+    create gate (covered by test_start_blocked_for_free): the interview lookup here would SUCCEED
+    (it's the user's own session, so the ownership 404 does not fire), so without this gate a
+    lapsed subscriber keeps consuming the paid scoring feature (and daily LLM slots) on a
+    pre-existing session. Revert-proof: drop the `user.tier != PREMIUM` gate on the answer
+    endpoint and this goes 403 -> 200 while every other (all-Pro) answer test still passes."""
+    uid, token = _register(client)
+    job_id = _add_job(client, token)
+    _make_pro(db_session, uid)
+    _consent(client, token)
+    iv = _start(client, token, job_id).json()["interview"]
+
+    # Subscription lapses after the session already exists.
+    _make_free(db_session, uid)
+
+    r = client.post(
+        f"/api/prep/mock-interview/{iv['id']}/answer",
+        headers=_auth(token),
+        json={"question_index": 0, "answer": "I led a migration that cut costs 30%."},
+    )
+    assert r.status_code == 403
+    assert "pro" in r.json()["detail"].lower()
 
 
 def test_get_and_list_interviews(client, db_session, _llm_on):

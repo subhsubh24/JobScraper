@@ -201,8 +201,16 @@ function MembersCard({ org, onUpdated }: { org: Organization; onUpdated: (org: O
           autoCorrect="off"
           spellCheck={false}
           aria-label="Teammate email to assign a seat"
+          // Lock the field READ-ONLY (not disabled) while an add is in flight: on success
+          // add() clears the input (setEmail('')), so an email typed DURING the round-trip
+          // would be silently wiped. readOnly blocks that edit WITHOUT force-blurring a
+          // focused input the way `disabled` would — the Enter-to-submit path (below) keeps
+          // focus here, and readOnly still fires keydown (harmless: add() early-returns while
+          // `adding`). Visual affordance gated on `adding` since Tailwind's disabled: variant
+          // doesn't apply to a read-only (non-disabled) input.
+          readOnly={adding}
           onKeyDown={(e) => e.key === 'Enter' && add()}
-          className="w-full rounded-lg border border-slate-700 bg-slate-800/60 px-3 py-2.5 text-sm text-slate-200 outline-none focus:border-indigo-500"
+          className={`w-full rounded-lg border border-slate-700 bg-slate-800/60 px-3 py-2.5 text-sm text-slate-200 outline-none focus:border-indigo-500${adding ? ' cursor-not-allowed opacity-50' : ''}`}
         />
         <Button onClick={add} disabled={adding || email.trim().length < 3 || seatsFree === 0}>
           {adding ? 'Adding…' : 'Add member'}
