@@ -1554,7 +1554,48 @@ def create_job(
         url=data.url,
     )
     db.add(job)
-    db.flush()
+    try:
+        db.flush()
+    except IntegrityError:
+        # ATOMIC backstop for the read-then-write idempotency guard above: a genuinely-
+        # simultaneous identical POST won the race and committed first, so this duplicate insert
+        # trips ``uq_job_user_title_company_url``. Recover EXACTLY like the read-guard — roll back
+        # the losing insert, refund the up-front per-day score slot we consumed (this add produced
+        # no new row, so nothing was scored and no embedding fired), re-read the row the winner
+        # committed, and return it as a duplicate. This makes the guard's own comment true under
+        # concurrency (no duplicate row, no double-fired side-effects), mirroring the billing
+        # webhook's IntegrityError recovery. (A NULL ``url`` does not trip the constraint — SQL
+        # NULLs are distinct — so that far-narrower concurrent case still falls through to a normal
+        # insert; the sequential read-guard covers the common NULL-url path.)
+        db.rollback()
+        if use_embeddings and may_score:
+            try:
+                _refund_counter(db, user.id, "score_daily", 86400)
+            except Exception:
+                logger.warning(
+                    "score_daily refund failed after a dedup race for user %s",
+                    user.id,
+                    exc_info=True,
+                )
+        existing = (
+            db.query(JobPosting)
+            .options(
+                joinedload(JobPosting.application),
+                joinedload(JobPosting.score),
+                joinedload(JobPosting.company),
+            )
+            .filter(
+                JobPosting.user_id == user.id,
+                JobPosting.title == data.title,
+                JobPosting.company_name == data.company_name,
+                JobPosting.url == data.url,
+            )
+            .first()
+        )
+        if existing is not None:
+            return {"success": True, "job": job_public(existing), "duplicate": True}
+        # No winner row found → the IntegrityError was not this dedup race; surface it honestly.
+        raise
     # Capture the PK now (stable after flush) so the post-commit serialization re-read can filter
     # on a plain string instead of the expired ``job.id`` attribute (which would force a refresh
     # SELECT just to read it back).

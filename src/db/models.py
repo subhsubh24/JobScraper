@@ -343,6 +343,20 @@ class JobPosting(Base):
 
     __table_args__ = (
         Index("ix_job_user_company", "user_id", "company_name"),
+        # Atomic backstop for the ``create_job`` idempotency guard (asgi.py): the app-level
+        # read-then-write check (``existing is None`` then INSERT) is not serialized, so two
+        # genuinely-simultaneous identical POSTs can BOTH pass it and both INSERT, double-firing
+        # the paid re-score / free-tier usage-count / analytics side-effects the guard exists to
+        # prevent. This DB constraint makes the loser's insert fail loud (IntegrityError, caught
+        # and recovered as a dedup in create_job) instead of creating a duplicate — mirroring
+        # ``uq_org_owner`` / ``uq_org_member_user``. NOTE: SQL treats NULLs as DISTINCT, so this
+        # does not constrain rows with a NULL ``url``; those still rely on the sequential
+        # read-guard (the concurrent NULL-url double-add is a far narrower residual, and the
+        # double-submit/retry case that motivates the guard almost always carries a real url).
+        UniqueConstraint(
+            "user_id", "title", "company_name", "url",
+            name="uq_job_user_title_company_url",
+        ),
     )
 
 
