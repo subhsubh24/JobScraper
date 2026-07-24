@@ -39,6 +39,7 @@ export default function MockInterviewPage() {
   const [starting, setStarting] = useState(false);
   const [startMsg, setStartMsg] = useState<string | null>(null);
   const [numQuestions, setNumQuestions] = useState(5);
+  const [openingId, setOpeningId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -85,7 +86,15 @@ export default function MockInterviewPage() {
   }
 
   async function openSession(interviewId: string) {
+    // Guard re-entry: without this, rapidly tapping two past sessions fires two concurrent
+    // getMockInterview reads with NO in-flight affordance (a dead tap on a slow network), and
+    // whichever RESPONSE lands last wins — so the user can end up viewing the session they did
+    // NOT click last (a last-response-wins race). Serializing to one open-at-a-time fixes both:
+    // the dead tap gets a visible affordance and only one read is ever outstanding. Mirrors the
+    // mobile twin's openingId latch (mobile/src/app/interview/[jobId].tsx).
+    if (openingId) return;
     setStartMsg(null);
+    setOpeningId(interviewId);
     try {
       const iv = await api.getMockInterview(interviewId);
       setInterview(iv);
@@ -99,6 +108,10 @@ export default function MockInterviewPage() {
         return;
       }
       setStartMsg(e instanceof ApiError ? e.message : 'Could not open that session.');
+    } finally {
+      // Clear on EVERY exit path (success, 403 early-return, error) so the list never sticks
+      // disabled.
+      setOpeningId(null);
     }
   }
 
@@ -161,6 +174,7 @@ export default function MockInterviewPage() {
           numQuestions={numQuestions}
           starting={starting}
           startMsg={startMsg}
+          openingId={openingId}
           onSetNumQuestions={setNumQuestions}
           onStart={start}
           onOpen={openSession}
@@ -178,6 +192,7 @@ function StartScreen({
   numQuestions,
   starting,
   startMsg,
+  openingId,
   onSetNumQuestions,
   onStart,
   onOpen,
@@ -189,6 +204,7 @@ function StartScreen({
   numQuestions: number;
   starting: boolean;
   startMsg: string | null;
+  openingId: string | null;
   onSetNumQuestions: (n: number) => void;
   onStart: () => void;
   onOpen: (id: string) => void;
@@ -249,23 +265,34 @@ function StartScreen({
             Your past sessions
           </h2>
           <ul className="space-y-2">
-            {sessions.map((s) => (
-              <li key={s.id}>
-                <button
-                  type="button"
-                  onClick={() => onOpen(s.id)}
-                  className="flex w-full items-center justify-between rounded-lg border border-slate-800 bg-slate-900/40 px-4 py-3 text-left hover:border-indigo-500/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950"
-                >
-                  <span className="text-sm text-slate-200">
-                    {s.status === 'completed' ? 'Completed' : 'In progress'} · {s.answered_count}/
-                    {s.total} answered
-                  </span>
-                  <span className="text-xs text-indigo-400">
-                    {s.status === 'completed' ? 'Review →' : 'Resume →'}
-                  </span>
-                </button>
-              </li>
-            ))}
+            {sessions.map((s) => {
+              const isOpening = openingId === s.id;
+              return (
+                <li key={s.id}>
+                  <button
+                    type="button"
+                    onClick={() => onOpen(s.id)}
+                    // Disable EVERY row while any session is opening so a slow fetch can't be
+                    // double-tapped or interleaved with another row (last-response-wins race).
+                    disabled={openingId !== null}
+                    aria-busy={isOpening}
+                    className="flex w-full items-center justify-between rounded-lg border border-slate-800 bg-slate-900/40 px-4 py-3 text-left hover:border-indigo-500/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <span className="text-sm text-slate-200">
+                      {s.status === 'completed' ? 'Completed' : 'In progress'} · {s.answered_count}/
+                      {s.total} answered
+                    </span>
+                    <span className="text-xs text-indigo-400">
+                      {isOpening
+                        ? 'Opening…'
+                        : s.status === 'completed'
+                          ? 'Review →'
+                          : 'Resume →'}
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
           </ul>
         </Card>
       )}
