@@ -4,7 +4,7 @@
 // (not a dead-end), and render a generated prep pack inline. Heavy deps mocked so it renders
 // headlessly.
 
-import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { fireEvent, render, screen, waitFor, act } from '@testing-library/react-native';
 
 const mockPush = jest.fn();
 const mockBack = jest.fn();
@@ -146,6 +146,25 @@ describe('JobDetailScreen', () => {
     // markdown itself is covered by markdown.test.tsx.
     expect(await screen.findByText('Interview Prep: Senior Backend Engineer')).toBeTruthy();
     expect(screen.getByTestId('prep-content').props.children).toContain('Acme builds rockets.');
+  });
+
+  it('a same-tick double-tap on Generate prep fires the paid call only ONCE (guards the consent gap)', async () => {
+    // The latch is acquired BEFORE the awaited ensureConsent(), so a second tap during the consent
+    // gap — when prepLoading/disabled is not even set yet — cannot fire a second paid generation
+    // (which would burn a second LLM ceiling slot). Revert-proof: removing the useLatch guard
+    // (leaving only the loading/disabled affordance) reddens this.
+    mockUser = { tier: 'free', ai_consent: true };
+    mockGeneratePrep.mockReturnValue(new Promise(() => {})); // never resolves: stays in-flight
+    render(<JobDetailScreen />);
+    await screen.findByText('Senior Backend Engineer');
+
+    const btn = screen.getByText('Generate prep pack (1 free)');
+    await act(async () => {
+      fireEvent.press(btn);
+      fireEvent.press(btn);
+    });
+
+    expect(mockGeneratePrep).toHaveBeenCalledTimes(1);
   });
 
   it('gates prep generation on third-party-AI consent — no LLM call until consented (Apple 5.1.2(i))', async () => {

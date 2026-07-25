@@ -5,7 +5,7 @@
 // the auth context, and the API are mocked so the screen renders headlessly (native can't compile
 // on CI/Linux). (Factory vars are `mock`-prefixed per jest's hoisting rule.)
 
-import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { fireEvent, render, screen, waitFor, act } from '@testing-library/react-native';
 
 jest.mock('react-native-safe-area-context', () => {
   const { View } = require('react-native');
@@ -106,6 +106,24 @@ describe('InsightsScreen', () => {
 
     expect(await screen.findByText('Enable AI features')).toBeTruthy();
     expect(screen.queryByText('Generate learning plan')).toBeNull();
+  });
+
+  it('a same-tick double-tap on Generate fires the paid learning-plan call only ONCE', async () => {
+    // Two rapid taps close over the pre-render planLoading=false and disabled lands late on RN;
+    // without the synchronous latch this fires two paid learning-plan generations (two ceiling
+    // slots). Revert-proof: removing the useLatch guard reddens this.
+    mockUser = { id: 'u1', tier: 'premium', ai_consent: true };
+    mockSkillGaps.mockResolvedValue(ANALYSIS);
+    mockGenerateLearningPlan.mockReturnValue(new Promise(() => {})); // never resolves: stays in-flight
+
+    render(<InsightsScreen />);
+    const btn = await screen.findByText('Generate learning plan');
+    await act(async () => {
+      fireEvent.press(btn);
+      fireEvent.press(btn);
+    });
+
+    expect(mockGenerateLearningPlan).toHaveBeenCalledTimes(1);
   });
 
   it('shows the empty state when the user has no jobs', async () => {

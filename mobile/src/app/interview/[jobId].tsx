@@ -7,6 +7,7 @@ import { Button, Card, ErrorBanner, Field } from '@/components/ui';
 import { ReportButton } from '@/components/report-button';
 import { AiConsentCard, hasAiConsent } from '@/components/ai-consent';
 import { useAuth } from '@/contexts/auth';
+import { useLatch } from '@/lib/use-latch';
 import {
   api,
   ApiError,
@@ -36,6 +37,7 @@ export default function MockInterviewScreen() {
   const [numQuestions, setNumQuestions] = useState(5);
   const [starting, setStarting] = useState(false);
   const [startMsg, setStartMsg] = useState<string | null>(null);
+  const startLatch = useLatch();
   // Which past session is currently being opened, so the tapped row shows a spinner and every
   // row disables — without this the fetch has NO visual feedback, so on a slow network the tap
   // reads as unresponsive and a user double-taps, firing duplicate getMockInterview requests.
@@ -59,6 +61,10 @@ export default function MockInterviewScreen() {
   }, [load]);
 
   async function start() {
+    // Synchronous latch: a same-tick double-tap must not spin up two mock-interview sessions
+    // (each fires a paid question-generation LLM call). `starting`/disabled can't guard it — the
+    // disabled prop only lands after the re-render crosses the RN bridge.
+    if (!startLatch.enter()) return;
     setStartMsg(null);
     setStarting(true);
     try {
@@ -72,6 +78,7 @@ export default function MockInterviewScreen() {
       }
       setStartMsg(e instanceof ApiError ? e.message : 'Could not start the interview — try again.');
     } finally {
+      startLatch.leave();
       setStarting(false);
     }
   }
@@ -279,6 +286,10 @@ function InterviewRunner({
   const [submitting, setSubmitting] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [reAnswer, setReAnswer] = useState(false);
+  // Synchronous re-entry latch (see useLatch): a same-tick double-tap must not fire a second paid
+  // answer-scoring call (another LLM ceiling slot + a shown-vs-persisted score desync). The
+  // `submitting` state can't guard it — the closure is stale and the disabled prop lands late.
+  const submitLatch = useLatch();
 
   const total = interview.questions.length;
   const question = interview.questions[activeIndex];
@@ -299,6 +310,7 @@ function InterviewRunner({
       setMsg('Type your answer first.');
       return;
     }
+    if (!submitLatch.enter()) return;
     setMsg(null);
     setSubmitting(true);
     try {
@@ -328,6 +340,7 @@ function InterviewRunner({
       }
       setMsg(e instanceof ApiError ? e.message : 'Could not score your answer — try again.');
     } finally {
+      submitLatch.leave();
       setSubmitting(false);
     }
   }

@@ -8,6 +8,7 @@ import { ReportButton } from '@/components/report-button';
 import { ArtifactActions } from '@/components/artifact-actions';
 import { useAiConsent } from '@/components/ai-consent';
 import { useAuth } from '@/contexts/auth';
+import { useLatch } from '@/lib/use-latch';
 import { api, ApiError } from '@/services/api';
 import { colors, radius, scoreColor, spacing } from '@/theme';
 import { STATUS_LABELS, type ApplicationStatus, type Job, type Readiness } from '@/types';
@@ -51,6 +52,15 @@ export default function JobDetailScreen() {
   const [resumeLoading, setResumeLoading] = useState(false);
   const [resume, setResume] = useState<{ id: string; title: string; content: string } | null>(null);
   const [resumeMsg, setResumeMsg] = useState<string | null>(null);
+  // One synchronous latch per paid generator (see useLatch). A same-tick double-tap — or a second
+  // tap during the awaited ensureConsent() gap, before the loading/disabled state is even set —
+  // must not fire the generation twice (each is a paid LLM call + a spend-ceiling slot). The
+  // latch is acquired BEFORE ensureConsent and released in finally, so consent-denial clears it.
+  const prepLatch = useLatch();
+  const letterLatch = useLatch();
+  const studyLatch = useLatch();
+  const resumeLatch = useLatch();
+  const negLatch = useLatch();
   const isCareerPlus = user?.career_plus === true;
   // Pro (paid) tier: Pro AND Career+ are both PREMIUM. Gates the cover-letter + study-plan tools.
   const isPaid = user?.tier === 'premium';
@@ -102,11 +112,12 @@ export default function JobDetailScreen() {
 
   async function generatePrep() {
     if (!id) return;
+    if (!prepLatch.enter()) return;
     setPrepMsg(null);
-    // Get explicit AI consent before sending resume/job text to the AI provider.
-    if (!(await ensureConsent())) return;
-    setPrepLoading(true);
     try {
+      // Get explicit AI consent before sending resume/job text to the AI provider.
+      if (!(await ensureConsent())) return;
+      setPrepLoading(true);
       // Render the full pack inline (scrollable) instead of a truncated, ephemeral alert —
       // the prep pack is the value, the user needs to read all of it and come back to it.
       setPrep(await api.generatePrepPack(id));
@@ -120,16 +131,18 @@ export default function JobDetailScreen() {
         setPrepMsg('Could not generate a prep pack. Please try again.');
       }
     } finally {
+      prepLatch.leave();
       setPrepLoading(false);
     }
   }
 
   async function generateCoverLetter() {
     if (!id) return;
+    if (!letterLatch.enter()) return;
     setLetterMsg(null);
-    if (!(await ensureConsent())) return;
-    setLetterLoading(true);
     try {
+      if (!(await ensureConsent())) return;
+      setLetterLoading(true);
       setLetter(await api.generateCoverLetter(id));
       refreshReadiness();
     } catch (e) {
@@ -141,6 +154,7 @@ export default function JobDetailScreen() {
         setLetterMsg('Could not generate a cover letter. Please try again.');
       }
     } finally {
+      letterLatch.leave();
       setLetterLoading(false);
     }
   }
@@ -153,10 +167,11 @@ export default function JobDetailScreen() {
       setStudyMsg('Enter how many days you have to prep (1–30).');
       return;
     }
+    if (!studyLatch.enter()) return;
     setStudyMsg(null);
-    if (!(await ensureConsent())) return;
-    setStudyLoading(true);
     try {
+      if (!(await ensureConsent())) return;
+      setStudyLoading(true);
       setStudyPlan(await api.generateStudyPlan(id, days));
       refreshReadiness();
     } catch (e) {
@@ -168,16 +183,18 @@ export default function JobDetailScreen() {
         setStudyMsg('Could not generate a study plan. Please try again.');
       }
     } finally {
+      studyLatch.leave();
       setStudyLoading(false);
     }
   }
 
   async function generateTailoredResume() {
     if (!id) return;
+    if (!resumeLatch.enter()) return;
     setResumeMsg(null);
-    if (!(await ensureConsent())) return;
-    setResumeLoading(true);
     try {
+      if (!(await ensureConsent())) return;
+      setResumeLoading(true);
       setResume(await api.generateTailoredResume(id));
       refreshReadiness();
     } catch (e) {
@@ -189,6 +206,7 @@ export default function JobDetailScreen() {
         setResumeMsg('Could not generate a tailored résumé. Please try again.');
       }
     } finally {
+      resumeLatch.leave();
       setResumeLoading(false);
     }
   }
@@ -207,10 +225,11 @@ export default function JobDetailScreen() {
       setNegMsg('Enter a realistic target salary.');
       return;
     }
+    if (!negLatch.enter()) return;
     setNegMsg(null);
-    if (!(await ensureConsent())) return;
-    setNegLoading(true);
     try {
+      if (!(await ensureConsent())) return;
+      setNegLoading(true);
       setNeg(await api.generateSalaryNegotiation(id, parsed));
     } catch (e) {
       // The UI already gates this to Career+, but the server is the source of truth — if it
@@ -223,6 +242,7 @@ export default function JobDetailScreen() {
         setNegMsg('Could not generate a negotiation guide. Please try again.');
       }
     } finally {
+      negLatch.leave();
       setNegLoading(false);
     }
   }

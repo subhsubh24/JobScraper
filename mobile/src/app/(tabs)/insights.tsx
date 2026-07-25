@@ -8,6 +8,7 @@ import { Markdown } from '@/components/markdown';
 import { ArtifactActions } from '@/components/artifact-actions';
 import { AiConsentCard, hasAiConsent } from '@/components/ai-consent';
 import { useAuth } from '@/contexts/auth';
+import { useLatch } from '@/lib/use-latch';
 import { api, ApiError, type SkillGapAnalysis, type SkillStat } from '@/services/api';
 import { colors, radius, spacing } from '@/theme';
 
@@ -24,6 +25,7 @@ export default function InsightsScreen() {
 
   const [plan, setPlan] = useState<{ title: string; content: string } | null>(null);
   const [planLoading, setPlanLoading] = useState(false);
+  const planLatch = useLatch();
   const [planMsg, setPlanMsg] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -44,6 +46,9 @@ export default function InsightsScreen() {
   );
 
   async function generatePlan() {
+    // Synchronous latch (see useLatch): a same-tick double-tap must not fire two learning-plan
+    // generations (each a paid LLM call + ceiling slot). disabled/planLoading lands too late.
+    if (!planLatch.enter()) return;
     setPlanLoading(true);
     setPlanMsg(null);
     // Do NOT clear the existing plan up front: a transient failure (5xx / rate limit) would
@@ -61,6 +66,7 @@ export default function InsightsScreen() {
       }
       setPlanMsg(e instanceof ApiError ? e.message : 'Could not generate a learning plan — try again.');
     } finally {
+      planLatch.leave();
       setPlanLoading(false);
     }
   }

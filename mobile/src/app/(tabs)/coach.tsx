@@ -17,6 +17,7 @@ import { Button } from '@/components/ui';
 import { ReportButton } from '@/components/report-button';
 import { AiConsentCard, hasAiConsent } from '@/components/ai-consent';
 import { useAuth } from '@/contexts/auth';
+import { useLatch } from '@/lib/use-latch';
 import { api, ApiError } from '@/services/api';
 import { colors, radius, spacing } from '@/theme';
 
@@ -55,10 +56,18 @@ export default function CoachScreen() {
     api.coachSuggestions().then(setSuggestions).catch(() => setSuggestions([]));
   }, []);
 
+  // Synchronous latch (see useLatch): a same-tick double-tap — on the Send button OR a suggestion
+  // chip (which has no disabled state at all) — must not fire coachChat twice. Two calls on this
+  // stable sessionId would double the turn in the server-threaded context, append a duplicate user
+  // bubble + two replies, and burn two LLM ceiling slots. The `sending` state can't guard it: both
+  // taps close over the pre-render sending=false.
+  const sendLatch = useLatch();
+
   const send = useCallback(
     async (text: string) => {
       const trimmed = text.trim();
       if (!trimmed || sending) return;
+      if (!sendLatch.enter()) return;
       setError(null);
       setInput('');
       const userMsgId = `u${counter.current++}`;
@@ -77,10 +86,11 @@ export default function CoachScreen() {
         setInput((cur) => (cur.length === 0 ? trimmed : cur));
         setError(e instanceof ApiError ? e.message : 'Coach is unavailable right now.');
       } finally {
+        sendLatch.leave();
         setSending(false);
       }
     },
-    [sending, sessionId],
+    [sending, sessionId, sendLatch],
   );
 
   // Send is a no-op on empty/whitespace input, so reflect that in the control rather than
