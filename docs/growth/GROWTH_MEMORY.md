@@ -6,6 +6,59 @@ pre-launch.
 
 ---
 
+### 2026-07-25 — Daily GTM review (quiet bookkeeping run; new connectors observed, none GTM sources; site-gate circuit-breaker now 9 reads)
+- **Observed:** Phase still `pre_launch`. Fresh `ListConnectors` surfaced **three new connectors**
+  since the last GTM read (2026-07-23): **Linear**, **Sentry**, **UptimeRobot** — all
+  `installState`/`connected: true` at the org level but `enabledInChat: false`. A fresh
+  `ToolSearch` for each (`Vercel deployment project`, `Sentry Linear UptimeRobot`) returned **zero**
+  `mcp__Linear__*`/`mcp__Sentry__*`/`mcp__UptimeRobot__*` tools — nothing is actually callable this
+  session. None of the three is EVER a candidate GTM source regardless of enablement (Linear =
+  issue/project tracking, Sentry = error monitoring, UptimeRobot = uptime monitoring — none is an
+  analytics/billing/ESP capability), so `channels_connected` stays `[]` honestly; recorded
+  transparently in the validation note rather than silently ignored, same discipline as the
+  2026-07-15 Vercel-appearance precedent. Gmail (connected, enabled — outreach lane) and Mobbin
+  (connected, enabled — design reference) unchanged. Vercel unchanged (5th consecutive read:
+  connected, `enabledInChat:false`, zero tools). Shell env unchanged: `GEMINI_API_KEY` + both
+  `BROWSERBASE_*` present (validator infra), no `PROD_URL`/`ANALYTICS_READ_TOKEN`/`STRIPE_*`/
+  `SMTP_*`/`DATABASE_URL`. Re-ran `analysis/gtm_engine_pct.py` (unchanged, 50) and `node
+  scripts/validate-computation.mjs` (4/4 PASS, none changed). Re-read `docs/BUSINESS_CASE.md`
+  lever 2 to confirm the 2026-07-23 fix (crediting the mobile team-management surface as landed in
+  code) is still intact in the live file — it is. Both independent scorecards are **UNCHANGED**
+  since 2026-07-23 despite 4 more product-factory commits landing since then (runs 75-78: atomic
+  `create_job` dedup fix #471, a quiet DEEP AUDIT run #473, the AI-coach failed-send twin fix #474,
+  the mobile double-tap paid-action latch fix #476) — none self-certifiable by this loop per
+  GTM_STANDARD §4 / FACTORY_STANDARD §28: **QUALITY_SCORECARD** stays the 9th audit (`as_of:
+  2026-07-23`, overall B, `ship_gate_met: false`, same two ship-critical gaps — store-readiness B,
+  business-case-strength B); **GTM_SCORECARD** stays the 4th grade (`as_of: 2026-07-23`, overall A,
+  `ship_gate_met: true`).
+- **Concluded:** No real funnel/PMF data justifies a ROADMAP/BUSINESS_CASE ARR/VISION steer this
+  run (same reasoning as every prior pre-launch read — 0 users, 0 funnel data). The new-connector
+  observation is a transparency note, not a source upgrade or a steer.
+- **Did (verification + a transparency note, not a new fix):** Re-verified `ListConnectors` +
+  `ToolSearch` for the three new connectors and confirmed none is callable or ever a GTM-source
+  candidate; documented this in `GROWTH_STATUS.md`'s validation note and `owner_blockers` rather
+  than silently absorbing it. Re-read `docs/BUSINESS_CASE.md` lever 2 and confirmed the prior run's
+  mobile-surface fix is still live (not re-edited — nothing drifted). **Circuit-breaker escalation,
+  now 9 consecutive quiet GTM reads:** the site-gate owner DECISION (`PENDING_OPS.md` `site-gate`,
+  `ROADMAP.md:421-435`) has gone 9 straight GTM reads (2026-07-09 reframe through 07-25) with zero
+  owner movement — re-verified `PENDING_OPS.md` still shows `as_of: 2026-07-04`, `status: open`,
+  unchanged. This is now the longest-running circuit-breaker instance in this loop's history.
+- **Recommended (to factory):** Unchanged priority — store-readiness (store screenshots, needs a
+  signed native build) and business-case-strength (a live per-seat price + real B2B adoption data)
+  remain the two ship-critical gaps, both product-factory/owner work. Zero outreach drafts this
+  run (correct): `QUALITY_SCORECARD.ship_gate_met` is still false. Demand_signal cadence checked:
+  last run 2026-07-03 (22 days), ~quarterly refresh not due until ~October.
+- **Meta / operational note:** This was a routine dashboard-bookkeeping refresh (dates + validation
+  reconciliation + the new-connector transparency note, which changed no copy/asset/steer) — no
+  maker≠checker review was run, consistent with the 2026-07-07/07-15/07-19/07-21 precedent for
+  bookkeeping-only reads. The new-connector pattern reinforces the existing lesson (07-15's Vercel
+  appearance, 07-23's Drive/Calendar volatility fix): a connector showing up as `connected` in
+  `ListConnectors` is never itself grounds to claim a GTM source — only an actual analytics/
+  billing/ESP capability with a callable tool clears that bar, and this run's three new arrivals
+  clear neither the capability class nor the callable-tool test.
+
+---
+
 ### 2026-07-23 — Daily GTM review (both scorecards fresh; closed both GTM_SCORECARD top_gaps; site-gate circuit-breaker now 8 reads)
 - **Observed:** Phase still `pre_launch`. Fresh `ListConnectors`: Gmail (connected, enabled —
   outreach lane) + Mobbin (connected, enabled — design reference) + Vercel (connected at org
