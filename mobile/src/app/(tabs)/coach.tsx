@@ -61,13 +61,20 @@ export default function CoachScreen() {
       if (!trimmed || sending) return;
       setError(null);
       setInput('');
-      const userMsg: Msg = { id: `u${counter.current++}`, role: 'user', content: trimmed };
-      setMessages((m) => [...m, userMsg]);
+      const userMsgId = `u${counter.current++}`;
+      setMessages((m) => [...m, { id: userMsgId, role: 'user', content: trimmed }]);
       setSending(true);
       try {
         const reply = await api.coachChat(trimmed, sessionId);
         setMessages((m) => [...m, { id: `a${counter.current++}`, role: 'assistant', content: reply }]);
       } catch (e) {
+        // The send failed, so the server's session (threaded by sessionId) never received this
+        // turn. Roll the optimistic user bubble back out so the visible transcript stays in sync
+        // with what the coach actually knows on the NEXT turn — an orphaned bubble would make the
+        // coach look like it ignored a message it never got. Return the text to the input so it
+        // can be resent without retyping, unless the user already started a new message.
+        setMessages((m) => m.filter((msg) => msg.id !== userMsgId));
+        setInput((cur) => (cur.length === 0 ? trimmed : cur));
         setError(e instanceof ApiError ? e.message : 'Coach is unavailable right now.');
       } finally {
         setSending(false);
