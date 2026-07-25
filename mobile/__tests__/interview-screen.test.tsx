@@ -5,7 +5,7 @@
 // consent card, the report button, and the API are mocked so the screen renders headlessly (native
 // can't compile on CI/Linux). (Factory vars are `mock`-prefixed per jest's hoisting rule.)
 
-import { render, screen, fireEvent, waitFor } from '@testing-library/react-native';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react-native';
 
 jest.mock('react-native-safe-area-context', () => {
   const { View } = require('react-native');
@@ -109,6 +109,24 @@ describe('MockInterviewScreen', () => {
     expect(mockStart).toHaveBeenCalledWith('job-1', 5);
   });
 
+  it('a same-tick double-tap on Start fires startMockInterview only ONCE', async () => {
+    // Two rapid taps close over the pre-render starting=false; without the synchronous latch this
+    // spins up two mock-interview sessions (each a paid question-generation LLM call). Revert-proof:
+    // removing the startLatch guard reddens this.
+    mockUser = { id: 'u1', tier: 'premium', ai_consent: true };
+    mockList.mockResolvedValue([]);
+    mockStart.mockReturnValue(new Promise(() => {})); // never resolves: stays in-flight
+
+    render(<MockInterviewScreen />);
+    const btn = await screen.findByText('Start mock interview');
+    await act(async () => {
+      fireEvent.press(btn);
+      fireEvent.press(btn);
+    });
+
+    expect(mockStart).toHaveBeenCalledTimes(1);
+  });
+
   it('scores a real answer and shows the SERVER score + feedback (no optimistic fake)', async () => {
     mockUser = { id: 'u1', tier: 'premium', ai_consent: true };
     mockList.mockResolvedValue([]);
@@ -142,6 +160,33 @@ describe('MockInterviewScreen', () => {
     expect(screen.getByText('Your answer scored')).toBeTruthy();
     expect(screen.getByText('A strong answer would open with the situation.')).toBeTruthy();
     await waitFor(() => expect(mockAnswer).toHaveBeenCalledWith('iv-1', 0, 'I designed a distributed queue that cut latency 40%.'));
+  });
+
+  it('a same-tick double-tap on Submit fires the paid scoring call only ONCE', async () => {
+    // A fast double-tap delivers two onPress calls that both close over the pre-render
+    // submitting=false, and the disabled prop only blocks after the re-render propagates to
+    // native — so the second tap would otherwise fire a SECOND api.answerMockInterview call,
+    // burning another LLM ceiling slot and desyncing the shown score from the persisted one. The
+    // synchronous ref latch short-circuits it. Revert-proof: replacing the ref guard with the
+    // `submitting` state (or removing it) makes this fire twice (the state closure is stale).
+    mockUser = { id: 'u1', tier: 'premium', ai_consent: true };
+    mockList.mockResolvedValue([]);
+    mockStart.mockResolvedValue(SESSION);
+    // Never resolves: the first submit stays in-flight so the second tap races it.
+    mockAnswer.mockReturnValue(new Promise(() => {}));
+
+    render(<MockInterviewScreen />);
+    fireEvent.press(await screen.findByText('Start mock interview'));
+    const input = await screen.findByLabelText('Your answer');
+    fireEvent.changeText(input, 'I designed a distributed queue that cut latency 40%.');
+
+    const btn = screen.getByText('Submit answer');
+    await act(async () => {
+      fireEvent.press(btn);
+      fireEvent.press(btn);
+    });
+
+    expect(mockAnswer).toHaveBeenCalledTimes(1);
   });
 
   it('routes to the paywall (not a dead-end) if scoring 403s mid-session', async () => {

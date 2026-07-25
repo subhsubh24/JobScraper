@@ -5,7 +5,7 @@
 // confirming). expo-router + auth context + api + native Alert/Share are mocked for headless run.
 
 import { Alert } from 'react-native';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react-native';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react-native';
 
 const mockReplace = jest.fn();
 jest.mock('expo-router', () => ({
@@ -117,6 +117,26 @@ describe('SettingsScreen', () => {
     // The Pro user sees the enrichment import affordance.
     expect(screen.getByText('Import')).toBeTruthy();
     await screen.findByText('Share invite link');
+  });
+
+  it('a same-tick double-tap on Import fires the GitHub enrichment scrape only ONCE', async () => {
+    // The Import button is disabled only on empty input (not while importing), so a second tap
+    // during an in-flight scrape closes over the pre-render importing=false — without the
+    // synchronous latch it fires a second GitHub enrichment scrape. Revert-proof: removing the
+    // useLatch guard (leaving only the `importing` state check) reddens this.
+    mockUser = { ...mockUser, tier: 'premium' };
+    (api.enrichGithub as jest.Mock).mockReturnValue(new Promise(() => {})); // never resolves: stays in-flight
+    render(<SettingsScreen />);
+    await screen.findByText('Share invite link'); // settle async loads
+    fireEvent.changeText(screen.getByPlaceholderText('github.com/yourname'), 'github.com/octocat');
+
+    const btn = screen.getByText('Import');
+    await act(async () => {
+      fireEvent.press(btn);
+      fireEvent.press(btn);
+    });
+
+    expect(api.enrichGithub).toHaveBeenCalledTimes(1);
   });
 
   it('renders the referral share card with real invite stats once loaded', async () => {

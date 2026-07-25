@@ -4,7 +4,7 @@
 // sent message gets a reply, and a provider failure surfaces honestly (no fake reply).
 // expo-router + the auth context + the api client are mocked so the screen renders headlessly.
 
-import { render, screen, fireEvent, waitFor } from '@testing-library/react-native';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react-native';
 
 const mockPush = jest.fn();
 jest.mock('expo-router', () => ({
@@ -108,6 +108,27 @@ describe('CoachScreen', () => {
     // Same conversation → identical session id (the whole point of the fix: without it the
     // server started a fresh, context-free session on every message).
     expect(secondSession).toBe(firstSession);
+  });
+
+  it('a same-tick double-tap on Send fires coachChat only ONCE (no duplicate threaded turn)', async () => {
+    // Two rapid taps on Send (or a suggestion chip) close over the pre-render sending=false and
+    // the disabled prop lands late on RN — without the synchronous latch this fires coachChat
+    // twice on the SAME session id, doubling the turn in the server-threaded context, appending a
+    // duplicate user bubble + two replies, and burning two LLM ceiling slots. Revert-proof:
+    // removing the `useLatch` guard (leaving only the `sending` state check) reddens this.
+    mockTier = 'premium';
+    (api.coachChat as jest.Mock).mockReturnValue(new Promise(() => {})); // never resolves: stays in-flight
+    render(<CoachScreen />);
+    await waitFor(() => expect(api.coachSuggestions).toHaveBeenCalled());
+    fireEvent.changeText(screen.getByPlaceholderText('Type a message…'), 'help me negotiate');
+
+    const btn = screen.getByText('Send');
+    await act(async () => {
+      fireEvent.press(btn);
+      fireEvent.press(btn);
+    });
+
+    expect(api.coachChat).toHaveBeenCalledTimes(1);
   });
 
   it('surfaces a coach provider failure honestly (no fabricated reply)', async () => {

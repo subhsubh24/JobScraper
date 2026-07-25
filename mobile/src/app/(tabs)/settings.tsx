@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button, Card, Field } from '@/components/ui';
 import { AiConsentSetting } from '@/components/ai-consent';
 import { useAuth } from '@/contexts/auth';
+import { useLatch } from '@/lib/use-latch';
 import { api, ApiError } from '@/services/api';
 import { colors, spacing } from '@/theme';
 import type { Competency, ReferralStats } from '@/types';
@@ -110,6 +111,7 @@ function GithubEnrichmentCard() {
   const [competencies, setCompetencies] = useState<Competency[] | null>(null);
   const [handle, setHandle] = useState('');
   const [importing, setImporting] = useState(false);
+  const importLatch = useLatch();
   const [clearing, setClearing] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -135,6 +137,9 @@ function GithubEnrichmentCard() {
   async function importGithub() {
     const value = handle.trim();
     if (!value || importing) return;
+    // Synchronous latch (see useLatch): a same-tick double-tap must not fire two GitHub enrichment
+    // scrapes. The `importing` state can't guard it (stale closure) and disabled lands too late.
+    if (!importLatch.enter()) return;
     setImporting(true);
     setNotice(null);
     setError(null);
@@ -145,6 +150,7 @@ function GithubEnrichmentCard() {
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Could not import from GitHub. Try again.');
     } finally {
+      importLatch.leave();
       setImporting(false);
     }
   }
