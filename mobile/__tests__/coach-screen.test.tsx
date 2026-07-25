@@ -122,6 +122,54 @@ describe('CoachScreen', () => {
     expect(screen.queryByText('Lead with your strongest signal.')).toBeNull();
   });
 
+  it('rolls the failed turn back out of the transcript and restores the input for retry', async () => {
+    // LOAD-BEARING: a send whose server call fails never reached the coach's threaded session,
+    // so the optimistic user bubble must be rolled back (else the visible transcript desyncs from
+    // what the coach knows and the next reply looks like it ignored the message) AND the typed
+    // text must return to the input so the user can resend without retyping it. Removing the
+    // `filter` rollback reddens the "no orphaned bubble" assertion; removing the `setInput`
+    // restore reddens the "input restored" assertion.
+    mockTier = 'premium';
+    (api.coachChat as jest.Mock).mockRejectedValueOnce(new Error('boom'));
+    render(<CoachScreen />);
+    await waitFor(() => expect(api.coachSuggestions).toHaveBeenCalled()); // settle the load first
+    const input = screen.getByPlaceholderText('Type a message…');
+    fireEvent.changeText(input, 'help me negotiate');
+    fireEvent.press(screen.getByText('Send'));
+    await waitFor(() => expect(screen.getByText(/unavailable right now/i)).toBeTruthy());
+    // No orphaned user bubble lingers in the transcript (the send never reached the server).
+    expect(screen.queryByText('help me negotiate')).toBeNull();
+    // The text is back in the input, ready to resend without retyping.
+    expect(screen.getByDisplayValue('help me negotiate')).toBeTruthy();
+  });
+
+  it('rolls back ONLY the failed turn, leaving an earlier successful turn intact', async () => {
+    // The rollback filters by the failed turn's own message id, so a later failure must never
+    // remove an earlier turn's user bubble OR its assistant reply. Turn 1 succeeds; turn 2 fails.
+    mockTier = 'premium';
+    (api.coachChat as jest.Mock)
+      .mockResolvedValueOnce('Lead with your strongest signal.') // turn 1 succeeds
+      .mockRejectedValueOnce(new Error('boom')); // turn 2 fails
+    render(<CoachScreen />);
+    await waitFor(() => expect(api.coachSuggestions).toHaveBeenCalled());
+    const input = screen.getByPlaceholderText('Type a message…');
+
+    fireEvent.changeText(input, 'first question');
+    fireEvent.press(screen.getByText('Send'));
+    await waitFor(() => expect(screen.getByText('Lead with your strongest signal.')).toBeTruthy());
+
+    fireEvent.changeText(input, 'second question');
+    fireEvent.press(screen.getByText('Send'));
+    await waitFor(() => expect(screen.getByText(/unavailable right now/i)).toBeTruthy());
+
+    // Turn 1's user message AND assistant reply survive the turn-2 rollback…
+    expect(screen.getByText('first question')).toBeTruthy();
+    expect(screen.getByText('Lead with your strongest signal.')).toBeTruthy();
+    // …and only turn 2's failed bubble is gone, its text returned to the input for retry.
+    expect(screen.queryByText('second question')).toBeNull();
+    expect(screen.getByDisplayValue('second question')).toBeTruthy();
+  });
+
   it('exposes accessible names so a screen reader can operate the chat', async () => {
     mockTier = 'premium';
     render(<CoachScreen />);
