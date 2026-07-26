@@ -7,7 +7,7 @@
 // expo-router + the auth context are mocked so the screen renders headlessly.
 
 import { Alert } from 'react-native';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 
 const mockBack = jest.fn();
 jest.mock('expo-router', () => ({
@@ -26,7 +26,30 @@ jest.mock('@/contexts/auth', () => ({
   }),
 }));
 
+// Mock the IAP client so we can count the native purchase/restore calls, while keeping the REAL
+// error classes (PurchasesUnavailable / PurchaseCancelled) so the screen's `instanceof` branches
+// still work. Default behavior mirrors an UNCONFIGURED build (no SDK key → throws
+// PurchasesUnavailable), so the existing "honest when unconfigured" tests below are unaffected;
+// the double-tap tests override per-test with an in-flight (never-resolving) promise.
+const mockPurchasePlan = jest.fn((..._a: unknown[]) => Promise.resolve());
+const mockRestorePurchases = jest.fn((..._a: unknown[]) => Promise.resolve(false));
+jest.mock('@/services/purchases', () => {
+  const actual = jest.requireActual('@/services/purchases');
+  return {
+    ...actual,
+    purchasePlan: (...a: unknown[]) => mockPurchasePlan(...a),
+    restorePurchases: (...a: unknown[]) => mockRestorePurchases(...a),
+  };
+});
+
 import PaywallScreen from '@/app/paywall';
+import { PurchasesUnavailable } from '@/services/purchases';
+
+beforeEach(() => {
+  // The unconfigured-build default: every IAP call throws PurchasesUnavailable (no charge).
+  mockPurchasePlan.mockRejectedValue(new PurchasesUnavailable());
+  mockRestorePurchases.mockRejectedValue(new PurchasesUnavailable());
+});
 
 afterEach(() => {
   jest.clearAllMocks();
@@ -128,5 +151,38 @@ describe('PaywallScreen', () => {
     expect(String(title)).toMatch(/nothing to restore/i);
     expect(mockBack).not.toHaveBeenCalled();
     alertSpy.mockRestore();
+  });
+
+  it('a same-tick double-tap on Start Pro runs the native purchase flow only ONCE', async () => {
+    // The paywall is the highest-stakes place to double-fire: purchasePlan() runs the native
+    // StoreKit/Play billing flow. A `useState` busy flag CANNOT stop a same-tick double-tap on
+    // RN (both onPress close over the pre-render busy=false; the disabled/loading prop only lands
+    // after the re-render crosses the bridge, later than two quick taps), so without the
+    // synchronous useLatch the second tap fires a SECOND purchase. Revert-proof: replacing the
+    // actionLatch.enter() guard with the old `if (busy) return` reddens this.
+    mockTier = 'free';
+    mockPurchasePlan.mockReturnValue(new Promise(() => {})); // never resolves: stays in-flight
+    render(<PaywallScreen />);
+    const btn = screen.getByText('Start Pro');
+    await act(async () => {
+      fireEvent.press(btn);
+      fireEvent.press(btn);
+    });
+    expect(mockPurchasePlan).toHaveBeenCalledTimes(1);
+  });
+
+  it('a same-tick double-tap on Restore purchases runs restore only ONCE', async () => {
+    // Same class as Start Pro: restore + purchase share ONE synchronous latch (mutually exclusive,
+    // matching the shared `busy` affordance), so a double-tapped Restore cannot fire twice.
+    // Revert-proof: reverting restore() to `if (busy) return` reddens this.
+    mockTier = 'free';
+    mockRestorePurchases.mockReturnValue(new Promise(() => {})); // never resolves: stays in-flight
+    render(<PaywallScreen />);
+    const btn = screen.getByText('Restore purchases');
+    await act(async () => {
+      fireEvent.press(btn);
+      fireEvent.press(btn);
+    });
+    expect(mockRestorePurchases).toHaveBeenCalledTimes(1);
   });
 });
