@@ -415,3 +415,37 @@ def test_recompute_all_member_tiers_bulk_loads_users_not_n_plus_one(db_session):
     # made this equal the member count (2 then 5), so reverting the bulk load reddens both asserts.
     assert u2 == 1, f"expected 1 bulk user load for 2 members, got {u2} (per-member N+1?)"
     assert u5 == 1, f"expected 1 bulk user load for 5 members, got {u5} (per-member N+1?)"
+
+
+def test_purge_user_orgs_bulk_loads_affected_members_not_n_plus_one(db_session):
+    """Deleting an account that OWNS an org must reconcile the freed members' tiers with ONE bulk
+    user load, not one ``SELECT ... FROM users`` per member. ``purge_user_orgs`` runs on the
+    account-deletion path (``DELETE /api/auth/me`` → ``AuthService.delete_user`` → here), so a
+    per-member re-read is an N+1 that scales with the org (up to MAX_SEATS) against the serverless
+    budget. Counting ONLY ``FROM users`` statements isolates the affected-member load
+    (``recompute_user_tier`` reads subscriptions/org_members, never users; the org/member deletes
+    query their own tables), so this reddens the moment the bulk ``User.id.in_(...)`` load reverts
+    to a per-member ``User.id == uid`` query."""
+    import src.org_billing as org_billing
+
+    org2 = _seed_org_with_members(db_session, 2, "purge-a")
+    owner2 = db_session.query(User).filter(User.id == org2.owner_id).one()
+    db_session.expire_all()
+    u2, _ = _capture_user_selects(
+        db_session, lambda: org_billing.purge_user_orgs(db_session, owner2)
+    )
+
+    org5 = _seed_org_with_members(db_session, 5, "purge-b")
+    owner5 = db_session.query(User).filter(User.id == org5.owner_id).one()
+    db_session.expire_all()
+    u5, _ = _capture_user_selects(
+        db_session, lambda: org_billing.purge_user_orgs(db_session, owner5)
+    )
+
+    # CONSTANT IN MEMBER COUNT: the affected-member reconciliation must not scale with org size.
+    # A small fixed baseline (the owner-relationship load the org-delete cascade issues, 1 per owned
+    # org) is fine — what must stay flat is the member reconcile. Post-fix both orgs are the same
+    # small constant (1 cascade owner load + 1 bulk member load = 2). The OLD per-member re-read made
+    # the count grow (3 for 2 members -> 6 for 5), so reverting the bulk load reddens the equality.
+    assert u2 == u5, f"purge_user_orgs FROM users scaled with member count (N+1): {u2} (2) -> {u5} (5)"
+    assert u5 <= 2, f"expected a bounded, member-count-independent user load, got {u5}"

@@ -482,8 +482,11 @@ def purge_user_orgs(db: Session, user: User) -> None:
                 affected_user_ids.add(m.user_id)
         db.delete(org)  # ORM cascade removes the org's member rows
     db.flush()
-    for uid in affected_user_ids:
-        member_user = db.query(User).filter(User.id == uid).first()
-        if member_user is not None:
+    # Bulk-load the affected member users in ONE query instead of a per-member SELECT: deleting an
+    # owner of a large org (up to MAX_SEATS members) would otherwise fire 1 + N round-trips on the
+    # account-deletion path, against the serverless 60s budget. Mirrors _recompute_all_member_tiers.
+    if affected_user_ids:
+        member_users = db.query(User).filter(User.id.in_(affected_user_ids)).all()
+        for member_user in member_users:
             billing.recompute_user_tier(db, member_user)
-    db.flush()
+        db.flush()
