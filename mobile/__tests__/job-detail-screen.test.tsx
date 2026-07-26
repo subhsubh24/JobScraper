@@ -178,6 +178,36 @@ describe('JobDetailScreen', () => {
     expect(mockGeneratePrep).not.toHaveBeenCalled();
   });
 
+  it('releases the prep latch on consent DENIAL so the user can retry (Generate → Not now → Generate)', async () => {
+    // The prep latch is acquired BEFORE the awaited ensureConsent() and released in `finally`, so
+    // dismissing the consent modal ("Not now") MUST clear it — otherwise the user is soft-locked:
+    // the second tap hits a still-held latch and silently no-ops, never re-showing the prompt.
+    // The existing double-tap test holds the latch open (never-resolving promise) and the gate
+    // test only asserts the modal appears; neither exercises the finally-release-on-denial path.
+    // Revert-proof: moving prepLatch.leave() out of the finally (so denial doesn't release it)
+    // means the modal never reappears on the retry below → this test reddens.
+    mockUser = { tier: 'free', ai_consent: false };
+    render(<JobDetailScreen />);
+    await screen.findByText('Senior Backend Engineer');
+
+    // First tap: consent modal appears, latch acquired, no paid call yet.
+    fireEvent.press(screen.getByText('Generate prep pack (1 free)'));
+    expect(await screen.findByText('Enable AI features')).toBeTruthy();
+
+    // Deny: "Not now" resolves ensureConsent(false) → the handler returns → finally releases.
+    await act(async () => {
+      fireEvent.press(screen.getByText('Not now'));
+    });
+    await waitFor(() => expect(screen.queryByText('Enable AI features')).toBeNull());
+    expect(mockGeneratePrep).not.toHaveBeenCalled();
+
+    // Retry: the modal must reappear (proving the latch was released). If it stayed held, this
+    // find times out and the test fails.
+    fireEvent.press(screen.getByText('Generate prep pack (1 free)'));
+    expect(await screen.findByText('Enable AI features')).toBeTruthy();
+    expect(mockGeneratePrep).not.toHaveBeenCalled();
+  });
+
   it('gates salary negotiation behind Career+ for a non-Career+ user (upsell, no input)', async () => {
     mockUser = { tier: 'premium' }; // Pro (premium, not career_plus) — must NOT see the tool
     render(<JobDetailScreen />);

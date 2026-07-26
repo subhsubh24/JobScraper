@@ -6,6 +6,7 @@ import { Alert, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'r
 import { Button, Card } from '@/components/ui';
 import { api } from '@/services/api';
 import { useAuth } from '@/contexts/auth';
+import { useLatch } from '@/lib/use-latch';
 import {
   PlanId,
   PurchaseCancelled,
@@ -94,9 +95,17 @@ export default function PaywallScreen() {
   const isCareerPlus = user?.career_plus === true;
   const [plan, setPlan] = useState<PlanId>('annual');
   const [busy, setBusy] = useState(false);
+  // ONE synchronous single-flight latch shared by purchase + restore (mutually exclusive, same as
+  // the `busy` affordance): a `useState` "busy" flag CANNOT stop a same-tick double-tap on React
+  // Native — both onPress calls close over the pre-render `busy=false` and the `disabled`/`loading`
+  // prop only lands after the re-render crosses the bridge, measurably later than two quick taps.
+  // Here the double-fire would run the native StoreKit/Play purchase (or restore) flow TWICE — the
+  // highest-stakes place to double-fire (a real charge) — so a ref latch (useLatch) is required,
+  // matching every other paid-action handler in the app (interview/coach/job/insights/settings).
+  const actionLatch = useLatch();
 
   async function purchase() {
-    if (busy) return;
+    if (!actionLatch.enter()) return;
     setBusy(true);
     try {
       await purchasePlan(plan);
@@ -120,11 +129,12 @@ export default function PaywallScreen() {
       }
     } finally {
       setBusy(false);
+      actionLatch.leave();
     }
   }
 
   async function restore() {
-    if (busy) return;
+    if (!actionLatch.enter()) return;
     setBusy(true);
     try {
       const found = await restorePurchases();
@@ -145,6 +155,7 @@ export default function PaywallScreen() {
       }
     } finally {
       setBusy(false);
+      actionLatch.leave();
     }
   }
 
