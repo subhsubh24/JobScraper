@@ -443,9 +443,11 @@ def test_purge_user_orgs_bulk_loads_affected_members_not_n_plus_one(db_session):
     )
 
     # CONSTANT IN MEMBER COUNT: the affected-member reconciliation must not scale with org size.
-    # A small fixed baseline (the owner-relationship load the org-delete cascade issues, 1 per owned
-    # org) is fine — what must stay flat is the member reconcile. Post-fix both orgs are the same
-    # small constant (1 cascade owner load + 1 bulk member load = 2). The OLD per-member re-read made
-    # the count grow (3 for 2 members -> 6 for 5), so reverting the bulk load reddens the equality.
+    # A small fixed baseline is fine — what must stay flat is the member reconcile. Post-fix both
+    # orgs measure the same small constant (2): the bulk member load, plus one owner re-load that the
+    # test's own `expire_all()` above forces when purge_user_orgs first touches `user.id` (there is no
+    # ORM Organization.owner relationship — owner_id is a bare FK — so this is NOT a cascade load and,
+    # like the bulk member load, does NOT grow with member count). The OLD per-member re-read made the
+    # count grow (3 for 2 members -> 6 for 5), so reverting the bulk load reddens the equality.
     assert u2 == u5, f"purge_user_orgs FROM users scaled with member count (N+1): {u2} (2) -> {u5} (5)"
     assert u5 <= 2, f"expected a bounded, member-count-independent user load, got {u5}"
