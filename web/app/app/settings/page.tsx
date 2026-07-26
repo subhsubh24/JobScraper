@@ -478,6 +478,7 @@ export default function SettingsPage() {
               </Button>
               <Button
                 variant="secondary"
+                disabled={deleting}
                 onClick={() => {
                   setShowConfirm(false);
                   setConfirm('');

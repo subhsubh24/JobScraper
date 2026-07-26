@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text } from 'react-native';
 
 import { Button, Field } from '@/components/ui';
+import { useLatch } from '@/lib/use-latch';
 import { api, ApiError } from '@/services/api';
 import { colors, spacing } from '@/theme';
 
@@ -13,6 +14,12 @@ export default function NewJobScreen() {
   const [description, setDescription] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Synchronous single-flight latch: "Add & score" fires a paid fit-score AND creates a job row.
+  // A manual add carries no URL, so the server's UNIQUE(user_id,title,company,url) dedup can't catch
+  // a NULL-url duplicate — two same-tick taps (the `loading`/`disabled` prop lands only after the RN
+  // bridge round-trip) would race the sequential read-guard and create TWO rows + burn TWO score
+  // slots. The ref bails the second tap before it fires. (Same class as the job/[id] generators.)
+  const submitLatch = useLatch();
 
   async function onSubmit() {
     setError(null);
@@ -20,6 +27,7 @@ export default function NewJobScreen() {
       setError('A title and company are required.');
       return;
     }
+    if (!submitLatch.enter()) return; // second same-tick tap bails before the paid create
     setLoading(true);
     try {
       await api.createJob({
@@ -33,6 +41,7 @@ export default function NewJobScreen() {
       setError(e instanceof ApiError ? e.message : 'Could not add this job.');
     } finally {
       setLoading(false);
+      submitLatch.leave();
     }
   }
 

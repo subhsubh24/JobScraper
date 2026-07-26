@@ -3,7 +3,7 @@
 // API with the typed values, navigates back on success, and surfaces an API failure honestly
 // (no fake "added" + no navigation). expo-router + the api client are mocked for a headless run.
 
-import { render, screen, fireEvent, waitFor } from '@testing-library/react-native';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react-native';
 
 const mockBack = jest.fn();
 jest.mock('expo-router', () => ({
@@ -62,5 +62,27 @@ describe('NewJobScreen', () => {
 
     await waitFor(() => expect(screen.getByText('Server exploded')).toBeTruthy());
     expect(mockBack).not.toHaveBeenCalled();
+  });
+
+  it('a same-tick double-tap on "Add & score" fires the paid create only ONCE', async () => {
+    // "Add & score" fires a paid fit-score and creates a job row. On RN two fast taps both close
+    // over the pre-render `loading=false` (the Button's `disabled`/`loading` prop lands only after
+    // the bridge round-trip), so without a synchronous latch BOTH would call createJob — creating a
+    // duplicate row (a manual add has no URL, so the server's UNIQUE(...,url) dedup can't catch it)
+    // and burning a second score slot. Revert-proof: removing the useLatch guard reddens this
+    // (the count becomes 2).
+    (api.createJob as jest.Mock).mockReturnValueOnce(new Promise(() => {})); // stays in-flight
+    render(<NewJobScreen />);
+    fireEvent.changeText(screen.getByPlaceholderText('Senior Backend Engineer'), 'Staff Engineer');
+    fireEvent.changeText(screen.getByPlaceholderText('Acme'), 'Globex');
+
+    const btn = screen.getByText('Add & score');
+    await act(async () => {
+      fireEvent.press(btn);
+      fireEvent.press(btn);
+    });
+
+    expect(api.createJob).toHaveBeenCalledTimes(1);
+    expect(mockBack).not.toHaveBeenCalled(); // still in flight, no fake success
   });
 });
