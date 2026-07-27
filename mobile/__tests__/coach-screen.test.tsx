@@ -41,7 +41,7 @@ jest.mock('@/services/api', () => ({
 }));
 
 import CoachScreen from '@/app/(tabs)/coach';
-import { api } from '@/services/api';
+import { api, ApiError } from '@/services/api';
 
 afterEach(() => {
   jest.clearAllMocks();
@@ -141,6 +141,23 @@ describe('CoachScreen', () => {
     await waitFor(() => expect(screen.getByText(/unavailable right now/i)).toBeTruthy());
     // The failed turn must NOT leave a fake assistant message claiming success.
     expect(screen.queryByText('Lead with your strongest signal.')).toBeNull();
+  });
+
+  it('routes a mid-session 403 (lapsed Pro) to the paywall, not a dead-end inline error', async () => {
+    // The screen's initial isPremium gate can let a user in, then the Pro entitlement lapses
+    // (e.g. cancelled on another device) so the NEXT send 403s. Parity with the job generators /
+    // mock interview / insights: a mid-call 403 must route to the paywall (a real recovery path),
+    // never strand the user on the inline "unavailable" error — a dead end on a lapsed tier that
+    // no retry can clear. Removing the `status === 403` branch reddens this (mockPush not called).
+    mockTier = 'premium';
+    (api.coachChat as jest.Mock).mockRejectedValueOnce(new ApiError(403, 'Upgrade to Pro'));
+    render(<CoachScreen />);
+    await waitFor(() => expect(api.coachSuggestions).toHaveBeenCalled());
+    fireEvent.changeText(screen.getByPlaceholderText('Type a message…'), 'help me negotiate');
+    fireEvent.press(screen.getByText('Send'));
+    await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/paywall'));
+    // No dead-end inline error is shown for the tier gate (the paywall IS the surfaced recovery).
+    expect(screen.queryByText(/unavailable right now/i)).toBeNull();
   });
 
   it('rolls the failed turn back out of the transcript and restores the input for retry', async () => {

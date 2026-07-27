@@ -8,8 +8,9 @@ import { Alert } from 'react-native';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react-native';
 
 const mockReplace = jest.fn();
+const mockPush = jest.fn();
 jest.mock('expo-router', () => ({
-  router: { push: jest.fn(), replace: (...a: unknown[]) => mockReplace(...a) },
+  router: { push: (...a: unknown[]) => mockPush(...a), replace: (...a: unknown[]) => mockReplace(...a) },
 }));
 
 // jest-expo stubs the NATIVE bridge but not the JS layer of safe-area-context; mock it to a
@@ -76,7 +77,7 @@ jest.mock('@/services/api', () => {
 });
 
 import SettingsScreen from '@/app/(tabs)/settings';
-import { api } from '@/services/api';
+import { api, ApiError } from '@/services/api';
 
 afterEach(() => {
   jest.clearAllMocks();
@@ -137,6 +138,23 @@ describe('SettingsScreen', () => {
     });
 
     expect(api.enrichGithub).toHaveBeenCalledTimes(1);
+  });
+
+  it('routes a mid-import 403 (lapsed Pro) to the paywall, not a dead-end retry error', async () => {
+    // The GitHub card renders for a Pro user, then the Pro entitlement can lapse (e.g. cancelled
+    // on another device) so the import 403s. Parity with the job generators / mock interview /
+    // insights: a mid-call 403 must route to the paywall (a real recovery path), never strand the
+    // user on the inline "Try again" error — a dead end that no retry can clear on a lapsed tier.
+    // Removing the `status === 403` branch reddens this (mockPush not called with '/paywall').
+    mockUser = { ...mockUser, tier: 'premium' };
+    (api.enrichGithub as jest.Mock).mockRejectedValueOnce(new ApiError(403, 'Upgrade to Pro'));
+    render(<SettingsScreen />);
+    await screen.findByText('Import'); // Pro import affordance present
+    fireEvent.changeText(screen.getByPlaceholderText('github.com/yourname'), 'github.com/octocat');
+    fireEvent.press(screen.getByText('Import'));
+    await waitFor(() => expect(mockPush).toHaveBeenCalledWith('/paywall'));
+    // No dead-end inline error for the tier gate (the paywall IS the surfaced recovery).
+    expect(screen.queryByText(/could not import from github/i)).toBeNull();
   });
 
   it('renders the referral share card with real invite stats once loaded', async () => {
