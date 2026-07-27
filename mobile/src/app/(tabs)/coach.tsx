@@ -84,6 +84,16 @@ export default function CoachScreen() {
         // can be resent without retyping, unless the user already started a new message.
         setMessages((m) => m.filter((msg) => msg.id !== userMsgId));
         setInput((cur) => (cur.length === 0 ? trimmed : cur));
+        // A mid-session 403 means the Pro entitlement lapsed OR AI consent was revoked on another
+        // device AFTER this screen's initial isPremium/consent gates let the user in. Route to the
+        // paywall for recovery instead of stranding them on a dead-end inline "unavailable" error
+        // — parity with the other paid surfaces (job generators, mock interview, insights) that all
+        // send a mid-call 403 to /paywall. The rollback above still runs first so the transcript
+        // and input stay consistent regardless of the failure kind.
+        if (e instanceof ApiError && e.status === 403) {
+          router.push('/paywall');
+          return;
+        }
         setError(e instanceof ApiError ? e.message : 'Coach is unavailable right now.');
       } finally {
         sendLatch.leave();

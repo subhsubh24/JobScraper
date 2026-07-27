@@ -148,6 +148,14 @@ function GithubEnrichmentCard() {
       setCompetencies(result.competencies);
       setNotice(result.message);
     } catch (e) {
+      // A mid-call 403 means the Pro entitlement lapsed (e.g. cancelled on another device) after
+      // the isPro check rendered this card. Route to the paywall for recovery instead of a
+      // dead-end "Try again" that can never succeed on a lapsed tier — parity with the other
+      // paid surfaces (job generators, mock interview, insights) that all send a 403 to /paywall.
+      if (e instanceof ApiError && e.status === 403) {
+        router.push('/paywall');
+        return;
+      }
       setError(e instanceof ApiError ? e.message : 'Could not import from GitHub. Try again.');
     } finally {
       importLatch.leave();
