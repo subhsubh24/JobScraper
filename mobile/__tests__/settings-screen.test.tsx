@@ -140,6 +140,35 @@ describe('SettingsScreen', () => {
     expect(api.enrichGithub).toHaveBeenCalledTimes(1);
   });
 
+  it('shows a loading affordance for imported skills until getEnrichment resolves (no false-empty)', async () => {
+    // A returning Pro user who HAS imported skills must not see an empty "no skills" card during
+    // the initial getEnrichment load — that false-empty flash is the defect. While `competencies`
+    // is null (and no error), the card shows "Loading your imported skills…"; once the fetch
+    // resolves the real chips replace it. Revert-proof: removing the `competencies === null &&
+    // !error` loading branch reddens the "loading present" assertion (the card renders nothing
+    // during the in-flight window). Mirrors the Résumé card's loading state + the web card skeleton.
+    mockUser = { ...mockUser, tier: 'premium' };
+    let resolveEnrich: (c: unknown) => void = () => {};
+    (api.getEnrichment as jest.Mock).mockReturnValue(
+      new Promise((res) => {
+        resolveEnrich = res;
+      }),
+    );
+    render(<SettingsScreen />);
+    await screen.findByText('Share invite link'); // settle the other async loads
+
+    // In-flight: the loading affordance is shown, no chips yet.
+    expect(screen.getByText('Loading your imported skills…')).toBeTruthy();
+    expect(screen.queryByText('Python')).toBeNull();
+
+    // The fetch lands with a real imported skill → chips replace the loading text.
+    await act(async () => {
+      resolveEnrich([{ skill: 'Python', source_type: 'repo_language' }]);
+    });
+    expect(screen.getByText('Python')).toBeTruthy();
+    expect(screen.queryByText('Loading your imported skills…')).toBeNull();
+  });
+
   it('routes a mid-import 403 (lapsed Pro) to the paywall, not a dead-end retry error', async () => {
     // The GitHub card renders for a Pro user, then the Pro entitlement can lapse (e.g. cancelled
     // on another device) so the import 403s. Parity with the job generators / mock interview /
