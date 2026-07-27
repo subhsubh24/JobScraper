@@ -19,7 +19,7 @@ state. Nothing is fabricated.
 ```yaml
 GROWTH_STATUS:
   project: jobscraper
-  as_of: 2026-07-25
+  as_of: 2026-07-27
   phase: pre_launch
   engine_built: false      # engine_built iff engine_pct==100 (scripts/check_blocks.py invariant)
   engine_pct: 50           # COMPUTED (FACTORY_STANDARD s22): analysis/gtm_engine_pct.py parses
@@ -183,22 +183,49 @@ GROWTH_STATUS:
     published: 0
     last_published: null
   validation:               # GTM_STANDARD s4 self-validation -- fail closed, never claim an unverified source
-    checked_as_of: 2026-07-25
+    checked_as_of: 2026-07-27
     sources:
       - name: product_analytics
-        status: unavailable   # no PROD_URL/ANALYTICS_READ_TOKEN present in this run's env; no
-                               # analytics MCP/tool connected either
+        status: unavailable   # no PROD_URL/ANALYTICS_READ_TOKEN present in this run's env.
+                               # NEW this run: ListConnectors surfaces a "PostHog" connector for
+                               # the FIRST time (installState/connected:true at org level,
+                               # enabledInChat:false) -- see the dedicated `posthog` row below.
+                               # Unlike Linear/Sentry/UptimeRobot/Vercel (never a candidate
+                               # regardless of enablement), PostHog IS a genuine product-analytics
+                               # capability class -- but it is not enabled-in-chat this session (a
+                               # fresh ToolSearch for "PostHog analytics query insights" returns
+                               # zero mcp__PostHog__* tools), and even if enabled, whether it reads
+                               # the Career Operator app's OWN instrumented project (vs. an
+                               # unrelated PostHog account) is unverified -- so this row stays
+                               # unavailable, fail-closed, no metric claimed.
       - name: billing
         status: unavailable   # no Stripe/billing MCP/tool connected this run
       - name: email_esp
         status: unavailable   # no email-provider MCP/tool connected this run
+      - name: posthog
+        status: unavailable   # NEW row this run (2026-07-27): "PostHog" appears in ListConnectors
+                               # for the first time ever (installState/connected:true at org
+                               # level, enabledInChat:false). PostHog is a genuine analytics
+                               # PRODUCT (unlike Linear/Sentry/UptimeRobot below, which are never
+                               # GTM-source candidates regardless of state) -- it is the single
+                               # most plausible path to a real product_analytics source seen so
+                               # far in this loop's history. A fresh ToolSearch ("PostHog analytics
+                               # query insights") confirms zero mcp__PostHog__* tools are loaded,
+                               # so nothing is callable this session; even once enabled, the loop
+                               # cannot assume this connector reads Career Operator's OWN
+                               # instrumented project rather than an unrelated PostHog account --
+                               # that needs owner confirmation. Surfaced as a new, specific owner
+                               # action (`gtm-connect-posthog`, PENDING_OPS.md) rather than folded
+                               # into the generic connect-marketing ask, since enabling an EXISTING
+                               # connector is a lower-effort path than the full CONNECT.md flow if
+                               # the app is already instrumented on the same PostHog account.
       - name: vercel
         status: unavailable   # Re-checked this run: ListConnectors still lists Vercel
                                # (installState/connected: true at org level) but
                                # enabledInChat: false -- ToolSearch for Vercel-project/deploy
                                # keywords returned zero mcp__Vercel__* tools, so nothing is
                                # callable; still not used as a source (fail-closed). Unchanged
-                               # for the 5th consecutive GTM read since it first appeared 07-15.
+                               # for the 6th consecutive GTM read since it first appeared 07-15.
       - name: gtm_scorecard
         status: available     # docs/growth/GTM_SCORECARD.md -- UNCHANGED this run: still the 4th
                                # grade, as_of 2026-07-23. Overall A, ship_gate_met true. Read as a
@@ -212,38 +239,89 @@ GROWTH_STATUS:
            because no analytics/billing/email source is connected -- this satisfies
            scripts/validate_gtm.py's honesty gate (a non-zero metric requires a connected
            source; METRIC_SECTIONS covers outreach/email/content too). Re-checked this run: (1)
-           fresh ListConnectors shows THREE NEW connectors since the last GTM read (2026-07-23):
-           Linear, Sentry, and UptimeRobot, all installState/connected:true at the org level but
-           enabledInChat:false -- a fresh ToolSearch for each ('Vercel deployment project' and
-           'Sentry Linear UptimeRobot') confirms ZERO mcp__Linear__*/mcp__Sentry__*/
-           mcp__UptimeRobot__* tools are loaded this session, so nothing is callable. None of the
-           three is EVER a candidate GTM source regardless of enablement (Linear = issue/project
-           tracking, Sentry = error monitoring, UptimeRobot = uptime monitoring -- none is an
-           analytics/billing/ESP capability), so they are recorded here for transparency but are
-           NOT added as validation rows (same treatment as Drive/Calendar/Vercel: connected does
-           not mean a GTM source). Of the connectors that COULD ever plausibly be a GTM source,
-           only Gmail is connected+enabled (draft-only outreach lane, GTM_STANDARD s6a) and Mobbin
-           is connected+enabled (design-reference tool, not a funnel/billing/email source). Vercel
-           stays connected at the org level but enabledInChat:false with zero callable
-           mcp__Vercel__* tools (see row above, now the 5th consecutive read with no change). (2)
-           shell env -- GEMINI_API_KEY and BOTH BROWSERBASE_* vars present (validator infra, not a
-           GTM source), no PROD_URL/ANALYTICS_READ_TOKEN/STRIPE_*/SMTP_*/DATABASE_URL. Both checks
-           confirm channels_connected=[] honestly (fail-closed, no invented metric, no new
-           connector treated as a source just because it appeared). Re-ran
-           analysis/gtm_engine_pct.py (unchanged, 50) and node scripts/validate-computation.mjs
-           (4/4 figures PASS, none changed). Re-read docs/BUSINESS_CASE.md lever 2 to confirm the
-           2026-07-23 mobile-team-surface fix is still intact in the live file (it is -- both web
-           and mobile management surfaces credited as landed in code, live per-seat price named as
-           the sole remaining gap). Both independent scorecards are UNCHANGED since the last GTM
-           read despite 4 more product-factory commits landing since 2026-07-23 (runs 75-78:
-           atomic create_job dedup fix #471, a quiet DEEP AUDIT run #473, the AI-coach
-           failed-send twin fix #474, and the mobile double-tap paid-action latch fix #476) --
-           none of that is self-certifiable by this loop per GTM_STANDARD s4/FACTORY_STANDARD s28,
-           so both scorecards are consumed AS-IS until their own next independent grade:
-           QUALITY_SCORECARD stays the 9th audit (B, ship_gate_met false, same two ship-critical
-           gaps -- store-readiness B, business-case-strength B); GTM_SCORECARD stays the 4th grade
-           (A, ship_gate_met true)."
+           fresh ListConnectors shows TWO NEW connectors since the last GTM read (2026-07-25):
+           **PostHog** and **Notion**, both installState/connected:true at the org level but
+           enabledInChat:false -- a fresh ToolSearch for each ('PostHog analytics query insights'
+           and 'Notion search page database') confirms ZERO mcp__PostHog__*/mcp__Notion__* tools
+           are loaded this session, so nothing is callable. Notion gets the SAME treatment as
+           Drive/Calendar/Linear/Sentry/UptimeRobot -- never a GTM-source candidate regardless of
+           enablement (workspace/wiki tool, no analytics/billing/ESP capability) -- recorded here
+           for transparency, not added as a row. **PostHog is different and treated distinctly**:
+           it IS a genuine product-analytics platform -- the first connector in this loop's
+           history that could plausibly become the `product_analytics` source if enabled +
+           confirmed to read Career Operator's own instrumented project (unverified either way
+           this run) -- so it gets its OWN validation row above (`posthog`, unavailable) and a new,
+           specific owner action (`gtm-connect-posthog`, PENDING_OPS.md) rather than being folded
+           into this transparency note alone. Linear/Sentry/UptimeRobot (first seen 2026-07-25) and
+           Vercel (first seen 2026-07-15) remain connected, not enabled-in-chat, zero tools --
+           unchanged. Of the connectors that COULD ever plausibly be a GTM source, only Gmail is
+           connected+enabled (draft-only outreach lane, GTM_STANDARD s6a) and Mobbin is
+           connected+enabled (design-reference tool, not a funnel/billing/email source); PostHog is
+           now a THIRD analytics-class connector but stays unenabled/unverified. (2) shell env --
+           GEMINI_API_KEY and BOTH BROWSERBASE_* vars present (validator infra, not a GTM source),
+           no PROD_URL/ANALYTICS_READ_TOKEN/STRIPE_*/SMTP_*/DATABASE_URL. Both checks confirm
+           channels_connected=[] honestly (fail-closed, no invented metric, no new connector
+           treated as a source just because it appeared -- including PostHog, despite it being a
+           genuine analytics product, since it is neither enabled nor confirmed to point at this
+           app's own data). Re-ran analysis/gtm_engine_pct.py (unchanged, 50) and node
+           scripts/validate-computation.mjs (4/4 figures PASS, none changed). Re-read
+           docs/BUSINESS_CASE.md lever 2 and ROADMAP.md's site-gate section (:421-435) -- both
+           unchanged since the 2026-07-23/07-25 reads. Both independent scorecards are UNCHANGED
+           since 2026-07-23 (now the 2nd consecutive GTM read without a fresh grade, after 07-25
+           first noted it) despite 8 more product-factory commits landing since then (runs 75-82:
+           atomic create_job dedup fix #471 [closes QUALITY_SCORECARD's own named correctness
+           top_gap, but per s4/s28 this loop does not self-certify from an adjacent commit -- read
+           AS-IS until the auditor re-grades], a quiet DEEP AUDIT run #473, the AI-coach
+           failed-send twin fix #474, the mobile double-tap paid-action latch fix #476, the paywall
+           purchase/restore useLatch fix #479, the account-deletion N+1 + create-job double-tap
+           mobile latch #481, the mobile coach-send 403->paywall route #483, and the
+           enrichment-card load affordance + org reactivation test-net #485) -- none of that is
+           self-certifiable by this loop per GTM_STANDARD s4/FACTORY_STANDARD s28, so both
+           scorecards are consumed AS-IS until their own next independent grade: QUALITY_SCORECARD
+           stays the 9th audit (B, ship_gate_met false, same two ship-critical gaps --
+           store-readiness B, business-case-strength B); GTM_SCORECARD stays the 4th grade (A,
+           ship_gate_met true)."
   learnings:
+    - "2026-07-27 (GTM run): Quiet bookkeeping run, no ROADMAP/BUSINESS_CASE ARR/VISION steer --
+       still 0 users/0 funnel, phase=pre_launch. **New observation:** fresh ListConnectors
+       surfaced TWO new connectors since the last GTM read -- PostHog and Notion, both connected
+       at the org level but enabledInChat:false, zero mcp__PostHog__*/mcp__Notion__* tools loaded
+       (confirmed via ToolSearch). Notion gets the standard never-a-source treatment (workspace
+       tool). **PostHog is treated distinctly**: unlike every prior new-connector arrival in this
+       loop's history (Vercel 07-15; Linear/Sentry/UptimeRobot 07-25), PostHog IS a genuine
+       product-analytics platform -- the first connector that could plausibly become the real
+       `product_analytics` source. It stays honestly `unavailable` (not enabled, zero tools, and
+       even if enabled its data would need owner confirmation that it reads THIS app's own
+       instrumentation) but earned its own validation row + a new, specific PENDING_OPS owner
+       action (`gtm-connect-posthog`) rather than a generic mention, since flipping an existing
+       connector's enabledInChat toggle is a materially lower-effort path than the full
+       CONNECT.md analytics flow if the app is already instrumented on that account. Vercel/
+       Linear/Sentry/UptimeRobot unchanged. Shell env unchanged: GEMINI_API_KEY + both
+       BROWSERBASE_* present (validator infra), no PROD_URL/ANALYTICS_READ_TOKEN/STRIPE_*/
+       SMTP_*/DATABASE_URL. Re-ran analysis/gtm_engine_pct.py (unchanged, 50) and node
+       scripts/validate-computation.mjs (4/4 PASS, none changed). Re-read docs/BUSINESS_CASE.md
+       lever 2 and ROADMAP.md's site-gate section to confirm both are still intact -- they are.
+       Both independent scorecards UNCHANGED since 2026-07-23 -- now the 2nd consecutive GTM read
+       without a fresh grade (07-25 first noted it) -- despite 8 more product-factory commits
+       landing since then (runs 75-82, most notably #471's atomic create_job dedup fix, which
+       closes QUALITY_SCORECARD's own named correctness top_gap, but per GTM_STANDARD s4/
+       FACTORY_STANDARD s28 this loop does not self-certify from an adjacent commit): QUALITY_
+       SCORECARD stays the 9th audit (B, ship_gate_met false, same two ship-critical gaps --
+       store-readiness B, business-case-strength B); GTM_SCORECARD stays the 4th grade (A,
+       ship_gate_met true). **Circuit-breaker escalation, now 10 consecutive quiet GTM reads on
+       the site-gate ask:** the site-gate owner DECISION (PENDING_OPS `site-gate`, ROADMAP.md:
+       421-435) has now gone 10 straight GTM reads (2026-07-09 reframe through 07-27) with zero
+       owner movement -- re-verified the `site-gate` item's own `status: open` + its why/how text
+       is byte-identical to every prior read (this run also bumped PENDING_OPS.md's file-level
+       `as_of` from stale 2026-07-04 to 2026-07-27 for the unrelated `gtm-connect-posthog`
+       addition below, so per-item `status` is now the correct staleness signal, not the file-level
+       date -- noted explicitly in PENDING_OPS.md itself to avoid confusing future reads).
+       Demand_signal cadence checked: last run 2026-07-03 (24 days), ~quarterly
+       refresh not due until ~October. Zero outreach drafts (correct, unchanged reason):
+       QUALITY_SCORECARD.ship_gate_met is still false. **Did:** the PostHog finding + its new
+       owner action is real, specific, actionable new content (not pure date bookkeeping), so it
+       went through an independent reviewer (maker!=checker, fresh subagent) before merge -- see
+       PR."
     - "2026-07-25 (GTM run): Quiet bookkeeping run, no ROADMAP/BUSINESS_CASE ARR/VISION steer --
        still 0 users/0 funnel, phase=pre_launch. **New observation:** fresh ListConnectors
        surfaced THREE new connectors since the last GTM read -- Linear, Sentry, UptimeRobot, all
@@ -685,25 +763,35 @@ GROWTH_STATUS:
        changed -- pure computation-integrity hardening, independently reviewed
        (maker!=checker, APPROVE)."
   next_actions:
-    - "Factory: both scorecards UNCHANGED since 2026-07-23 despite 4 more product-factory commits
-       (runs 75-78) landing since then -- read AS-IS, not self-certified. Two ship-critical
+    - "Factory: both scorecards UNCHANGED since 2026-07-23 despite 8 more product-factory commits
+       (runs 75-82) landing since then -- read AS-IS, not self-certified. Two ship-critical
        QUALITY_SCORECARD gaps remain: store-readiness B (only store SCREENSHOTS remain, needing a
        signed native build, Human-Core) and business-case-strength B (the seat tier is
        user-reachable end-to-end on BOTH web and mobile (#356/#429) but needs a LIVE per-seat
        price (STRIPE_PRICE_TEAM_ANNUAL, owner) + real B2B adoption data to cross the floor on
        honest math)."
     - "Owner DECISION NEEDED, ESCALATING (site-gate, PENDING_OPS `site-gate`, ROADMAP.md:421-435)
-       -- now 9 CONSECUTIVE GTM reads (2026-07-09 reframe, 07-11, 07-13, 07-15, 07-17, 07-19,
-       07-21, 07-23, 07-25) with zero owner movement (PENDING_OPS.md still `as_of: 2026-07-04`,
-       `status: open`). Choose (A) reinstate a real gate -- the loop can then REBUILD the
-       middleware + the §34 gated-beta invite mechanism, then flip site_gate_up once applied -- or
-       (B) keep the app public and formally drop the §34 gated-beta half from ROADMAP. This is the
-       single highest-leverage owner decision outstanding: it hard-blocks ALL pre-launch
+       -- now 10 CONSECUTIVE GTM reads (2026-07-09 reframe, 07-11, 07-13, 07-15, 07-17, 07-19,
+       07-21, 07-23, 07-25, 07-27) with zero owner movement (PENDING_OPS.md `site-gate` item's own
+       `status: open` + why/how text unchanged; the file's file-level `as_of` moved this run only
+       because of the unrelated new `gtm-connect-posthog` item, not any site-gate action). Choose
+       (A) reinstate a real gate -- the loop can then REBUILD
+       the middleware + the §34 gated-beta invite mechanism, then flip site_gate_up once applied --
+       or (B) keep the app public and formally drop the §34 gated-beta half from ROADMAP. This is
+       the single highest-leverage owner decision outstanding: it hard-blocks ALL pre-launch
        execute-mode outreach regardless of channel connection or ship-gate status. Per the
        GTM_STANDARD brakes, this remains the longest-running circuit-breaker pattern in this
        loop's history -- proposing this as the SINGLE highest-leverage next owner action, above
        the other open PENDING_OPS items, since it uniquely gates outreach regardless of what else
        gets connected."
+    - "Owner (NEW this run): a 'PostHog' connector appeared in ListConnectors for the first time
+       ever -- connected at the org level, not yet enabled-in-chat. Unlike every other new
+       connector this loop has seen (Vercel, Linear, Sentry, UptimeRobot -- none ever a candidate
+       GTM source), PostHog IS a real analytics product. See PENDING_OPS `gtm-connect-posthog`:
+       (1) confirm whether this PostHog project is the SAME one (if any) the deployed Career
+       Operator app is instrumented with, and (2) if so, enable the connector in-chat so the next
+       GTM run can read real aggregate product analytics -- the first potential channel-side
+       movement in this loop's history that does not require signing up for a new service."
     - "Owner: connect an email provider + analytics (see CONNECT.md) -- engine_pct is honestly
        50% built (Track G+H infra exists) but 0 channels are CONNECTED, which is the actual
        remaining gap, distinct from build completeness."
@@ -720,22 +808,21 @@ GROWTH_STATUS:
        is true -- it is still false (B, 9th audit), so zero drafts is the only compliant
        outcome regardless of target quality. Re-evaluate the moment ship_gate_met flips true."
     - "Next GTM run: re-check for demand-signal recency drift (~quarterly refresh, last run
-       2026-07-03, not due until ~Oct), watch whether the owner enables the Vercel/Linear/Sentry/
-       UptimeRobot connectors in-chat or a PROD_URL/ANALYTICS_READ_TOKEN appears in env (none of
-       the four is ever a GTM source, so this only matters if a genuine analytics/billing/ESP
-       connector appears instead), watch for the owner's site-gate decision (A/B) landing in
-       PENDING_OPS + reconcile ROADMAP/GROWTH_STATUS accordingly (now 9 consecutive quiet reads --
-       keep escalating each additional quiet read), and watch for the next independent
-       QUALITY_SCORECARD/GTM_SCORECARD grade (4 product-factory commits have landed since the last
-       grade with no re-audit yet)."
+       2026-07-03, not due until ~Oct), watch whether the owner enables the PostHog connector
+       in-chat (the one genuinely plausible analytics-class candidate seen so far) or a
+       PROD_URL/ANALYTICS_READ_TOKEN appears in env, watch for the owner's site-gate decision
+       (A/B) landing in PENDING_OPS + reconcile ROADMAP/GROWTH_STATUS accordingly (now 10
+       consecutive quiet reads -- keep escalating each additional quiet read), and watch for the
+       next independent QUALITY_SCORECARD/GTM_SCORECARD grade (8 product-factory commits have
+       landed since the last grade with no re-audit yet)."
   owner_blockers:
-    - "SITE-GATE OWNER DECISION -- CIRCUIT-BREAKER ESCALATION, NOW 9 CONSECUTIVE QUIET GTM READS
-       (2026-07-09 reframe, 07-11, 07-13, 07-15, 07-17, 07-19, 07-21, 07-23, 07-25; PENDING_OPS.md
-       `site-gate` still `as_of: 2026-07-04`, `status: open`, zero owner movement). This is the
-       single highest-leverage owner action outstanding: it hard-blocks ALL pre-launch
-       execute-mode outreach regardless of channel connection or QUALITY_SCORECARD status. Choose
-       (A) reinstate a real pre-launch gate, or (B) keep the app public and formally drop the §34
-       gated-beta half -- see next_actions."
+    - "SITE-GATE OWNER DECISION -- CIRCUIT-BREAKER ESCALATION, NOW 10 CONSECUTIVE QUIET GTM READS
+       (2026-07-09 reframe, 07-11, 07-13, 07-15, 07-17, 07-19, 07-21, 07-23, 07-25, 07-27;
+       PENDING_OPS.md `site-gate` item's `status: open` + its why/how text byte-identical to every
+       prior read, zero owner movement). This is the single highest-leverage owner action outstanding: it hard-blocks ALL
+       pre-launch execute-mode outreach regardless of channel connection or QUALITY_SCORECARD
+       status. Choose (A) reinstate a real pre-launch gate, or (B) keep the app public and
+       formally drop the §34 gated-beta half -- see next_actions."
     - "QUALITY_SCORECARD B (9th audit, as_of 2026-07-23, unchanged this run), ship gate still NOT
        met: 2 ship-critical dims below A -- store-readiness B (only store screenshots remain,
        needing a Human-Core signed native build) and business-case-strength B (seat tier
@@ -744,10 +831,10 @@ GROWTH_STATUS:
        flips true."
     - "No marketing channels connected -- Growth Agent stays in prepare-mode. engine_pct is
        honestly 50% (build completeness, computed) -- the gap is channel CONNECTION, not
-       missing infra. Vercel remains org-connected but not enabled-in-chat with zero usable
-       tools; Linear/Sentry/UptimeRobot newly appeared this run in the same state (connected,
-       not enabled-in-chat) and none is ever a GTM-source candidate regardless -- none counted
-       as a connection."
+       missing infra. Vercel/Linear/Sentry/UptimeRobot stay org-connected, not enabled-in-chat,
+       zero usable tools, none ever a GTM-source candidate. PostHog and Notion newly appeared
+       this run in the same connected-not-enabled state; Notion is never a candidate, but
+       PostHog is a genuine analytics product -- see the new `gtm-connect-posthog` owner action."
     - "Team/B2B2C seat tier (backend #348 + web surface #356 + mobile surface #429, all
        gate-verified) is fully built end-to-end but not sellable: STRIPE_PRICE_TEAM_ANNUAL is
        unset (PENDING_OPS `stripe-account`), so POST /api/org/checkout refuses honestly (503, no

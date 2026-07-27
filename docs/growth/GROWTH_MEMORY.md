@@ -6,6 +6,78 @@ pre-launch.
 
 ---
 
+### 2026-07-27 — Daily GTM review (PostHog connector appeared — the first genuine analytics-class candidate; new owner action filed; site-gate circuit-breaker now 10 reads)
+- **Observed:** Phase still `pre_launch`. Fresh `ListConnectors` surfaced **two new connectors**
+  since the last GTM read (2026-07-25): **PostHog** and **Notion**, both `installState`/
+  `connected: true` at the org level but `enabledInChat: false`. A fresh `ToolSearch` for each
+  ("PostHog analytics query insights", "Notion search page database") returned **zero**
+  `mcp__PostHog__*`/`mcp__Notion__*` tools — nothing callable this session. Notion gets the
+  standard treatment (workspace/wiki tool, never a GTM-source candidate). **PostHog is different
+  and material:** unlike every prior new-connector arrival this loop has logged (Vercel 07-15;
+  Linear/Sentry/UptimeRobot 07-25 — none ever a candidate regardless of state), PostHog IS a real
+  product-analytics platform — the first connector in this loop's history that could plausibly
+  become the actual `product_analytics` source. It stays `unavailable` (not enabled, zero tools,
+  and even once enabled the loop cannot assume it reads Career Operator's OWN instrumented
+  project vs. an unrelated PostHog account — unverified either way), but earned its own
+  `GROWTH_STATUS.md` validation row and a new, specific `PENDING_OPS.md` owner action
+  (`gtm-connect-posthog`) rather than a passing mention, since flipping an existing connector's
+  enabled-in-chat toggle is materially lower-effort than the full `CONNECT.md` flow if the app
+  happens to already be instrumented on that account. Vercel/Linear/Sentry/UptimeRobot unchanged.
+  Shell env unchanged: `GEMINI_API_KEY` + both `BROWSERBASE_*` present (validator infra), no
+  `PROD_URL`/`ANALYTICS_READ_TOKEN`/`STRIPE_*`/`SMTP_*`/`DATABASE_URL`. Re-ran
+  `analysis/gtm_engine_pct.py` (unchanged, 50) and `node scripts/validate-computation.mjs` (4/4
+  PASS, none changed). Re-read `docs/BUSINESS_CASE.md` lever 2 and `ROADMAP.md`'s site-gate
+  section (:421-435) — both unchanged since 07-23/07-25. Both independent scorecards are
+  **UNCHANGED** since 2026-07-23 — now the **2nd consecutive GTM read** without a fresh grade
+  (07-25 first noted it) — despite **8 more product-factory commits** landing since then (runs
+  75-82: `create_job` dedup fix #471 [closes QUALITY_SCORECARD's own named correctness top_gap,
+  but per GTM_STANDARD §4/FACTORY_STANDARD §28 this loop does not self-certify from an adjacent
+  commit], a quiet DEEP AUDIT #473, the AI-coach failed-send twin fix #474, the mobile
+  double-tap paid-action latch #476, the paywall purchase/restore `useLatch` fix #479, the
+  account-deletion N+1 + create-job double-tap mobile latch #481, the mobile coach-send
+  403→paywall route #483, and the enrichment-card load affordance + org reactivation test-net
+  #485): **QUALITY_SCORECARD** stays the 9th audit (`as_of: 2026-07-23`, overall B,
+  `ship_gate_met: false`, same two ship-critical gaps — store-readiness B, business-case-strength
+  B); **GTM_SCORECARD** stays the 4th grade (`as_of: 2026-07-23`, overall A, `ship_gate_met:
+  true`).
+- **Concluded:** No real funnel/PMF data justifies a ROADMAP/BUSINESS_CASE ARR/VISION steer this
+  run (same reasoning as every prior pre-launch read). The PostHog finding is real, new,
+  channel-side signal — the first connector arrival in this loop's history worth a dedicated
+  owner action rather than a transparency footnote — but it is not itself a metric or a steer.
+- **Did (real, specific, new content — went through maker≠checker, not treated as pure
+  bookkeeping):** Added a dedicated `posthog` validation row (`GROWTH_STATUS.md`, status
+  unavailable) distinguishing it from the never-candidate connector class. Filed a new,
+  specific `PENDING_OPS.md` owner action (`gtm-connect-posthog`) asking the owner to (1) confirm
+  whether this PostHog project is the one (if any) the deployed app is instrumented with, and (2)
+  enable the connector in-chat if so. Bumped `PENDING_OPS.md`'s file-level `as_of` (stale since
+  2026-07-04) to 2026-07-27 to reflect this genuine edit — and added an explicit note in the file
+  itself that per-item `status` (not the file-level date) is the correct staleness signal going
+  forward, since this run is the first time the GTM loop has actually edited `PENDING_OPS.md`
+  rather than only reading it. Re-verified the `site-gate` item's own `status: open` + why/how
+  text is byte-identical to every prior read — the real "no owner movement" signal, now that the
+  file-level date no longer proxies for it. **Circuit-breaker escalation, now 10 consecutive
+  quiet GTM reads:** the site-gate owner DECISION (`PENDING_OPS.md` `site-gate`,
+  `ROADMAP.md:421-435`) has gone 10 straight GTM reads (2026-07-09 reframe through 07-27) with
+  zero owner movement.
+- **Recommended (to factory):** Unchanged priority — store-readiness (store screenshots, needs a
+  signed native build) and business-case-strength (a live per-seat price + real B2B adoption
+  data) remain the two ship-critical gaps, both product-factory/owner work. Zero outreach drafts
+  this run (correct): `QUALITY_SCORECARD.ship_gate_met` is still false. Demand_signal cadence
+  checked: last run 2026-07-03 (24 days), ~quarterly refresh not due until ~October.
+- **Meta / operational note:** Two firsts this run: (1) the first time a newly-appeared connector
+  genuinely warranted its OWN owner action rather than a transparency footnote — worth
+  distinguishing "connected, never a candidate" (Linear/Sentry/UptimeRobot/Vercel/Drive/Calendar/
+  Notion) from "connected, genuinely plausible, just unconfirmed/unenabled" (PostHog) going
+  forward, rather than defaulting every new arrival to the same footnote treatment; (2) the first
+  time this loop has actually EDITED `PENDING_OPS.md` (previously read-only) — doing so required
+  fixing the file's own file-level `as_of` staleness (unchanged since 2026-07-04 despite the
+  07-09 site-gate reframe editing its prose), which in turn required re-anchoring the
+  circuit-breaker evidence in this and future entries to the `site-gate` item's own `status`
+  field rather than the file-level date, so a legitimate future PENDING_OPS edit (by either
+  factory) never again looks like phantom "owner movement" on an unrelated item.
+
+---
+
 ### 2026-07-25 — Daily GTM review (quiet bookkeeping run; new connectors observed, none GTM sources; site-gate circuit-breaker now 9 reads)
 - **Observed:** Phase still `pre_launch`. Fresh `ListConnectors` surfaced **three new connectors**
   since the last GTM read (2026-07-23): **Linear**, **Sentry**, **UptimeRobot** — all

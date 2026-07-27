@@ -10,7 +10,11 @@ submission. Everything else the factory builds.
 ```yaml
 OWNER_ACTIONS:
   project: jobscraper
-  as_of: 2026-07-04
+  as_of: 2026-07-27  # bumped by the GTM loop's 2026-07-27 run adding `gtm-connect-posthog` --
+                      # this file-level date no longer proxies "no owner movement on any item";
+                      # check each item's own `status` field instead. The `site-gate` item's
+                      # status/why/how text below is UNCHANGED verbatim since 2026-07-04 (10
+                      # consecutive quiet GTM reads) -- that per-item stasis is the real signal.
   items:
     - id: site-gate
       title: "DECISION NEEDED: the pre-launch SITE GATE was REMOVED at owner request 2026-07-02 — the app is PUBLIC. Re-instate it, or drop the gated-beta track?"
@@ -68,6 +72,12 @@ OWNER_ACTIONS:
       status: open
       why: "Growth Agent stays in prepare-mode until a connected, funded, authorized channel exists. The email SEAM is now BUILT (PR #187, src/email): waitlist double-opt-in dispatches a confirmation email + a signed confirm link, but the default backend is DRY-RUN (logs, delivers nothing) — so no confirmation email actually leaves the system until a real provider is connected. The app is fully functional without it (the waitlist row is captured either way); this only activates confirmation delivery."
       how: "Follow docs/growth/CONNECT.md (~20 min). To ACTIVATE waitlist-confirmation email delivery specifically: a real delivering backend now EXISTS (src/email SMTPBackend) — no code needed. Set EMAIL_BACKEND=smtp + the SMTP_* config (SMTP_HOST, SMTP_FROM, SMTP_PORT, SMTP_USERNAME, SMTP_PASSWORD; STARTTLS on by default) for your ESP (SendGrid/Mailgun/SES all speak SMTP), AND set WEB_APP_URL to the live public origin (the confirm LINK is built ONLY from WEB_APP_URL — never the request Host, an anti-phishing measure — so double-opt-in emails are silently NOT sent until WEB_APP_URL is set). Never commit any SMTP_* value. Then the Growth Agent can queue/measure for real."
+    - id: gtm-connect-posthog
+      title: "NEW (GTM run, 2026-07-27): a 'PostHog' MCP connector appeared, connected but not enabled-in-chat -- confirm + enable if it's Career Operator's own analytics"
+      priority: normal
+      status: open
+      why: "GTM_STANDARD s4 self-validation: the GTM Factory's fresh ListConnectors call this run shows a 'PostHog' connector for the first time ever (installState/connected:true at the org level, enabledInChat:false). This is materially different from every other connector this loop has previously flagged (Vercel/Linear/Sentry/UptimeRobot/Drive/Calendar) -- those are NEVER GTM-source candidates regardless of state (issue tracking / error monitoring / uptime / file storage). PostHog IS a real product-analytics platform and would be the first genuine candidate to fill the always-unavailable `product_analytics` validation row in GROWTH_STATUS.md -- but the loop cannot use it: it is not enabled-in-chat (zero mcp__PostHog__* tools loaded, confirmed via ToolSearch), and even if it were, the loop has no way to confirm this PostHog PROJECT is the one (if any) the deployed Career Operator app is actually instrumented with, versus an unrelated PostHog account connected for some other purpose."
+      how: "1) Confirm which PostHog project this connector authenticates to, and whether the deployed Career Operator app is instrumented to send events to that SAME project (per CONNECT.md #2, the app's own product analytics is a separate self-host/consent decision from this Claude-session MCP connector -- they are only useful together if they point at the same data). 2) If they match (or once you wire the app to that PostHog project), enable the connector in this chat's connector settings so mcp__PostHog__* tools load. 3) The next GTM run will then attempt to read privacy-safe AGGREGATE funnel/activation data through it (never raw PII/events, per GTM_STANDARD s2) and, if it genuinely reflects Career Operator usage, flip the `product_analytics` validation row from unavailable to available. Not required for launch -- pre-launch there is no funnel to read regardless (0 users) -- but this is the lowest-effort path to a real analytics source once users exist."
     - id: connect-captcha
       title: "Connect Cloudflare Turnstile — set the keys ONLY after a mobile widget ships (else native auth 403s)"
       priority: normal
