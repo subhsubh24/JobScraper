@@ -718,6 +718,60 @@ def test_deleting_member_frees_their_seat(client, monkeypatch, db_session):
     assert got["seats_used"] == 0
 
 
+def test_removed_member_re_added_reactivates_seat_and_tier(client, monkeypatch, db_session):
+    """A soft-removed member — ``remove_member`` keeps the row inactive for audit (``active=False``,
+    org_billing.py:241) — who is RE-ADDED later must REACTIVATE that same row: re-consume a seat,
+    flip ``active`` True, and recompute to PREMIUM. NOT create a duplicate row, NOT stay FREE. This
+    is ``add_member``'s reactivation branch (org_billing.py:194-204), a common admin flow (remove
+    someone, then re-invite them). It is distinct from the first-assignment INSERT path and from the
+    active-in-ANOTHER-org 409 (``test_member_cannot_belong_to_two_orgs`` — that hits the
+    ``existing.active`` guard at :191 and never reaches the reactivation write). Effects asserted in
+    the DB. LOAD-BEARING: dropping ``existing.active = True`` (:201) leaves the re-add inactive so
+    ``seats_used`` stays 0; dropping ``recompute_user_tier`` (:203) leaves the member FREE — either
+    mutation reddens this."""
+    _, otoken = _register(client, "owner-readd@example.com")
+    member_id, _ = _register(client, "member-readd@example.com")
+    org = client.post("/api/org", json={"name": "Team ReAdd"}, headers=_auth(otoken)).json()
+    _activate_org(client, monkeypatch, org["id"], seats=2)
+
+    # 1) Add → the member holds a seat and is PREMIUM.
+    assert client.post(
+        "/api/org/members", json={"email": "member-readd@example.com"}, headers=_auth(otoken)
+    ).status_code == 200
+    db_session.expire_all()
+    assert db_session.query(User).filter(User.id == member_id).first().tier == UserTier.PREMIUM
+
+    # 2) Soft-remove → FREE, seat freed, but the row PERSISTS inactive (audit trail).
+    assert client.delete(
+        f"/api/org/members/{member_id}", headers=_auth(otoken)
+    ).status_code == 200
+    db_session.expire_all()
+    assert db_session.query(User).filter(User.id == member_id).first().tier == UserTier.FREE
+    assert client.get("/api/org", headers=_auth(otoken)).json()["organization"]["seats_used"] == 0
+    removed_row = (
+        db_session.query(OrganizationMember)
+        .filter(OrganizationMember.user_id == member_id)
+        .one()  # exactly one row, kept for audit
+    )
+    assert removed_row.active is False
+
+    # 3) Re-add the SAME person → the inactive row REACTIVATES (no duplicate); PREMIUM again.
+    assert client.post(
+        "/api/org/members", json={"email": "member-readd@example.com"}, headers=_auth(otoken)
+    ).status_code == 200
+    db_session.expire_all()
+    assert db_session.query(User).filter(User.id == member_id).first().tier == UserTier.PREMIUM
+    assert client.get("/api/org", headers=_auth(otoken)).json()["organization"]["seats_used"] == 1
+    # Exactly ONE member row for this user — reactivated in place, never a second row.
+    reactivated = (
+        db_session.query(OrganizationMember)
+        .filter(OrganizationMember.user_id == member_id)
+        .one()
+    )
+    assert reactivated.active is True
+    assert reactivated.org_id == org["id"]
+
+
 # --- price_id_for_org_plan: the seat-tier (highest-ARPA lever) price resolver ------------------
 # Cheap deterministic guards on the two error branches. A typo in a new plan's env-var name, or
 # a forgotten STRIPE_PRICE_* in the deploy env, must be caught HERE — not silently at webhook

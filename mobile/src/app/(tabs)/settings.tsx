@@ -214,6 +214,17 @@ function GithubEnrichmentCard() {
           />
           {notice ? <Text style={styles.referStats}>{notice}</Text> : null}
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
+          {competencies === null && !error ? (
+            // Initial-load affordance: until getEnrichment resolves, `competencies` is null and the
+            // chips block below renders nothing — so a returning Pro user who HAS imported skills
+            // sees an empty card that reads as "no skills imported" until the fetch lands (a
+            // false-empty flash). Matches the Résumé card's "Loading…" text above (the mobile
+            // idiom — plain Text, no skeletons in this app); the web twin
+            // (web/app/app/settings/page.tsx) guards the same window with an animate-pulse
+            // skeleton. On a failed load `error` renders instead (above), so this shows only
+            // during a genuine in-flight load.
+            <Text style={styles.referStats}>Loading your imported skills…</Text>
+          ) : null}
           {competencies && competencies.length > 0 ? (
             <>
               <View style={styles.chipWrap}>
